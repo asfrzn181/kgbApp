@@ -1,0 +1,48 @@
+{
+  "PNS" : {
+    "I": {
+      "I/a": "Juru Muda",
+      "I/b": "Juru Muda Tk. I",
+      "I/c": "Juru",
+      "I/d": "Juru Tk. I"
+    },
+    "II": {
+      "II/a": "Pengatur Muda",
+      "II/b": "Pengatur Muda Tk. I",
+      "II/c": "Pengatur",
+      "II/d": "Pengatur Tk. I"
+    },
+    "III": {
+      "III/a": "Penata Muda",
+      "III/b": "Penata Muda Tk. I",
+      "III/c": "Penata",
+      "III/d": "Penata Tk. I"
+    },
+    "IV": {
+      "IV/a": "Pembina",
+      "IV/b": "Pembina Tk. I",
+      "IV/c": "Pembina Utama Muda",
+      "IV/d": "Pembina Utama Madya",
+      "IV/e": "Pembina Utama"
+    }
+  },
+  "PPPK" : {
+    "I": { "I": "PPPK Golongan I" },
+    "II": { "II": "PPPK Golongan II" },
+    "III": { "III": "PPPK Golongan III" },
+    "IV": { "IV": "PPPK Golongan IV" },
+    "V": { "V": "PPPK Golongan V" },
+    "VI": { "VI": "PPPK Golongan VI" },
+    "VII": { "VII": "PPPK Golongan VII" },
+    "VIII": { "VIII": "PPPK Golongan VIII" },
+    "IX": { "IX": "PPPK Golongan IX" },
+    "X": { "X": "PPPK Golongan X" },
+    "XI": { "XI": "PPPK Golongan XI" },
+    "XII": { "XII": "PPPK Golongan XII" },
+    "XIII": { "XIII": "PPPK Golongan XIII" },
+    "XIV": { "XIV": "PPPK Golongan XIV" },
+    "XV": { "XV": "PPPK Golongan XV" },
+    "XVI": { "XVI": "PPPK Golongan XVI" },
+    "XVII": { "XVII": "PPPK Golongan XVII" }
+  }
+}
