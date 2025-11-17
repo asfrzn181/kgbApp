@@ -1,0 +1,40 @@
+/* ====================================================================
+   style.css (Minimal overrides untuk Bootstrap)
+   ==================================================================== */
+
+/* Perbaiki lebar kolom Aksi agar tombol tidak terpotong */
+.actions-header,
+.actions {
+    width: 150px;
+    min-width: 150px;
+    text-align: center !important;
+}
+
+/* Membuat form grid di modal lebih rapat */
+fieldset {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+legend {
+    font-size: 1.1rem;
+    font-weight: 500;
+    padding: 0 0.5rem;
+    width: auto;
+    float: none;
+    margin-bottom: 0.5rem;
+}
+
+/* Pastikan form modal bisa di-scroll */
+#formDialog .modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* Ukuran tombol aksi di tabel */
+.table .actions .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}

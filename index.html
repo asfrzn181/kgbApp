@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Kepegawaian</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Sedikit style tambahan agar loading tidak merusak layout */
+        .d-none { display: none !important; }
+    </style>
+</head>
+<body class="bg-light">
+
+    <div id="loginSection" class="container vh-100 d-flex justify-content-center align-items-center">
+        <div class="card shadow-lg p-4" style="width: 100%; max-width: 400px;">
+            <div class="text-center mb-4">
+                <h3>🔐 Login App</h3>
+                <p class="text-muted">Masukkan URL API Google Script & Token</p>
+            </div>
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label class="form-label">API URL</label>
+                    <input type="text" id="inputApiUrl" class="form-control" placeholder="https://script.google.com/..." required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">API Token</label>
+                    <input type="password" id="inputApiToken" class="form-control" placeholder="Token..." required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Masuk</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="mainAppSection" class="d-none">
+        
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
+            <div class="container">
+                <a class="navbar-brand" href="#">Simpeg KGB</a>
+                <div class="d-flex">
+                    <button id="btnLogout" class="btn btn-danger btn-sm">🚪 Keluar</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container bg-white p-4 rounded shadow-sm">
+            <h4 class="mb-3">Data Pegawai</h4>
+            
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <button id="btnTambah" class="btn btn-success me-2">+ Tambah</button>
+                    <button id="btnRefresh" class="btn btn-secondary">↻ Refresh</button>
+                </div>
+                <input type="text" id="searchBox" class="form-control w-25" placeholder="Cari NIP/Nama...">
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>NIP</th>
+                            <th>Nama</th>
+                            <th>Gol</th>
+                            <th>Jabatan</th>
+                            <th>TMT</th>
+                            <th style="width: 150px;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        </tbody>
+                </table>
+            </div>
+
+            <nav aria-label="Page navigation" class="mt-3">
+                <div id="paginationNav"></div>
+            </nav>
+            <div id="statusLabel" class="text-muted small mt-2"></div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="formDialog" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="formTitle">Form Pegawai</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="pegawaiForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="formPegawaiId">
+                        <input type="hidden" id="formTahunPembuatan">
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">NIP</label>
+                                <input type="text" id="formNip" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Nama</label>
+                                <input type="text" id="formNama" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Tempat Lahir</label>
+                                <input type="text" id="formTempatLahir" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Tanggal Lahir</label>
+                                <input type="text" id="formTglLahir" class="form-control" placeholder="01 Januari 1990">
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Status</label>
+                                <select id="formStatus" class="form-select">
+                                    <option value="PNS">PNS</option>
+                                    <option value="PPPK">PPPK</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Kode Gol</label>
+                                <select id="formKodeGolongan" class="form-select"></select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Pangkat</label>
+                                <select id="formPangkat" class="form-select"></select>
+                            </div>
+                            
+                            <div class="d-none">
+                                <select id="formGolongan"></select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Jabatan</label>
+                                <input type="text" id="formJabatan" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Unit Kerja</label>
+                                <input type="text" id="formUnitKerja" class="form-control">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Unit Kerja Induk</label>
+                                <input type="text" id="formUnitKerjaInduk" class="form-control">
+                            </div>
+
+                            <hr class="my-3">
+                            <h6 class="text-primary">Data KGB / Dasar SPT</h6>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Dasar SPT</label>
+                                <select id="formDasar" class="form-select">
+                                    <option value="Kenaikan Gaji Berkala">Kenaikan Gaji Berkala</option>
+                                    <option value="Pangkat">Pangkat</option>
+                                    <option value="Perpres">Perpres</option>
+                                </select>
+                            </div>
+                             <div class="col-md-8">
+                                <label class="form-label">Pejabat Penandatangan</label>
+                                <input type="text" id="formDasarPejabat" class="form-control">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Nomor dasar</label>
+                                <input type="text" id="formDasarNomor" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Tanggal dasar</label>
+                                <input type="text" id="formDasarTanggal" class="form-control">
+                            </div>
+                             <div class="col-md-6">
+                                <label class="form-label">TMT dasar</label>
+                                <input type="text" id="formDasarTmt" class="form-control">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">MK dasar (Thn)</label>
+                                <input type="number" id="formDasarMkTahun" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">MK dasar (Bln)</label>
+                                <input type="number" id="formDasarMkBulan" class="form-control">
+                            </div>
+                             <div class="col-md-12">
+                                <label class="form-label">Gaji Lama dasar</label>
+                                <input type="text" id="formDasarGajiLama" class="form-control bg-light" readonly>
+                            </div>
+
+                            <hr class="my-3">
+                            <h6 class="text-success">Ketetapan Baru</h6>
+
+                             <div class="col-md-3">
+                                <label class="form-label">MK Baru (Thn)</label>
+                                <input type="number" id="formMkBaruTahun" class="form-control">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">MK Baru (Bln)</label>
+                                <input type="number" id="formMkBaruBulan" class="form-control">
+                            </div>
+                             <div class="col-md-6">
+                                <label class="form-label">Gaji Baru</label>
+                                <input type="text" id="formGajiBaru" class="form-control fw-bold text-success" readonly>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">TMT Sekarang (Berlaku)</label>
+                                <input type="text" id="formTmtSekarang" class="form-control" placeholder="01 Januari 2025">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">TMT YAD (Berikutnya)</label>
+                                <input type="text" id="formTmtSelanjutnya" class="form-control" placeholder="01 Januari 2027">
+                            </div>
+
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" id="btnSimpan" class="btn btn-primary">Simpan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/pizzip@3.1.4/dist/pizzip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.40.2/docxtemplater.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <script src="app.js"></script>
+
+</body>
+</html>
