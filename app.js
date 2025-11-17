@@ -666,7 +666,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 DASAR_PEJABAT: pegawai.dasar_pejabat,
                 TEMPAT_LAHIR: pegawai.tempatLahir,
                 TGL_LAHIR: fmtDate(pegawai.tglLahir),
-                
+                DASAR_TMT : fmtDate(pegawai.dasar_tmt)
             });
 
             doc.render();
@@ -685,4 +685,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     init();
+
 });
