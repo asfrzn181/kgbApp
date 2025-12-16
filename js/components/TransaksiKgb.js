@@ -530,7 +530,7 @@ export default {
                 const foundH = mapH.find(h => h.judul === item.dasar_hukum);
                 const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
                 const toTitle = (s) => s ? s.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
-
+                const twoDigits = (num) => num.toString().padStart(2, '0');
                 const res = await fetch(url); const buf = await res.arrayBuffer();
                 const zip = new window.PizZip(buf);
                 const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => p.value.startsWith('$') ? `{${p.value}}` : "" });
@@ -550,11 +550,11 @@ export default {
                     DASAR_PEJABAT: item.dasar_pejabat || "-", PEJABAT_LAMA: item.dasar_pejabat || "-", OLEH_PEJABAT: item.dasar_pejabat || "-",
                     DASAR_TMT: formatTanggal(item.dasar_tmt),
                     DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
-                    DASAR_MK_LAMA: `${item.dasar_mk_tahun || 0} Tahun ${item.dasar_mk_bulan || 0} Bulan`,
+                    DASAR_MK_LAMA: `${twoDigits(item.dasar_mk_tahun) || 0} Tahun ${twoDigits(item.dasar_mk_bulan) || 0} Bulan`,
                     DASAR_HUKUM: textHukum, KONSIDERANS: textHukum,
 
                     GOLONGAN: item.golongan || "", DALAM_GOLONGAN: item.golongan || "",
-                    MK_BARU: `${item.mk_baru_tahun || 0} Tahun ${item.mk_baru_bulan || 0} Bulan`,
+                    MK_BARU: `${twoDigits(item.mk_baru_tahun) || 0} Tahun ${twoDigits(item.mk_baru_bulan) || 0} Bulan`,
                     GAJI_BARU: formatRupiah(item.gaji_baru),
                     TMT_SEKARANG: formatTanggal(item.tmt_sekarang),
                     TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
