@@ -1,0 +1,118 @@
+/* style.css */
+
+:root {
+    --primary-color: #4361ee; /* Biru yang lebih fresh */
+    --primary-hover: #3a56d4;
+    --bg-color: #f8f9fa;
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    --text-main: #2b2d42;
+    --radius-md: 12px;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+}
+
+/* --- OVERRIDE BOOTSTRAP UTILS --- */
+
+/* Navbar yang lebih elegan */
+.navbar {
+    background: white !important; /* Ganti biru solid jadi putih bersih */
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+.navbar-brand {
+    color: var(--primary-color) !important;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+/* Card yang "mengapung" (Elevation) */
+.card {
+    border: none;
+    border-radius: var(--radius-md);
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Animasi hover pada card dashboard */
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(67, 97, 238, 0.15);
+}
+
+/* Tabel Modern */
+.table thead th {
+    background-color: #f1f5f9;
+    color: #64748b;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: none;
+    padding: 1rem;
+}
+.table tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+    color: #334155;
+}
+.table-hover tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+/* Tombol dengan radius lebih bulat */
+.btn {
+    border-radius: 8px;
+    padding: 0.6rem 1.2rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(67, 97, 238, 0.3);
+}
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+/* Input Form yang lebih lega */
+.form-control {
+    border-radius: 8px;
+    padding: 0.7rem 1rem;
+    border: 1px solid #e2e8f0;
+    background-color: #f8fafc;
+}
+.form-control:focus {
+    background-color: #fff;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
+}
+
+/* Modal Styling */
+.modal-content {
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+.modal-header {
+    border-bottom: 1px solid #f1f5f9;
+    background-color: #fff !important; /* Override warna bg modal */
+    border-radius: 16px 16px 0 0;
+    padding: 1.5rem;
+}
+.modal-title {
+    color: var(--text-main);
+    font-weight: 700;
+}
+.modal-body {
+    padding: 1.5rem;
+}
+
+/* Utility tambahan */
+.text-primary-soft { color: var(--primary-color); }
+.bg-gradient-primary { background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); }
