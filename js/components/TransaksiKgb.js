@@ -1,8 +1,9 @@
 import { ref, reactive, watch, onMounted, computed } from 'vue';
+// PERBAIKAN DI SINI: Import onAuthStateChanged dari ../firebase.js (bukan 'firebase/auth')
 import { 
     db, auth, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc,
-    query, orderBy, limit, startAfter, where, serverTimestamp 
-} from '../firebase.js';
+    query, orderBy, limit, startAfter, where, serverTimestamp, onAuthStateChanged
+} from '../firebase.js'; 
 import { showToast, showConfirm, debounce, formatRupiah, formatTanggal } from '../utils.js';
 import { store } from '../store.js';
 
@@ -508,7 +509,7 @@ export default {
                 const mapH = gvd.dasar_hukum || [];
                 const foundH = mapH.find(h => h.judul === item.dasar_hukum);
                 const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
-
+                const toTitle = (s) => s ? s.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
 
                 const res = await fetch(url); const buf = await res.arrayBuffer();
                 const zip = new window.PizZip(buf);
@@ -520,8 +521,8 @@ export default {
                     NIP: item.nip || "", Nip: item.nip || "", nip: item.nip || "",
                     PANGKAT: item.pangkat || "", Pangkat: item.pangkat || "",
                     JABATAN: item.jabatan || "", Jabatan: item.jabatan || "",
-                    UNIT_KERJA: item.unit_kerja, Unit_Kerja: item.unit_kerja,
-                    UNIT_KERJA_INDUK: item.perangkat_daerah,
+                    UNIT_KERJA: toTitle(item.unit_kerja), Unit_Kerja: toTitle(item.unit_kerja),
+                    UNIT_KERJA_INDUK: toTitle(item.perangkat_daerah),
                     TGL_LAHIR: formatTanggal(item.tgl_lahir),
 
                     DASAR_NOMOR: item.dasar_nomor || "-", NOMOR: item.dasar_nomor || "-",
@@ -548,9 +549,9 @@ export default {
                     PANGKAT_PEJABAT: pjp,
 
                     KOP: kopT, ALAMAT_KOP: kopA,
-                    NOMOR_NASKAH: "${nomor_naskah}", TANGGAL_NASKAH: "${tanggal_naskah}", SIFAT: "${sifat}",
-                    JABATAN_PEJABAT_TTD: "${jabatan_pejabat_ttd}", TTD_PENGIRIM: "${ttd_pengirim}",
-                    NAMA_PENGIRIM: "${nama_pengirim}", NIP_PENGIRIM: "${nip_pengirim}"
+                    NOMOR_NASKAH: "${NOMOR_NASKAH}", TANGGAL_NASKAH: "${TANGGAL_NASKAH}", SIFAT: "${SIFAT}",
+                    JABATAN_PEJABAT_TTD: "${JABATAN_PEJABAT_TTD}", TTD_PENGIRIM: "${TTD_PENGIRIM}",
+                    NAMA_PENGIRIM: "${NAMA_PENGIRIM}", NIP_PENGIRIM: "${NIP_PENGIRIM}"
                 };
 
                 docRender.render(dataPrint);
@@ -561,7 +562,11 @@ export default {
             } catch(e) { console.error(e); showToast("Gagal: " + e.message, 'error'); }
         };
 
-        onMounted(() => fetchTable('first'));
+        onMounted(() => {
+            const unsubscribe = onAuthStateChanged(auth, (user) => {
+                if (user) fetchTable('first'); else listData.value = [];
+            });
+        });
         
         return { 
             listData, tableLoading, tableSearch, currentPage, isLastPage, showModal, isEditMode, isSaving, isSearching, searchMsg, gajiMsg,
