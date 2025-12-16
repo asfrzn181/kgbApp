@@ -541,8 +541,8 @@ export default {
                     NIP: item.nip || "", Nip: item.nip || "", nip: item.nip || "",
                     PANGKAT: item.pangkat || "", Pangkat: item.pangkat || "",
                     JABATAN: item.jabatan || "", Jabatan: item.jabatan || "",
-                    UNIT_KERJA: toTitle(item.unit_kerja), Unit_Kerja: toTitle(item.unit_kerja),
-                    UNIT_KERJA_INDUK: toTitle(item.perangkat_daerah),
+                    UNIT_KERJA: item.unit_kerja, Unit_Kerja: item.unit_kerja,
+                    UNIT_KERJA_INDUK: item.perangkat_daerah,
                     TGL_LAHIR: formatTanggal(item.tgl_lahir),
 
                     DASAR_NOMOR: item.dasar_nomor || "-", NOMOR: item.dasar_nomor || "-",
