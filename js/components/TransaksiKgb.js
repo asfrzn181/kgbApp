@@ -1,9 +1,8 @@
 import { ref, reactive, watch, onMounted, computed } from 'vue';
-// PERBAIKAN DI SINI: Import onAuthStateChanged dari ../firebase.js (bukan 'firebase/auth')
 import { 
     db, auth, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc,
-    query, orderBy, limit, startAfter, where, serverTimestamp, onAuthStateChanged
-} from '../firebase.js'; 
+    query, orderBy, limit, startAfter, where, serverTimestamp, onAuthStateChanged 
+} from '../firebase.js';
 import { showToast, showConfirm, debounce, formatRupiah, formatTanggal } from '../utils.js';
 import { store } from '../store.js';
 
@@ -129,6 +128,7 @@ export default {
                                     <td class="ps-4">
                                         <div class="fw-bold text-dark">{{ item.nama_snapshot }}</div>
                                         <div class="small text-muted font-monospace">{{ item.nip }}</div>
+                                        <div class="d-none">{{ item.id }}</div>
                                     </td>
                                     <td>
                                         <div class="small fw-bold">{{ item.jabatan_snapshot }}</div>
@@ -187,7 +187,6 @@ export default {
                                             </select>
                                         </div>
                                         <div class="col-md-6"><label class="form-label small text-muted">Nama Lengkap</label><input v-model="form.nama" class="form-control fw-bold" required></div>
-                                        
                                         <div class="col-md-3"><label class="form-label small text-muted">Tempat Lahir</label><input v-model="form.tempat_lahir" class="form-control" placeholder="Kota"></div>
                                         <div class="col-md-3">
                                             <label class="form-label small text-muted">Tanggal Lahir</label>
@@ -197,7 +196,6 @@ export default {
                                         <div class="col-md-6"><label class="form-label small text-muted">Jabatan</label><AutocompleteJabatan v-model="form.jabatan" @select="handleJabatanSelect" /></div>
                                         <div class="col-md-6"><label class="form-label small text-muted">Perangkat Daerah</label><input v-model="form.perangkat_daerah" class="form-control"></div>
                                         <div class="col-md-6"><label class="form-label small text-muted">Unit Kerja (Lokasi)</label><input v-model="form.unit_kerja" class="form-control"></div>
-                                        
                                         <div class="col-md-12">
                                             <div class="form-check form-switch bg-light p-2 rounded border">
                                                 <input class="form-check-input ms-0 me-2" type="checkbox" v-model="form.is_pensiun_manual" id="manualPensiunCheck">
@@ -218,7 +216,6 @@ export default {
                                         <div class="col-md-4"><label class="form-label small text-muted">Nomor SK</label><input v-model="form.dasar_nomor" class="form-control"></div>
                                         <div class="col-md-4"><label class="form-label small text-muted">Tanggal SK</label><input v-model="form.dasar_tanggal" type="date" class="form-control"></div>
                                         <div class="col-md-4"><label class="form-label small fw-bold text-primary">TMT Gaji Lama</label><input v-model="form.dasar_tmt" type="date" class="form-control" required></div>
-                                        
                                         <div class="col-12 bg-light p-3 rounded border">
                                             <div class="row g-2">
                                                 <div class="col-md-4"><label class="small text-muted fw-bold">Gol. Lama</label><SearchSelect :options="filteredGolongan" v-model="form.dasar_golongan" label-key="kode" value-key="kode" placeholder="Pilih..." /></div>
@@ -324,15 +321,24 @@ export default {
                     const qAll = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(50));
                     const snap = await getDocs(qAll);
                     const term = tableSearch.value.toLowerCase();
-                    listData.value = snap.docs.map(d => ({id: d.id, ...d.data()}))
-                        .filter(d => (d.nama||'').toLowerCase().includes(term) || (d.nip||'').includes(term));
+                    // PERBAIKAN: Pastikan ID ter-mapping dengan benar
+                    listData.value = snap.docs.map(d => {
+                        const data = d.data();
+                        data.id = d.id; // Paksa ID masuk
+                        return data;
+                    }).filter(d => (d.nama||'').toLowerCase().includes(term) || (d.nip||'').includes(term));
                     isLastPage.value = true;
                 } else {
                     if (direction === 'first') { q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(itemsPerPage)); pageStack.value = []; currentPage.value = 1; }
                     else if (direction === 'next') { const last = pageStack.value[pageStack.value.length - 1]; q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(last), limit(itemsPerPage)); currentPage.value++; }
                     else if (direction === 'prev') { pageStack.value.pop(); const prev = pageStack.value[pageStack.value.length - 1]; q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(prev), limit(itemsPerPage)); currentPage.value--; }
                     const snap = await getDocs(q);
-                    listData.value = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                    // PERBAIKAN: Mapping yang aman
+                    listData.value = snap.docs.map(d => {
+                        const data = d.data();
+                        data.id = d.id;
+                        return data;
+                    });
                     isLastPage.value = snap.docs.length < itemsPerPage;
                     if(direction !== 'prev' && snap.docs.length > 0) pageStack.value.push(snap.docs[snap.docs.length - 1]);
                 }
@@ -444,7 +450,11 @@ export default {
 
         const openModal = (item=null) => {
             initRefs();
-            if(item){ isEditMode.value=true; formId.value=item.id; Object.assign(form,item); 
+            if(item){ 
+                if(!item.id) { showToast("Error: ID Data tidak terbaca", 'error'); return; }
+                isEditMode.value=true; 
+                formId.value=item.id; // AMBIL ID DARI ITEM
+                Object.assign(form,item); 
                 if(!form.tgl_lahir && form.nip) form.tgl_lahir = extractTglLahir(form.nip);
                 currentBup.value=58; checkBup(); 
             }
@@ -462,8 +472,16 @@ export default {
             try {
                 let pjSnap={}; if(form.pejabat_baru_nip){const p=listPejabat.value.find(x=>x.nip===form.pejabat_baru_nip); if(p) pjSnap={pejabat_baru_nama:p.jabatan, pejabat_baru_pangkat:p.pangkat};}
                 const payload = {...form, ...pjSnap, nama_snapshot:form.nama, jabatan_snapshot:form.jabatan, updated_at:serverTimestamp()};
-                if(isEditMode.value) await updateDoc(doc(db,"usulan_kgb",formId.value), payload);
-                else { payload.created_at=serverTimestamp(); payload.created_by=auth.currentUser.uid; payload.status='DRAFT'; await addDoc(collection(db,"usulan_kgb"), payload); }
+                
+                // SAFETY CHECK TANPA THROW ERROR
+                if(isEditMode.value) {
+                    if(!formId.value) { showToast("Gagal: ID Transaksi tidak ditemukan. Coba refresh.", 'error'); return; }
+                    await updateDoc(doc(db,"usulan_kgb",formId.value), payload);
+                }
+                else { 
+                    payload.created_at=serverTimestamp(); payload.created_by=auth.currentUser.uid; payload.status='DRAFT'; 
+                    await addDoc(collection(db,"usulan_kgb"), payload); 
+                }
                 
                 await setDoc(doc(db,"master_pegawai",form.nip), {
                     nip:form.nip, nama:form.nama, tempat_lahir:form.tempat_lahir, tgl_lahir:form.tgl_lahir,
@@ -478,9 +496,11 @@ export default {
                 showToast("Tersimpan!"); closeModal(); fetchTable();
             } catch(e){showToast(e.message,'error');} finally{isSaving.value=false;}
         };
-        const hapusTransaksi = async(item)=>{ if(await showConfirm("Hapus?","Data hilang.")) { await deleteDoc(doc(db,"usulan_kgb",item.id)); fetchTable(); } };
+        const hapusTransaksi = async(item)=>{ 
+            if(!item || !item.id) return showToast("ID Data tidak valid! Refresh halaman.", 'error');
+            if(await showConfirm("Hapus?","Data hilang.")) { await deleteDoc(doc(db,"usulan_kgb",item.id)); fetchTable(); } 
+        };
 
-        // --- 4. PRINT LOGIC (FIXED: MANUAL INPUT PPPK) ---
         const cetakSK = async (item) => {
             try {
                 if (!window.PizZip || !window.docxtemplater || !window.saveAs) return showToast("Lib cetak error",'error');
