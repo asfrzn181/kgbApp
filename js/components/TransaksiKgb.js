@@ -399,7 +399,8 @@ export default {
                         tgl_lahir: finalTgl, 
                         perangkat_daerah:d.perangkat_daerah||'', unit_kerja:d.unit_kerja||'', 
                         jabatan:d.jabatan||'', tipe_asn:d.tipe_asn||'PNS',
-                        jenis_jabatan: d.jenis_jabatan || 'Pelaksana'
+                        jenis_jabatan: d.jenis_jabatan || 'Pelaksana', // Mencegah undefined saat load
+                        eselon: d.eselon || '-'
                     });
                     if(form.jabatan){
                         const q=query(collection(db,"master_jabatan"),where("nama_jabatan","==",form.jabatan),limit(1));
@@ -452,7 +453,7 @@ export default {
 
         const handleJabatanSelect = (item) => {
             form.jabatan=item.nama_jabatan; 
-            form.jenis_jabatan = item.jenis_jabatan || 'Pelaksana'; // Fallback
+            form.jenis_jabatan = item.jenis_jabatan || 'Pelaksana'; 
             currentBup.value=item.bup||58; 
             checkBup();
             if(['Administrator','Pengawas','Pimpinan Tinggi Pratama'].includes(item.jenis_jabatan)) {
@@ -479,7 +480,7 @@ export default {
                 isEditMode.value=false; formId.value=null; 
                 Object.keys(form).forEach(k=>form[k]=(typeof form[k]==='number'?0:'')); 
                 form.tipe_asn='PNS'; form.mk_baru_tahun=0; form.eselon='-'; currentBup.value=58; 
-                form.jenis_jabatan='Pelaksana'; // Default
+                form.jenis_jabatan='Pelaksana'; 
             }
             showModal.value=true;
         };
@@ -490,11 +491,16 @@ export default {
             try {
                 let pjSnap={}; if(form.pejabat_baru_nip){const p=listPejabat.value.find(x=>x.nip===form.pejabat_baru_nip); if(p) pjSnap={pejabat_baru_nama:p.jabatan, pejabat_baru_pangkat:p.pangkat};}
                 
-                // --- FIX UNDEFINED ---
+                // --- SANITASI DATA (CEGAH ERROR UNDEFINED) ---
+                // Pastikan tidak ada field 'undefined' yang dikirim ke Firestore
                 const safeForm = { ...form };
-                safeForm.jenis_jabatan = safeForm.jenis_jabatan || 'Pelaksana';
-                safeForm.eselon = safeForm.eselon || '-';
-                safeForm.golongan = safeForm.golongan || '';
+                
+                // Default value untuk field rawan kosong
+                if (safeForm.jenis_jabatan === undefined) safeForm.jenis_jabatan = 'Pelaksana';
+                if (safeForm.eselon === undefined) safeForm.eselon = '-';
+                if (safeForm.golongan === undefined) safeForm.golongan = '';
+                if (safeForm.masa_perjanjian === undefined) safeForm.masa_perjanjian = '';
+                if (safeForm.perpanjangan_perjanjian === undefined) safeForm.perpanjangan_perjanjian = '';
 
                 const payload = {
                     ...safeForm, 
@@ -574,8 +580,8 @@ export default {
                     NIP: item.nip || "", Nip: item.nip || "", nip: item.nip || "",
                     PANGKAT: item.pangkat || "", Pangkat: item.pangkat || "",
                     JABATAN: item.jabatan || "", Jabatan: item.jabatan || "",
-                    UNIT_KERJA: toTitle(item.unit_kerja), Unit_Kerja: toTitle(item.unit_kerja),
-                    UNIT_KERJA_INDUK: toTitle(item.perangkat_daerah),
+                    UNIT_KERJA: item.unit_kerja, Unit_Kerja: item.unit_kerja,
+                    UNIT_KERJA_INDUK: item.perangkat_daerah,
                     TGL_LAHIR: formatTanggal(item.tgl_lahir),
 
                     DASAR_NOMOR: item.dasar_nomor || "-", NOMOR: item.dasar_nomor || "-",
