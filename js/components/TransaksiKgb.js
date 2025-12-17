@@ -418,6 +418,7 @@ export default {
         }, 800);
 
         const checkBup = () => {
+            // 1. Hitung Umur (Tetap sama)
             if (form.tgl_lahir) {
                 const birth = new Date(form.tgl_lahir); const today = new Date();
                 let age = today.getFullYear() - birth.getFullYear();
@@ -425,13 +426,42 @@ export default {
                 if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
                 currentAge.value = age;
             } else currentAge.value = 0;
-            if (form.is_pensiun_manual) { isPensiun.value=true; form.tmt_selanjutnya="-"; pensiunMsg.value="Manual Pensiun"; return; }
+
+            // 2. Validasi Input Dasar
             if (!form.tgl_lahir || !form.tmt_sekarang) return;
-            const bd = new Date(form.tgl_lahir); const tmt = new Date(form.tmt_sekarang); const bup = currentBup.value||58;
-            const pd = new Date(bd); pd.setFullYear(bd.getFullYear()+bup); pd.setDate(1); pd.setMonth(pd.getMonth()+1);
-            const next = new Date(tmt); next.setFullYear(next.getFullYear()+2);
-            if(next>=pd) { isPensiun.value=true; form.tmt_selanjutnya="-"; pensiunMsg.value=`BUP ${formatTanggal(pd.toISOString())}`; }
-            else { isPensiun.value=false; form.tmt_selanjutnya=next.toISOString().split('T')[0]; pensiunMsg.value=`Batas: ${formatTanggal(pd.toISOString())}`; }
+
+            // 3. Definisikan Variabel Tanggal
+            const bd = new Date(form.tgl_lahir); 
+            const tmt = new Date(form.tmt_sekarang); 
+            const bup = currentBup.value || 58;
+
+            // 4. Hitung Tanggal Pensiun (BUP)
+            const pd = new Date(bd); 
+            pd.setFullYear(bd.getFullYear() + bup); 
+            pd.setDate(1); 
+            pd.setMonth(pd.getMonth() + 1);
+
+            // 5. Hitung TMT Berikutnya (Selalu +2 Tahun) - INI PERUBAHAN UTAMANYA
+            // Kita hitung dulu dan tetapkan nilainya SEBELUM mengecek status pensiun
+            const next = new Date(tmt); 
+            next.setFullYear(next.getFullYear() + 2);
+            form.tmt_selanjutnya = next.toISOString().split('T')[0]; // Selalu terisi tanggal
+
+            // 6. Cek Status Pensiun (Hanya untuk Peringatan/Status, tidak menimpa tanggal)
+            if (form.is_pensiun_manual) { 
+                isPensiun.value = true; 
+                pensiunMsg.value = "Manual Pensiun"; 
+            } 
+            else if (next >= pd) { 
+                isPensiun.value = true; 
+                // form.tmt_selanjutnya = "-";  <-- Baris ini DIHAPUS agar tanggal tetap muncul
+                pensiunMsg.value = `Masuk BUP (${formatTanggal(pd.toISOString())})`; 
+            } 
+            else { 
+                isPensiun.value = false; 
+                pensiunMsg.value = `Batas: ${formatTanggal(pd.toISOString())}`; 
+            }
+            
             form.tahun_pembuatan = tmt.getFullYear();
         };
         watch(()=>[form.tmt_sekarang,form.tgl_lahir,currentBup.value,form.is_pensiun_manual], checkBup);
