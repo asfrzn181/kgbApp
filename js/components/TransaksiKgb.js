@@ -1,4 +1,4 @@
-import { ref, reactive, watch, onMounted, computed } from 'vue';
+import { ref, reactive, watch, onMounted, computed, nextTick } from 'vue';
 import { 
     db, auth, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc,
     query, orderBy, limit, startAfter, where, serverTimestamp, onAuthStateChanged 
@@ -97,7 +97,7 @@ export default {
     components: { SearchSelect, AutocompleteJabatan },
     template: `
     <div class="p-4">
-        <div v-if="!showModal">
+        <div v-if="!showModal && !showPreviewModal">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div><h3 class="fw-bold text-primary mb-1">Data Usulan KGB</h3><p class="text-muted small mb-0">Riwayat usulan gaji berkala.</p></div>
                 <div class="d-flex gap-2">
@@ -118,12 +118,13 @@ export default {
                                     <th>Jabatan</th>
                                     <th>Gaji Baru</th>
                                     <th>TMT Berlaku</th>
+                                    <th class="text-center">Status & Tanggal</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-if="tableLoading"><td colspan="5" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>
-                                <tr v-else-if="listData.length === 0"><td colspan="5" class="text-center py-5 text-muted">Belum ada data.</td></tr>
+                                <tr v-if="tableLoading"><td colspan="6" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>
+                                <tr v-else-if="listData.length === 0"><td colspan="6" class="text-center py-5 text-muted">Belum ada data.</td></tr>
                                 <tr v-else v-for="item in listData" :key="item.id">
                                     <td class="ps-4">
                                         <div class="fw-bold text-dark">{{ item.nama_snapshot }}</div>
@@ -137,10 +138,39 @@ export default {
                                     </td>
                                     <td class="fw-bold text-success">{{ formatRupiah(item.gaji_baru) }}</td>
                                     <td>{{ formatTanggal(item.tmt_sekarang) }}</td>
+                                    
+                                    <td class="text-center">
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm dropdown-toggle fw-bold text-white shadow-sm" 
+                                                :class="statusColor(item.status)" 
+                                                type="button" 
+                                                data-bs-toggle="dropdown" 
+                                                style="min-width: 110px;">
+                                                {{ item.status || 'DRAFT' }}
+                                            </button>
+                                            <ul class="dropdown-menu shadow">
+                                                <li><h6 class="dropdown-header">Ubah Status</h6></li>
+                                                <li><a class="dropdown-item" href="#" @click.prevent="updateStatus(item, 'DRAFT')"><i class="bi bi-file-earmark me-2"></i>DRAFT</a></li>
+                                                <li><a class="dropdown-item" href="#" @click.prevent="updateStatus(item, 'TEKEN')"><i class="bi bi-pen me-2 text-warning"></i>TEKEN</a></li>
+                                                <li><a class="dropdown-item" href="#" @click.prevent="updateStatus(item, 'DISTRIBUSI')"><i class="bi bi-check-circle me-2 text-success"></i>DISTRIBUSI</a></li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <div class="mt-1 small fw-bold text-muted" style="font-size: 0.75em;">
+                                            <span v-if="item.status === 'TEKEN' && item.tgl_teken_formatted">
+                                                {{ item.tgl_teken_formatted }}
+                                            </span>
+                                            <span v-else-if="item.status === 'DISTRIBUSI' && item.tgl_distribusi_formatted">
+                                                {{ item.tgl_distribusi_formatted }}
+                                            </span>
+                                        </div>
+                                    </td>
+
                                     <td class="text-end pe-4">
                                         <div class="btn-group">
-                                            <button @click="cetakSK(item)" class="btn btn-sm btn-light border text-dark" title="Cetak"><i class="bi bi-printer-fill"></i></button>
-                                            <button @click="openModal(item)" class="btn btn-sm btn-light border text-primary" title="Edit"><i class="bi bi-pencil-square"></i></button>
+                                            <button @click="previewSK(item)" class="btn btn-sm btn-light border text-primary" title="Preview"><i class="bi bi-eye-fill"></i></button>
+                                            <button @click="cetakSK(item)" class="btn btn-sm btn-light border text-dark" title="Download"><i class="bi bi-download"></i></button>
+                                            <button @click="openModal(item)" class="btn btn-sm btn-light border text-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
                                             <button @click="hapusTransaksi(item)" class="btn btn-sm btn-light border text-danger" title="Hapus"><i class="bi bi-trash"></i></button>
                                         </div>
                                     </td>
@@ -157,7 +187,7 @@ export default {
             </div>
         </div>
 
-        <div v-if="showModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);" tabindex="-1">
+        <div v-if="showModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); z-index: 1050;" tabindex="-1">
             <div class="modal-dialog modal-xl modal-dialog-scrollable">
                 <div class="modal-content border-0 shadow-lg">
                     <div class="modal-header bg-primary text-white">
@@ -196,6 +226,16 @@ export default {
                                         <div class="col-md-6"><label class="form-label small text-muted">Jabatan</label><AutocompleteJabatan v-model="form.jabatan" @select="handleJabatanSelect" /></div>
                                         <div class="col-md-6"><label class="form-label small text-muted">Perangkat Daerah</label><input v-model="form.perangkat_daerah" class="form-control"></div>
                                         <div class="col-md-6"><label class="form-label small text-muted">Unit Kerja (Lokasi)</label><input v-model="form.unit_kerja" class="form-control"></div>
+                                        
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted">Jenis Jabatan</label>
+                                            <select v-model="form.jenis_jabatan" class="form-select">
+                                                <option value="Pelaksana">Pelaksana</option>
+                                                <option value="Fungsional">Fungsional</option>
+                                                <option value="Struktural">Struktural</option>
+                                            </select>
+                                        </div>
+
                                         <div class="col-md-12">
                                             <div class="form-check form-switch bg-light p-2 rounded border">
                                                 <input class="form-check-input ms-0 me-2" type="checkbox" v-model="form.is_pensiun_manual" id="manualPensiunCheck">
@@ -242,19 +282,17 @@ export default {
                                         <div v-if="form.tipe_asn === 'PPPK'" class="col-12 bg-warning bg-opacity-10 p-3 rounded border border-warning mb-3">
                                             <h6 class="text-warning small fw-bold mb-3"><i class="bi bi-exclamation-circle-fill me-2"></i>Atribut Khusus PPPK</h6>
                                             <div class="row g-3">
-                                                <div class="col-md-6">
-                                                    <label class="form-label small fw-bold">Masa Perjanjian Kerja</label>
-                                                    <input v-model="form.masa_perjanjian" class="form-control" placeholder="Contoh: 5 (Lima) Tahun">
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label small fw-bold">Perpanjangan Perjanjian Kerja</label>
-                                                    <input v-model="form.perpanjangan_perjanjian" class="form-control" placeholder="Contoh: 01 Januari 2025 s.d 31 Desember 2029">
-                                                </div>
+                                                <div class="col-md-6"><label class="form-label small fw-bold">Masa Perjanjian Kerja</label><input v-model="form.masa_perjanjian" class="form-control" placeholder="Contoh: 5 (Lima) Tahun"></div>
+                                                <div class="col-md-6"><label class="form-label small fw-bold">Perpanjangan Perjanjian Kerja</label><input v-model="form.perpanjangan_perjanjian" class="form-control" placeholder="Contoh: 01 Januari 2025 s.d 31 Desember 2029"></div>
                                             </div>
                                         </div>
 
                                         <div class="col-md-3"><label class="form-label small fw-bold">TMT Sekarang</label><input v-model="form.tmt_sekarang" type="date" class="form-control" required></div>
-                                        <div class="col-md-3"><label class="form-label small text-muted">TMT YAD</label><input v-model="form.tmt_selanjutnya" type="date" class="form-control bg-light" readonly><div v-if="isPensiun" class="small text-danger fw-bold mt-1">STOP! Pegawai Masuk BUP.</div></div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small text-muted">TMT YAD (Selanjutnya)</label>
+                                            <input v-model="form.tmt_selanjutnya" type="date" class="form-control bg-white">
+                                            <div v-if="isPensiun" class="small text-danger fw-bold mt-1">Info: Pegawai BUP</div>
+                                        </div>
                                         <div class="col-md-6"><label class="form-label small fw-bold text-primary">Pejabat Penandatangan SK</label><SearchSelect :options="listPejabat" v-model="form.pejabat_baru_nip" label-key="jabatan" value-key="nip" placeholder="Pilih Pejabat..." /></div>
                                     </div>
                                 </div>
@@ -263,11 +301,37 @@ export default {
                     </div>
                     <div class="modal-footer bg-white">
                         <button type="button" class="btn btn-light border px-4" @click="closeModal">Batal</button>
-                        <button type="button" class="btn btn-primary px-4 shadow" @click="simpanTransaksi" :disabled="isSaving || (isPensiun && !isEditMode)"><span v-if="isSaving" class="spinner-border spinner-border-sm me-2"></span> Simpan</button>
+                        <button type="button" class="btn btn-primary px-4 shadow" @click="simpanTransaksi" :disabled="isSaving"><span v-if="isSaving" class="spinner-border spinner-border-sm me-2"></span> Simpan</button>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div v-if="showPreviewModal" class="modal fade show d-block" 
+             style="background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); z-index: 1060;" 
+             tabindex="-1"
+             @click.self="closePreview">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable" style="height: 95vh;">
+                <div class="modal-content h-100 border-0">
+                    <div class="modal-header bg-dark text-white border-0 py-2">
+                        <h6 class="modal-title"><i class="bi bi-eye me-2"></i>Preview Dokumen SK</h6>
+                        <div>
+                            <button class="btn btn-sm btn-success me-2" @click="downloadFromPreview"><i class="bi bi-download me-1"></i> Download Word</button>
+                            <button type="button" class="btn-close btn-close-white" @click="closePreview"></button>
+                        </div>
+                    </div>
+                    <div class="modal-body bg-secondary p-0 d-flex justify-content-center overflow-auto">
+                        <div id="docx-preview-container" class="bg-white shadow-lg my-4" style="width: 210mm; min-height: 297mm; padding: 20px;">
+                            <div v-if="previewLoading" class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <div class="mt-2 text-muted">Sedang membuat dokumen...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
     `,
     setup() {
@@ -277,13 +341,19 @@ export default {
         const currentPage = ref(1);
         const isLastPage = ref(false);
         const pageStack = ref([]);
+        
         const showModal = ref(false);
+        const showPreviewModal = ref(false);
+        const previewLoading = ref(false);
+        const currentPreviewItem = ref(null);
+
         const isEditMode = ref(false);
         const isSaving = ref(false);
         const isSearching = ref(false);
         const searchMsg = ref('');
         const gajiMsg = ref('');
         const formId = ref(null);
+        
         const listGolongan = ref([]); 
         const listDasarHukum = ref([]);
         const listPejabat = ref([]); 
@@ -296,19 +366,32 @@ export default {
         const form = reactive({
             nip: '', nama: '', tempat_lahir: '', tgl_lahir: '', tipe_asn: 'PNS',
             perangkat_daerah: '', unit_kerja: '', jabatan: '', pangkat: '',
-            jenis_jabatan: 'Pelaksana', eselon: '-', is_pensiun_manual: false,
+            jenis_jabatan: 'Pelaksana', is_pensiun_manual: false,
             dasar_hukum: '', dasar_nomor: '', dasar_tanggal: '', dasar_pejabat: '',
             dasar_tmt: '', dasar_golongan: '', dasar_mk_tahun: 0, dasar_mk_bulan: 0, dasar_gaji_lama: 0,
             golongan: '', mk_baru_tahun: 0, mk_baru_bulan: 0, gaji_baru: 0,
             pejabat_baru_nip: '', 
             tmt_sekarang: '', tmt_selanjutnya: '', tahun_pembuatan: new Date().getFullYear(),
-            
-            // --- NEW ATTRIBUTES PPPK ---
-            masa_perjanjian: '',
-            perpanjangan_perjanjian: ''
+            masa_perjanjian: '', perpanjangan_perjanjian: ''
         });
 
         const filteredGolongan = computed(() => listGolongan.value.filter(g => g.tipe === form.tipe_asn));
+
+        // Helper Map Doc (Termasuk Format Tanggal Status)
+        const mapDoc = (d) => {
+            const data = d.data();
+            data.id = d.id; 
+            
+            // Format Tanggal Teken & Distribusi (jika ada)
+            if (data.tgl_teken && data.tgl_teken.toDate) {
+                data.tgl_teken_formatted = formatTanggal(data.tgl_teken.toDate().toISOString().split('T')[0]);
+            }
+            if (data.tgl_distribusi && data.tgl_distribusi.toDate) {
+                data.tgl_distribusi_formatted = formatTanggal(data.tgl_distribusi.toDate().toISOString().split('T')[0]);
+            }
+            
+            return data;
+        };
 
         const fetchTable = async (direction = 'first') => {
             tableLoading.value = true;
@@ -321,33 +404,60 @@ export default {
                     const qAll = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(50));
                     const snap = await getDocs(qAll);
                     const term = tableSearch.value.toLowerCase();
-                    // PERBAIKAN: Pastikan ID ter-mapping dengan benar
-                    listData.value = snap.docs.map(d => {
-                        const data = d.data();
-                        data.id = d.id; // Paksa ID masuk
-                        return data;
-                    }).filter(d => (d.nama||'').toLowerCase().includes(term) || (d.nip||'').includes(term));
+                    listData.value = snap.docs.map(mapDoc)
+                        .filter(d => (d.nama||'').toLowerCase().includes(term) || (d.nip||'').includes(term));
                     isLastPage.value = true;
                 } else {
                     if (direction === 'first') { q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(itemsPerPage)); pageStack.value = []; currentPage.value = 1; }
                     else if (direction === 'next') { const last = pageStack.value[pageStack.value.length - 1]; q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(last), limit(itemsPerPage)); currentPage.value++; }
                     else if (direction === 'prev') { pageStack.value.pop(); const prev = pageStack.value[pageStack.value.length - 1]; q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(prev), limit(itemsPerPage)); currentPage.value--; }
                     const snap = await getDocs(q);
-                    // PERBAIKAN: Mapping yang aman
-                    listData.value = snap.docs.map(d => {
-                        const data = d.data();
-                        data.id = d.id;
-                        return data;
-                    });
+                    listData.value = snap.docs.map(mapDoc);
                     isLastPage.value = snap.docs.length < itemsPerPage;
                     if(direction !== 'prev' && snap.docs.length > 0) pageStack.value.push(snap.docs[snap.docs.length - 1]);
                 }
             } catch (e) { console.error(e); } 
             finally { tableLoading.value = false; }
         };
+        
         const nextPage = () => fetchTable('next');
         const prevPage = () => fetchTable('prev');
         watch(tableSearch, debounce(() => fetchTable('first'), 800));
+
+        // --- UPDATE STATUS & TIMESTAMP ---
+        const statusColor = (status) => {
+            if(status === 'TEKEN') return 'btn-warning text-dark';
+            if(status === 'DISTRIBUSI') return 'btn-success';
+            return 'btn-secondary'; // DRAFT
+        };
+
+        const updateStatus = async (item, newStatus) => {
+            if(!item.id) return showToast("Error: ID Dokumen tidak ditemukan", "error");
+            try {
+                // Tentukan Data yang diupdate
+                const updateData = { status: newStatus };
+                
+                // Tambahkan Timestamp
+                if (newStatus === 'TEKEN') updateData.tgl_teken = serverTimestamp();
+                if (newStatus === 'DISTRIBUSI') updateData.tgl_distribusi = serverTimestamp();
+
+                await updateDoc(doc(db, "usulan_kgb", item.id), updateData);
+                showToast(`Status diubah: ${newStatus}`);
+                
+                // Optimistic UI Update (Update layar tanpa reload)
+                const index = listData.value.findIndex(d => d.id === item.id);
+                if (index !== -1) {
+                    listData.value[index].status = newStatus;
+                    // Update tanggal lokal (formatted) agar langsung muncul
+                    const today = formatTanggal(new Date().toISOString().split('T')[0]);
+                    if (newStatus === 'TEKEN') listData.value[index].tgl_teken_formatted = today;
+                    if (newStatus === 'DISTRIBUSI') listData.value[index].tgl_distribusi_formatted = today;
+                }
+            } catch (e) {
+                console.error(e);
+                showToast("Gagal ubah status: " + e.message, "error");
+            }
+        };
 
         const initRefs = async () => {
             const qGol = query(collection(db, "master_golongan"), orderBy("kode"));
@@ -382,9 +492,7 @@ export default {
         const extractTglLahir = (nip) => {
             const clean = nip.replace(/\s/g, '');
             if (clean.length < 8) return '';
-            const y = clean.substring(0, 4); 
-            const m = clean.substring(4, 6); 
-            const d = clean.substring(6, 8);
+            const y = clean.substring(0, 4); const m = clean.substring(4, 6); const d = clean.substring(6, 8);
             if (!isNaN(y) && !isNaN(m) && !isNaN(d)) return `${y}-${m}-${d}`;
             return '';
         };
@@ -397,28 +505,23 @@ export default {
                 const snap = await getDoc(doc(db, "master_pegawai", clean));
                 if(snap.exists()){
                     const d=snap.data(); 
-                    let finalTgl = d.tgl_lahir;
-                    if (!finalTgl || finalTgl === '' || finalTgl === 'Invalid Date') finalTgl = dateFromNip;
+                    let finalTgl = d.tgl_lahir; if (!finalTgl || finalTgl === '' || finalTgl === 'Invalid Date') finalTgl = dateFromNip;
                     Object.assign(form, {
-                        nama:d.nama, tempat_lahir:d.tempat_lahir||'', 
-                        tgl_lahir: finalTgl, 
+                        nama:d.nama, tempat_lahir:d.tempat_lahir||'', tgl_lahir: finalTgl, 
                         perangkat_daerah:d.perangkat_daerah||'', unit_kerja:d.unit_kerja||'', 
-                        jabatan:d.jabatan||'', tipe_asn:d.tipe_asn||'PNS'
+                        jabatan:d.jabatan||'', tipe_asn:d.tipe_asn||'PNS',
+                        jenis_jabatan: d.jenis_jabatan || 'Pelaksana'
                     });
                     if(form.jabatan){
                         const q=query(collection(db,"master_jabatan"),where("nama_jabatan","==",form.jabatan),limit(1));
                         const s=await getDocs(q); if(!s.empty) currentBup.value=s.docs[0].data().bup||58;
                     }
                     searchMsg.value="Ditemukan";
-                } else { 
-                    searchMsg.value="Baru";
-                    form.nama = ''; form.tgl_lahir = dateFromNip;
-                }
+                } else { searchMsg.value="Baru"; form.nama = ''; form.tgl_lahir = dateFromNip; }
             } catch(e){} finally { isSearching.value=false; }
         }, 800);
 
         const checkBup = () => {
-            // 1. Hitung Umur (Tetap sama)
             if (form.tgl_lahir) {
                 const birth = new Date(form.tgl_lahir); const today = new Date();
                 let age = today.getFullYear() - birth.getFullYear();
@@ -426,53 +529,23 @@ export default {
                 if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
                 currentAge.value = age;
             } else currentAge.value = 0;
-
-            // 2. Validasi Input Dasar
             if (!form.tgl_lahir || !form.tmt_sekarang) return;
-
-            // 3. Definisikan Variabel Tanggal
-            const bd = new Date(form.tgl_lahir); 
-            const tmt = new Date(form.tmt_sekarang); 
-            const bup = currentBup.value || 58;
-
-            // 4. Hitung Tanggal Pensiun (BUP)
-            const pd = new Date(bd); 
-            pd.setFullYear(bd.getFullYear() + bup); 
-            pd.setDate(1); 
-            pd.setMonth(pd.getMonth() + 1);
-
-            // 5. Hitung TMT Berikutnya (Selalu +2 Tahun) - INI PERUBAHAN UTAMANYA
-            // Kita hitung dulu dan tetapkan nilainya SEBELUM mengecek status pensiun
-            const next = new Date(tmt); 
-            next.setFullYear(next.getFullYear() + 2);
-            form.tmt_selanjutnya = next.toISOString().split('T')[0]; // Selalu terisi tanggal
-
-            // 6. Cek Status Pensiun (Hanya untuk Peringatan/Status, tidak menimpa tanggal)
-            if (form.is_pensiun_manual) { 
-                isPensiun.value = true; 
-                pensiunMsg.value = "Manual Pensiun"; 
-            } 
-            else if (next >= pd) { 
-                isPensiun.value = true; 
-                // form.tmt_selanjutnya = "-";  <-- Baris ini DIHAPUS agar tanggal tetap muncul
-                pensiunMsg.value = `Masuk BUP (${formatTanggal(pd.toISOString())})`; 
-            } 
-            else { 
-                isPensiun.value = false; 
-                pensiunMsg.value = `Batas: ${formatTanggal(pd.toISOString())}`; 
-            }
             
+            const bd = new Date(form.tgl_lahir); const tmt = new Date(form.tmt_sekarang); const bup = currentBup.value || 58;
+            const pd = new Date(bd); pd.setFullYear(bd.getFullYear() + bup); pd.setDate(1); pd.setMonth(pd.getMonth() + 1);
+            const next = new Date(tmt); next.setFullYear(next.getFullYear() + 2);
+            form.tmt_selanjutnya = next.toISOString().split('T')[0];
+
+            if (form.is_pensiun_manual) { isPensiun.value = true; pensiunMsg.value = "Manual Pensiun"; } 
+            else if (next >= pd) { isPensiun.value = true; pensiunMsg.value = `Masuk BUP (${formatTanggal(pd.toISOString())})`; } 
+            else { isPensiun.value = false; pensiunMsg.value = `Batas: ${formatTanggal(pd.toISOString())}`; }
             form.tahun_pembuatan = tmt.getFullYear();
         };
         watch(()=>[form.tmt_sekarang,form.tgl_lahir,currentBup.value,form.is_pensiun_manual], checkBup);
 
         const handleJabatanSelect = (item) => {
-            form.jabatan=item.nama_jabatan; form.jenis_jabatan=item.jenis_jabatan; currentBup.value=item.bup||58; checkBup();
-            if(['Administrator','Pengawas','Pimpinan Tinggi Pratama'].includes(item.jenis_jabatan)) {
-                if(item.kelas_jabatan>=15)form.eselon='II.a'; else if(item.kelas_jabatan>=12)form.eselon='III.a'; else if(item.kelas_jabatan>=9)form.eselon='IV.a'; else form.eselon='-';
-            } else form.eselon='-';
+            form.jabatan=item.nama_jabatan; form.jenis_jabatan = item.jenis_jabatan || 'Pelaksana'; currentBup.value=item.bup||58; checkBup();
         };
-
         const handleGolonganChange = (g) => { 
             if(!g) return; form.pangkat=g.pangkat; 
             form.pejabat_baru_nip = (form.tipe_asn==='PNS' && g.kode.startsWith('IV')) ? configPejabat.setda : configPejabat.bkpsdmd; 
@@ -482,16 +555,14 @@ export default {
             initRefs();
             if(item){ 
                 if(!item.id) { showToast("Error: ID Data tidak terbaca", 'error'); return; }
-                isEditMode.value=true; 
-                formId.value=item.id; // AMBIL ID DARI ITEM
-                Object.assign(form,item); 
+                isEditMode.value=true; formId.value=item.id; Object.assign(form,item); 
                 if(!form.tgl_lahir && form.nip) form.tgl_lahir = extractTglLahir(form.nip);
                 currentBup.value=58; checkBup(); 
             }
             else { 
                 isEditMode.value=false; formId.value=null; 
                 Object.keys(form).forEach(k=>form[k]=(typeof form[k]==='number'?0:'')); 
-                form.tipe_asn='PNS'; form.mk_baru_tahun=0; form.eselon='-'; currentBup.value=58; 
+                form.tipe_asn='PNS'; form.mk_baru_tahun=0; currentBup.value=58; form.jenis_jabatan='Pelaksana'; 
             }
             showModal.value=true;
         };
@@ -501,22 +572,38 @@ export default {
             if(!form.nip||!form.nama) return showToast("Identitas wajib",'warning'); isSaving.value=true;
             try {
                 let pjSnap={}; if(form.pejabat_baru_nip){const p=listPejabat.value.find(x=>x.nip===form.pejabat_baru_nip); if(p) pjSnap={pejabat_baru_nama:p.jabatan, pejabat_baru_pangkat:p.pangkat};}
-                const payload = {...form, ...pjSnap, nama_snapshot:form.nama, jabatan_snapshot:form.jabatan, updated_at:serverTimestamp()};
+                const safeForm = { ...form };
+                if (safeForm.jenis_jabatan === undefined) safeForm.jenis_jabatan = 'Pelaksana';
+                if (safeForm.golongan === undefined) safeForm.golongan = '';
+                if (safeForm.masa_perjanjian === undefined) safeForm.masa_perjanjian = '';
+                if (safeForm.perpanjangan_perjanjian === undefined) safeForm.perpanjangan_perjanjian = '';
+                delete safeForm.eselon; 
+
+                const payload = { 
+                    ...safeForm, 
+                    ...pjSnap, 
+                    nama_snapshot: form.nama, 
+                    jabatan_snapshot: form.jabatan, 
+                    creator_email: auth.currentUser.email, 
+                    updated_at: serverTimestamp() 
+                };
                 
-                // SAFETY CHECK TANPA THROW ERROR
                 if(isEditMode.value) {
-                    if(!formId.value) { showToast("Gagal: ID Transaksi tidak ditemukan. Coba refresh.", 'error'); return; }
+                    if(!formId.value) { showToast("ID hilang, refresh halaman.", 'error'); return; }
+                    if (!payload.creator_email) payload.creator_email = auth.currentUser.email;
                     await updateDoc(doc(db,"usulan_kgb",formId.value), payload);
-                }
-                else { 
-                    payload.created_at=serverTimestamp(); payload.created_by=auth.currentUser.uid; payload.status='DRAFT'; 
+                } else { 
+                    payload.created_at=serverTimestamp(); 
+                    payload.created_by=auth.currentUser.uid; 
+                    payload.creator_email = auth.currentUser.email;
+                    payload.status='DRAFT'; 
                     await addDoc(collection(db,"usulan_kgb"), payload); 
                 }
                 
                 await setDoc(doc(db,"master_pegawai",form.nip), {
                     nip:form.nip, nama:form.nama, tempat_lahir:form.tempat_lahir, tgl_lahir:form.tgl_lahir,
                     perangkat_daerah:form.perangkat_daerah, unit_kerja:form.unit_kerja, jabatan:form.jabatan,
-                    tipe_asn:form.tipe_asn, jenis_jabatan:form.jenis_jabatan, eselon:form.eselon, updated_at:serverTimestamp()
+                    tipe_asn:form.tipe_asn, jenis_jabatan: safeForm.jenis_jabatan, updated_at:serverTimestamp()
                 }, {merge:true});
                 
                 if(form.jabatan) {
@@ -524,91 +611,100 @@ export default {
                     await setDoc(doc(db,"master_jabatan",jId), {kode_jabatan:jId, nama_jabatan:form.jabatan, bup:currentBup.value, updated_at:serverTimestamp()}, {merge:true});
                 }
                 showToast("Tersimpan!"); closeModal(); fetchTable();
-            } catch(e){showToast(e.message,'error');} finally{isSaving.value=false;}
+            } catch(e){ console.error(e); showToast(e.message,'error');} finally{isSaving.value=false;}
         };
+
         const hapusTransaksi = async(item)=>{ 
             if(!item || !item.id) return showToast("ID Data tidak valid! Refresh halaman.", 'error');
             if(await showConfirm("Hapus?","Data hilang.")) { await deleteDoc(doc(db,"usulan_kgb",item.id)); fetchTable(); } 
         };
 
+        const generateDocBlob = async (item) => {
+            if (!window.PizZip || !window.docxtemplater) throw new Error("Library Cetak Error");
+            
+            const tplId = item.tipe_asn === 'PPPK' ? "PPPK" : "PNS"; 
+            const ts = await getDoc(doc(db, "config_template", tplId)); if(!ts.exists()) throw new Error("Template Belum Diupload!");
+            const url = ts.data().url || `./templates/${ts.data().nama_file}`;
+            const gv = await getDoc(doc(db, "config_template", "GLOBAL_VARS")); const gvd = gv.exists() ? gv.data() : {};
+            
+            let kopT='', kopA=''; const golKode = item.golongan || "";
+            if (item.tipe_asn === 'PNS' && (golKode.startsWith('IV') || golKode.startsWith('4'))) { kopT = gvd.kop_setda?.judul; kopA = gvd.kop_setda?.alamat; } 
+            else { kopT = gvd.kop_bkpsdmd?.judul; kopA = gvd.kop_bkpsdmd?.alamat; }
+
+            let pjp = item.pejabat_baru_pangkat || "", pjj = item.pejabat_baru_nama || "BUPATI BANGKA";
+            if(item.pejabat_baru_nip) { const ps = await getDoc(doc(db, "master_pejabat", item.pejabat_baru_nip)); if(ps.exists()){ pjp = ps.data().pangkat; pjj = ps.data().jabatan; } }
+            
+            const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
+            const toTitle = (s) => s ? s.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
+
+            const res = await fetch(url); const buf = await res.arrayBuffer();
+            const zip = new window.PizZip(buf);
+            const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => p.value.startsWith('$') ? `{${p.value}}` : "" });
+
+            docRender.render({
+                NAMA: item.nama || "", Nama: item.nama || "", nama: item.nama || "",
+                NIP: item.nip || "", Nip: item.nip || "", nip: item.nip || "",
+                PANGKAT: item.pangkat || "", Pangkat: item.pangkat || "",
+                JABATAN: item.jabatan || "", Jabatan: item.jabatan || "",
+                UNIT_KERJA: toTitle(item.unit_kerja), Unit_Kerja: toTitle(item.unit_kerja),
+                UNIT_KERJA_INDUK: toTitle(item.perangkat_daerah),
+                TGL_LAHIR: formatTanggal(item.tgl_lahir),
+                DASAR_NOMOR: item.dasar_nomor || "-", NOMOR: item.dasar_nomor || "-",
+                DASAR_TANGGAL: formatTanggal(item.dasar_tanggal),
+                DASAR_PEJABAT: item.dasar_pejabat || "-", PEJABAT_LAMA: item.dasar_pejabat || "-", OLEH_PEJABAT: item.dasar_pejabat || "-",
+                DASAR_TMT: formatTanggal(item.dasar_tmt),
+                DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
+                DASAR_MK_LAMA: `${item.dasar_mk_tahun || 0} Tahun ${item.dasar_mk_bulan || 0} Bulan`,
+                DASAR_HUKUM: textHukum, KONSIDERANS: textHukum,
+                GOLONGAN: item.golongan || "", DALAM_GOLONGAN: item.golongan || "",
+                MK_BARU: `${item.mk_baru_tahun || 0} Tahun ${item.mk_baru_bulan || 0} Bulan`,
+                GAJI_BARU: formatRupiah(item.gaji_baru),
+                TMT_SEKARANG: formatTanggal(item.tmt_sekarang),
+                TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
+                MASA_PERJANJIAN_KERJA: item.masa_perjanjian || "-", Masa_Perjanjian_Kerja: item.masa_perjanjian || "-",
+                PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian || "-", Perpanjangan_Perjanjian_Kerja: item.perpanjangan_perjanjian || "-",
+                JABATAN_PEJABAT: pjj, PEJABAT_BARU: pjj, PANGKAT_PEJABAT: pjp,
+                KOP: kopT, ALAMAT_KOP: kopA,
+                NOMOR_NASKAH: "${nomor_naskah}", TANGGAL_NASKAH: "${tanggal_naskah}", SIFAT: "${sifat}",
+                JABATAN_PEJABAT_TTD: "${jabatan_pejabat_ttd}", TTD_PENGIRIM: "${ttd_pengirim}",
+                NAMA_PENGIRIM: "${nama_pengirim}", NIP_PENGIRIM: "${nip_pengirim}"
+            });
+
+            return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
+        };
+
+        const previewSK = async (item) => {
+            if (!window.docx) return showToast("Library Preview belum dimuat!", 'error');
+            showPreviewModal.value = true;
+            previewLoading.value = true;
+            currentPreviewItem.value = item;
+            
+            try {
+                const blob = await generateDocBlob(item);
+                const container = document.getElementById('docx-preview-container');
+                container.innerHTML = ''; 
+                await window.docx.renderAsync(blob, container); 
+            } catch (e) {
+                console.error(e);
+                showToast("Gagal Preview: " + e.message, 'error');
+                showPreviewModal.value = false;
+            } finally {
+                previewLoading.value = false;
+            }
+        };
+
+        const closePreview = () => { showPreviewModal.value = false; currentPreviewItem.value = null; };
+
+        const downloadFromPreview = async () => {
+            if(currentPreviewItem.value) cetakSK(currentPreviewItem.value);
+        };
+
         const cetakSK = async (item) => {
             try {
-                if (!window.PizZip || !window.docxtemplater || !window.saveAs) return showToast("Lib cetak error",'error');
-                showToast("Menyiapkan...",'info');
-                
-                const tplId = item.tipe_asn === 'PPPK' ? "PPPK" : "PNS"; 
-                const ts = await getDoc(doc(db, "config_template", tplId)); if(!ts.exists()) return showToast("Template hilang",'error');
-                const url = ts.data().url || `./templates/${ts.data().nama_file}`;
-                
-                const gv = await getDoc(doc(db, "config_template", "GLOBAL_VARS")); const gvd = gv.exists() ? gv.data() : {};
-                
-                let kopT='', kopA='';
-                const golKode = item.golongan || "";
-                if (item.tipe_asn === 'PNS' && (golKode.startsWith('IV') || golKode.startsWith('4'))) {
-                    kopT = gvd.kop_setda?.judul; kopA = gvd.kop_setda?.alamat;
-                } else {
-                    kopT = gvd.kop_bkpsdmd?.judul; kopA = gvd.kop_bkpsdmd?.alamat;
-                }
-
-                let pjp = item.pejabat_baru_pangkat || "", pjj = item.pejabat_baru_nama || "BUPATI BANGKA";
-                if(item.pejabat_baru_nip) {
-                    const ps = await getDoc(doc(db, "master_pejabat", item.pejabat_baru_nip)); 
-                    if(ps.exists()){ pjp = ps.data().pangkat; pjj = ps.data().jabatan; }
-                }
-                
-                const mapH = gvd.dasar_hukum || [];
-                const foundH = mapH.find(h => h.judul === item.dasar_hukum);
-                const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
-                const toTitle = (s) => s ? s.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
-                const twoDigits = (num) => num.toString().padStart(2, '0');
-                const res = await fetch(url); const buf = await res.arrayBuffer();
-                const zip = new window.PizZip(buf);
-                const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => p.value.startsWith('$') ? `{${p.value}}` : "" });
-
-                // --- MAPPING DATA ---
-                const dataPrint = {
-                    NAMA: item.nama || "", Nama: item.nama || "", nama: item.nama || "",
-                    NIP: item.nip || "", Nip: item.nip || "", nip: item.nip || "",
-                    PANGKAT: item.pangkat || "", Pangkat: item.pangkat || "",
-                    JABATAN: item.jabatan || "", Jabatan: item.jabatan || "",
-                    UNIT_KERJA: item.unit_kerja, Unit_Kerja: item.unit_kerja,
-                    UNIT_KERJA_INDUK: item.perangkat_daerah,
-                    TGL_LAHIR: formatTanggal(item.tgl_lahir),
-
-                    DASAR_NOMOR: item.dasar_nomor || "-", NOMOR: item.dasar_nomor || "-",
-                    DASAR_TANGGAL: formatTanggal(item.dasar_tanggal),
-                    DASAR_PEJABAT: item.dasar_pejabat || "-", PEJABAT_LAMA: item.dasar_pejabat || "-", OLEH_PEJABAT: item.dasar_pejabat || "-",
-                    DASAR_TMT: formatTanggal(item.dasar_tmt),
-                    DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
-                    DASAR_MK_LAMA: `${twoDigits(item.dasar_mk_tahun) || 0} Tahun ${twoDigits(item.dasar_mk_bulan) || 0} Bulan`,
-                    DASAR_HUKUM: textHukum, KONSIDERANS: textHukum,
-
-                    GOLONGAN: item.golongan || "", DALAM_GOLONGAN: item.golongan || "",
-                    MK_BARU: `${twoDigits(item.mk_baru_tahun) || 0} Tahun ${twoDigits(item.mk_baru_bulan) || 0} Bulan`,
-                    GAJI_BARU: formatRupiah(item.gaji_baru),
-                    TMT_SEKARANG: formatTanggal(item.tmt_sekarang),
-                    TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
-
-                    // MENGAMBIL DARI INPUT MANUAL
-                    MASA_PERJANJIAN_KERJA: item.masa_perjanjian || "-",
-                    Masa_Perjanjian_Kerja: item.masa_perjanjian || "-",
-                    PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian || "-",
-                    Perpanjangan_Perjanjian_Kerja: item.perpanjangan_perjanjian || "-",
-
-                    JABATAN_PEJABAT: pjj, PEJABAT_BARU: pjj,
-                    PANGKAT_PEJABAT: pjp,
-
-                    KOP: kopT, ALAMAT_KOP: kopA,
-                    NOMOR_NASKAH: "${NOMOR_NASKAH}", TANGGAL_NASKAH: "${TANGGAL_NASKAH}", SIFAT: "${SIFAT}",
-                    JABATAN_PEJABAT_TTD: "${JABATAN_PEJABAT_TTD}", TTD_PENGIRIM: "${TTD_PENGIRIM}",
-                    NAMA_PENGIRIM: "${NAMA_PENGIRIM}", NIP_PENGIRIM: "${NIP_PENGIRIM}"
-                };
-
-                docRender.render(dataPrint);
-                const out = docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
+                showToast("Menyiapkan...", 'info');
+                const blob = await generateDocBlob(item);
                 const safeName = (item.nama || 'doc').replace(/[^a-zA-Z0-9]/g,'_');
-                window.saveAs(out, `SK_KGB_${safeName}.docx`);
-
+                window.saveAs(blob, `SK_KGB_${safeName}.docx`);
             } catch(e) { console.error(e); showToast("Gagal: " + e.message, 'error'); }
         };
 
@@ -622,7 +718,9 @@ export default {
             listData, tableLoading, tableSearch, currentPage, isLastPage, showModal, isEditMode, isSaving, isSearching, searchMsg, gajiMsg,
             form, listGolongan, listDasarHukum, listPejabat, filteredGolongan, currentAge, isPensiun, pensiunMsg,
             nextPage, prevPage, openModal, closeModal, simpanTransaksi, hapusTransaksi, cetakSK, 
-            handleNipInput, cariGajiBaru, cariGajiLama, handleGolonganChange, handleJabatanSelect, formatRupiah, formatTanggal 
+            handleNipInput, cariGajiBaru, cariGajiLama, handleGolonganChange, handleJabatanSelect, formatRupiah, formatTanggal,
+            showPreviewModal, previewLoading, previewSK, closePreview, downloadFromPreview,
+            statusColor, updateStatus
         };
     }
 };

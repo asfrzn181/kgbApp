@@ -45,7 +45,7 @@ export default {
                                 <option :value="auth.currentUser?.uid">Inputan Saya Sendiri</option>
                                 <option disabled>----------------</option>
                                 <option v-for="u in listUsers" :key="u.id" :value="u.id">
-                                    {{ u.email }} ({{ u.role || 'User' }})
+                                    {{ u.email }}
                                 </option>
                             </select>
                         </div>
@@ -81,7 +81,7 @@ export default {
                             <th>Gol</th>
                             <th>Gaji Baru</th>
                             <th>TMT</th>
-                            <th>Tgl Input</th>
+                            <th>Peninput</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -96,8 +96,12 @@ export default {
                             <td class="fw-bold text-end">{{ formatRupiah(item.gaji_baru) }}</td>
                             <td>{{ formatTanggal(item.tmt_sekarang) }}</td>
                             <td>
-                                {{ item.created_at_formatted }}
-                                <div class="text-muted fst-italic" style="font-size: 0.7em;">by {{ item.creator_email || '...' }}</div>
+                                <div class="fw-bold text-primary" style="font-size: 0.75em;">
+                                    <i class="bi bi-person-circle me-1"></i>{{ item.creator_email }}
+                                </div>
+                                <div class="text-muted fst-italic" style="font-size: 0.7em;">
+                                    {{ item.created_at_formatted }}
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -116,7 +120,7 @@ export default {
         // STATE
         const startDate = ref('');
         const endDate = ref('');
-        const filterType = ref('TMT'); // 'TMT' or 'CREATED'
+        const filterType = ref('TMT');
         const loading = ref(false);
         const hasSearched = ref(false);
         const selectedUser = ref('ALL');
@@ -124,14 +128,16 @@ export default {
         const listUsers = ref([]);
         const previewData = ref([]);
 
-        // --- FETCH USERS (ADMIN ONLY) ---
+        // --- FETCH USERS (HANYA UNTUK DROPDOWN ADMIN) ---
         const fetchUsers = async () => {
             if (store.isAdmin) {
                 try {
                     const q = query(collection(db, "users"));
                     const snap = await getDocs(q);
                     listUsers.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                } catch (e) { console.error(e); }
+                } catch (e) { 
+                    console.log("Collection 'users' tidak dapat diakses."); 
+                }
             }
         };
 
@@ -141,7 +147,7 @@ export default {
             
             loading.value = true;
             hasSearched.value = true;
-            previewData.value = []; // Reset
+            previewData.value = [];
 
             try {
                 const collRef = collection(db, "usulan_kgb");
@@ -149,16 +155,12 @@ export default {
 
                 // A. LOGIKA TANGGAL
                 if (filterType.value === 'TMT') {
-                    // Filter TMT (String YYYY-MM-DD)
                     qConstraints.push(where("tmt_sekarang", ">=", startDate.value));
                     qConstraints.push(where("tmt_sekarang", "<=", endDate.value));
                     qConstraints.push(orderBy("tmt_sekarang", "asc"));
                 } else {
-                    // Filter CREATED AT (Timestamp)
-                    // Konversi String Input ke Date Object (Start of Day & End of Day)
                     const startTs = Timestamp.fromDate(new Date(startDate.value + "T00:00:00"));
                     const endTs = Timestamp.fromDate(new Date(endDate.value + "T23:59:59"));
-                    
                     qConstraints.push(where("created_at", ">=", startTs));
                     qConstraints.push(where("created_at", "<=", endTs));
                     qConstraints.push(orderBy("created_at", "asc"));
@@ -181,26 +183,25 @@ export default {
                 const q = query(collRef, ...qConstraints);
                 const snap = await getDocs(q);
 
-                // D. MAPPING HASIL (Termasuk format tanggal input agar bisa dibaca)
-                const userMap = {}; // Cache user email
-                if (store.isAdmin && listUsers.value.length > 0) {
-                    listUsers.value.forEach(u => userMap[u.id] = u.email);
-                }
-
+                // D. MAPPING (TANPA CACHE/MAP USER LAGI)
+                // Langsung baca apa adanya dari dokumen
                 previewData.value = snap.docs.map(d => {
                     const data = d.data();
                     
-                    // Format Created At (Timestamp ke String Readable)
                     let createdAtStr = '-';
                     if (data.created_at && data.created_at.toDate) {
                         createdAtStr = formatTanggal(data.created_at.toDate().toISOString().split('T')[0]);
                     }
 
+                    // LANGSUNG AMBIL EMAIL DARI DATA
+                    // Jika data lama tidak punya creator_email, tampilkan created_by (UID)
+                    const finalEmail = data.creator_email || data.created_by || 'Legacy Data';
+
                     return {
                         id: d.id,
                         ...data,
                         created_at_formatted: createdAtStr,
-                        creator_email: userMap[data.created_by] || 'User'
+                        creator_email: finalEmail
                     };
                 });
 
@@ -213,7 +214,7 @@ export default {
             }
         };
 
-        // --- 2. DOWNLOAD EXCEL DARI PREVIEW ---
+        // --- 2. DOWNLOAD EXCEL ---
         const downloadExcel = () => {
             if (previewData.value.length === 0) return;
             
@@ -225,7 +226,6 @@ export default {
                 return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
             };
 
-            // Mapping untuk Excel
             const excelRows = previewData.value.map(data => ({
                 NIP: "'" + data.nip,
                 NAMA: data.nama,
@@ -237,10 +237,10 @@ export default {
                 GAJI_BARU: data.gaji_baru,
                 MK_TAHUN: data.mk_baru_tahun,
                 TGL_INPUT: data.created_at_formatted,
-                TIPE: data.tipe_asn || 'PNS' // Helper Split Sheet
+                PENINPUT: data.creator_email, 
+                TIPE: data.tipe_asn || 'PNS'
             }));
 
-            // Split Sheet
             const pnsGol3 = excelRows.filter(d => d.TIPE === 'PNS' && (String(d.GOLONGAN).startsWith('III') || String(d.GOLONGAN).startsWith('3')));
             const pnsGol4 = excelRows.filter(d => d.TIPE === 'PNS' && (String(d.GOLONGAN).startsWith('IV') || String(d.GOLONGAN).startsWith('4')));
             const pppp = excelRows.filter(d => d.TIPE === 'PPPK');
@@ -250,7 +250,10 @@ export default {
             const appendSheet = (data, name) => {
                 const cleanData = data.map(({ TIPE, ...rest }) => rest);
                 const ws = cleanData.length > 0 ? XLSX.utils.json_to_sheet(cleanData) : XLSX.utils.json_to_sheet([{Info: "Nihil"}]);
-                ws['!cols'] = [{wch:20}, {wch:30}, {wch:10}, {wch:30}, {wch:25}, {wch:25}, {wch:15}, {wch:15}, {wch:10}, {wch:15}];
+                ws['!cols'] = [
+                    {wch:20}, {wch:30}, {wch:10}, {wch:30}, {wch:25}, {wch:25}, 
+                    {wch:15}, {wch:15}, {wch:10}, {wch:15}, {wch:25}
+                ];
                 XLSX.utils.book_append_sheet(wb, ws, name);
             };
 
