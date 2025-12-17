@@ -302,7 +302,10 @@ export default {
             golongan: '', mk_baru_tahun: 0, mk_baru_bulan: 0, gaji_baru: 0,
             pejabat_baru_nip: '', 
             tmt_sekarang: '', tmt_selanjutnya: '', tahun_pembuatan: new Date().getFullYear(),
-            masa_perjanjian: '', perpanjangan_perjanjian: ''
+            
+            // --- NEW ATTRIBUTES PPPK ---
+            masa_perjanjian: '',
+            perpanjangan_perjanjian: ''
         });
 
         const filteredGolongan = computed(() => listGolongan.value.filter(g => g.tipe === form.tipe_asn));
@@ -318,9 +321,10 @@ export default {
                     const qAll = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(50));
                     const snap = await getDocs(qAll);
                     const term = tableSearch.value.toLowerCase();
+                    // PERBAIKAN: Pastikan ID ter-mapping dengan benar
                     listData.value = snap.docs.map(d => {
                         const data = d.data();
-                        data.id = d.id;
+                        data.id = d.id; // Paksa ID masuk
                         return data;
                     }).filter(d => (d.nama||'').toLowerCase().includes(term) || (d.nip||'').includes(term));
                     isLastPage.value = true;
@@ -329,6 +333,7 @@ export default {
                     else if (direction === 'next') { const last = pageStack.value[pageStack.value.length - 1]; q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(last), limit(itemsPerPage)); currentPage.value++; }
                     else if (direction === 'prev') { pageStack.value.pop(); const prev = pageStack.value[pageStack.value.length - 1]; q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(prev), limit(itemsPerPage)); currentPage.value--; }
                     const snap = await getDocs(q);
+                    // PERBAIKAN: Mapping yang aman
                     listData.value = snap.docs.map(d => {
                         const data = d.data();
                         data.id = d.id;
@@ -398,9 +403,7 @@ export default {
                         nama:d.nama, tempat_lahir:d.tempat_lahir||'', 
                         tgl_lahir: finalTgl, 
                         perangkat_daerah:d.perangkat_daerah||'', unit_kerja:d.unit_kerja||'', 
-                        jabatan:d.jabatan||'', tipe_asn:d.tipe_asn||'PNS',
-                        jenis_jabatan: d.jenis_jabatan || 'Pelaksana', // Mencegah undefined saat load
-                        eselon: d.eselon || '-'
+                        jabatan:d.jabatan||'', tipe_asn:d.tipe_asn||'PNS'
                     });
                     if(form.jabatan){
                         const q=query(collection(db,"master_jabatan"),where("nama_jabatan","==",form.jabatan),limit(1));
@@ -415,6 +418,7 @@ export default {
         }, 800);
 
         const checkBup = () => {
+            // 1. Hitung Umur (Tetap sama)
             if (form.tgl_lahir) {
                 const birth = new Date(form.tgl_lahir); const today = new Date();
                 let age = today.getFullYear() - birth.getFullYear();
@@ -422,40 +426,48 @@ export default {
                 if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
                 currentAge.value = age;
             } else currentAge.value = 0;
+
+            // 2. Validasi Input Dasar
             if (!form.tgl_lahir || !form.tmt_sekarang) return;
-            
+
+            // 3. Definisikan Variabel Tanggal
             const bd = new Date(form.tgl_lahir); 
             const tmt = new Date(form.tmt_sekarang); 
             const bup = currentBup.value || 58;
 
+            // 4. Hitung Tanggal Pensiun (BUP)
             const pd = new Date(bd); 
             pd.setFullYear(bd.getFullYear() + bup); 
             pd.setDate(1); 
             pd.setMonth(pd.getMonth() + 1);
 
+            // 5. Hitung TMT Berikutnya (Selalu +2 Tahun) - INI PERUBAHAN UTAMANYA
+            // Kita hitung dulu dan tetapkan nilainya SEBELUM mengecek status pensiun
             const next = new Date(tmt); 
             next.setFullYear(next.getFullYear() + 2);
-            form.tmt_selanjutnya = next.toISOString().split('T')[0];
+            form.tmt_selanjutnya = next.toISOString().split('T')[0]; // Selalu terisi tanggal
 
+            // 6. Cek Status Pensiun (Hanya untuk Peringatan/Status, tidak menimpa tanggal)
             if (form.is_pensiun_manual) { 
                 isPensiun.value = true; 
                 pensiunMsg.value = "Manual Pensiun"; 
-            } else if (next >= pd) { 
+            } 
+            else if (next >= pd) { 
                 isPensiun.value = true; 
+                // form.tmt_selanjutnya = "-";  <-- Baris ini DIHAPUS agar tanggal tetap muncul
                 pensiunMsg.value = `Masuk BUP (${formatTanggal(pd.toISOString())})`; 
-            } else { 
+            } 
+            else { 
                 isPensiun.value = false; 
                 pensiunMsg.value = `Batas: ${formatTanggal(pd.toISOString())}`; 
             }
+            
             form.tahun_pembuatan = tmt.getFullYear();
         };
         watch(()=>[form.tmt_sekarang,form.tgl_lahir,currentBup.value,form.is_pensiun_manual], checkBup);
 
         const handleJabatanSelect = (item) => {
-            form.jabatan=item.nama_jabatan; 
-            form.jenis_jabatan = item.jenis_jabatan || 'Pelaksana'; 
-            currentBup.value=item.bup||58; 
-            checkBup();
+            form.jabatan=item.nama_jabatan; form.jenis_jabatan=item.jenis_jabatan; currentBup.value=item.bup||58; checkBup();
             if(['Administrator','Pengawas','Pimpinan Tinggi Pratama'].includes(item.jenis_jabatan)) {
                 if(item.kelas_jabatan>=15)form.eselon='II.a'; else if(item.kelas_jabatan>=12)form.eselon='III.a'; else if(item.kelas_jabatan>=9)form.eselon='IV.a'; else form.eselon='-';
             } else form.eselon='-';
@@ -471,7 +483,7 @@ export default {
             if(item){ 
                 if(!item.id) { showToast("Error: ID Data tidak terbaca", 'error'); return; }
                 isEditMode.value=true; 
-                formId.value=item.id; 
+                formId.value=item.id; // AMBIL ID DARI ITEM
                 Object.assign(form,item); 
                 if(!form.tgl_lahir && form.nip) form.tgl_lahir = extractTglLahir(form.nip);
                 currentBup.value=58; checkBup(); 
@@ -480,7 +492,6 @@ export default {
                 isEditMode.value=false; formId.value=null; 
                 Object.keys(form).forEach(k=>form[k]=(typeof form[k]==='number'?0:'')); 
                 form.tipe_asn='PNS'; form.mk_baru_tahun=0; form.eselon='-'; currentBup.value=58; 
-                form.jenis_jabatan='Pelaksana'; 
             }
             showModal.value=true;
         };
@@ -490,28 +501,11 @@ export default {
             if(!form.nip||!form.nama) return showToast("Identitas wajib",'warning'); isSaving.value=true;
             try {
                 let pjSnap={}; if(form.pejabat_baru_nip){const p=listPejabat.value.find(x=>x.nip===form.pejabat_baru_nip); if(p) pjSnap={pejabat_baru_nama:p.jabatan, pejabat_baru_pangkat:p.pangkat};}
+                const payload = {...form, ...pjSnap, nama_snapshot:form.nama, jabatan_snapshot:form.jabatan, updated_at:serverTimestamp()};
                 
-                // --- SANITASI DATA (CEGAH ERROR UNDEFINED) ---
-                // Pastikan tidak ada field 'undefined' yang dikirim ke Firestore
-                const safeForm = { ...form };
-                
-                // Default value untuk field rawan kosong
-                if (safeForm.jenis_jabatan === undefined) safeForm.jenis_jabatan = 'Pelaksana';
-                if (safeForm.eselon === undefined) safeForm.eselon = '-';
-                if (safeForm.golongan === undefined) safeForm.golongan = '';
-                if (safeForm.masa_perjanjian === undefined) safeForm.masa_perjanjian = '';
-                if (safeForm.perpanjangan_perjanjian === undefined) safeForm.perpanjangan_perjanjian = '';
-
-                const payload = {
-                    ...safeForm, 
-                    ...pjSnap, 
-                    nama_snapshot:form.nama, 
-                    jabatan_snapshot:form.jabatan, 
-                    updated_at:serverTimestamp()
-                };
-                
+                // SAFETY CHECK TANPA THROW ERROR
                 if(isEditMode.value) {
-                    if(!formId.value) { showToast("ID hilang, refresh halaman.", 'error'); return; }
+                    if(!formId.value) { showToast("Gagal: ID Transaksi tidak ditemukan. Coba refresh.", 'error'); return; }
                     await updateDoc(doc(db,"usulan_kgb",formId.value), payload);
                 }
                 else { 
@@ -522,10 +516,7 @@ export default {
                 await setDoc(doc(db,"master_pegawai",form.nip), {
                     nip:form.nip, nama:form.nama, tempat_lahir:form.tempat_lahir, tgl_lahir:form.tgl_lahir,
                     perangkat_daerah:form.perangkat_daerah, unit_kerja:form.unit_kerja, jabatan:form.jabatan,
-                    tipe_asn:form.tipe_asn, 
-                    jenis_jabatan: safeForm.jenis_jabatan, 
-                    eselon: safeForm.eselon, 
-                    updated_at:serverTimestamp()
+                    tipe_asn:form.tipe_asn, jenis_jabatan:form.jenis_jabatan, eselon:form.eselon, updated_at:serverTimestamp()
                 }, {merge:true});
                 
                 if(form.jabatan) {
@@ -535,7 +526,6 @@ export default {
                 showToast("Tersimpan!"); closeModal(); fetchTable();
             } catch(e){showToast(e.message,'error');} finally{isSaving.value=false;}
         };
-
         const hapusTransaksi = async(item)=>{ 
             if(!item || !item.id) return showToast("ID Data tidak valid! Refresh halaman.", 'error');
             if(await showConfirm("Hapus?","Data hilang.")) { await deleteDoc(doc(db,"usulan_kgb",item.id)); fetchTable(); } 
@@ -570,11 +560,12 @@ export default {
                 const foundH = mapH.find(h => h.judul === item.dasar_hukum);
                 const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
                 const toTitle = (s) => s ? s.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
-
+                const twoDigits = (num) => num.toString().padStart(2, '0');
                 const res = await fetch(url); const buf = await res.arrayBuffer();
                 const zip = new window.PizZip(buf);
                 const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => p.value.startsWith('$') ? `{${p.value}}` : "" });
 
+                // --- MAPPING DATA ---
                 const dataPrint = {
                     NAMA: item.nama || "", Nama: item.nama || "", nama: item.nama || "",
                     NIP: item.nip || "", Nip: item.nip || "", nip: item.nip || "",
@@ -589,15 +580,16 @@ export default {
                     DASAR_PEJABAT: item.dasar_pejabat || "-", PEJABAT_LAMA: item.dasar_pejabat || "-", OLEH_PEJABAT: item.dasar_pejabat || "-",
                     DASAR_TMT: formatTanggal(item.dasar_tmt),
                     DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
-                    DASAR_MK_LAMA: `${item.dasar_mk_tahun || 0} Tahun ${item.dasar_mk_bulan || 0} Bulan`,
+                    DASAR_MK_LAMA: `${twoDigits(item.dasar_mk_tahun) || 0} Tahun ${twoDigits(item.dasar_mk_bulan) || 0} Bulan`,
                     DASAR_HUKUM: textHukum, KONSIDERANS: textHukum,
 
                     GOLONGAN: item.golongan || "", DALAM_GOLONGAN: item.golongan || "",
-                    MK_BARU: `${item.mk_baru_tahun || 0} Tahun ${item.mk_baru_bulan || 0} Bulan`,
+                    MK_BARU: `${twoDigits(item.mk_baru_tahun) || 0} Tahun ${twoDigits(item.mk_baru_bulan) || 0} Bulan`,
                     GAJI_BARU: formatRupiah(item.gaji_baru),
                     TMT_SEKARANG: formatTanggal(item.tmt_sekarang),
                     TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
 
+                    // MENGAMBIL DARI INPUT MANUAL
                     MASA_PERJANJIAN_KERJA: item.masa_perjanjian || "-",
                     Masa_Perjanjian_Kerja: item.masa_perjanjian || "-",
                     PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian || "-",
