@@ -635,7 +635,7 @@ export default {
             if(item.pejabat_baru_nip) { const ps = await getDoc(doc(db, "master_pejabat", item.pejabat_baru_nip)); if(ps.exists()){ pjp = ps.data().pangkat; pjj = ps.data().jabatan; } }
             
             const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
-            const toTitle = (s) => s ? s.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
+            const twoDigits = (n) => n.toString().padStart(2, '0');
 
             const res = await fetch(url); const buf = await res.arrayBuffer();
             const zip = new window.PizZip(buf);
@@ -646,18 +646,18 @@ export default {
                 NIP: item.nip || "", Nip: item.nip || "", nip: item.nip || "",
                 PANGKAT: item.pangkat || "", Pangkat: item.pangkat || "",
                 JABATAN: item.jabatan || "", Jabatan: item.jabatan || "",
-                UNIT_KERJA: toTitle(item.unit_kerja), Unit_Kerja: toTitle(item.unit_kerja),
-                UNIT_KERJA_INDUK: toTitle(item.perangkat_daerah),
+                UNIT_KERJA: item.unit_kerja, Unit_Kerja: item.unit_kerja,
+                UNIT_KERJA_INDUK: item.perangkat_daerah,
                 TGL_LAHIR: formatTanggal(item.tgl_lahir),
                 DASAR_NOMOR: item.dasar_nomor || "-", NOMOR: item.dasar_nomor || "-",
                 DASAR_TANGGAL: formatTanggal(item.dasar_tanggal),
                 DASAR_PEJABAT: item.dasar_pejabat || "-", PEJABAT_LAMA: item.dasar_pejabat || "-", OLEH_PEJABAT: item.dasar_pejabat || "-",
                 DASAR_TMT: formatTanggal(item.dasar_tmt),
                 DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
-                DASAR_MK_LAMA: `${item.dasar_mk_tahun || 0} Tahun ${item.dasar_mk_bulan || 0} Bulan`,
+                DASAR_MK_LAMA: `${twoDigits(item.dasar_mk_tahun || 0)} Tahun ${twoDigits(item.dasar_mk_bulan || 0)} Bulan`,
                 DASAR_HUKUM: textHukum, KONSIDERANS: textHukum,
                 GOLONGAN: item.golongan || "", DALAM_GOLONGAN: item.golongan || "",
-                MK_BARU: `${item.mk_baru_tahun || 0} Tahun ${item.mk_baru_bulan || 0} Bulan`,
+                MK_BARU: `${twoDigits(item.mk_baru_tahun || 0)} Tahun ${twoDigits(item.mk_baru_bulan || 0)} Bulan`,
                 GAJI_BARU: formatRupiah(item.gaji_baru),
                 TMT_SEKARANG: formatTanggal(item.tmt_sekarang),
                 TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
