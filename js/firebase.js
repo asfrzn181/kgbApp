@@ -21,7 +21,7 @@ import {
     deleteDoc,
     query, 
     where, 
-    
+    runTransaction,
     orderBy, 
     limit, 
     writeBatch, 
@@ -100,7 +100,7 @@ export {
     endBefore, 
     endAt, 
     limitToLast,
-    
+    runTransaction,
     // Auth
     signInWithEmailAndPassword, 
     signOut, 

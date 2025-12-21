@@ -6,7 +6,7 @@ export default {
         
         <a href="#" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto link-dark text-decoration-none border-bottom pb-3 w-100">
             <i class="bi bi-person-workspace fs-3 text-primary me-2"></i>
-            <span class="fs-4 fw-bold text-primary">SIMPEG KGB</span>
+            <span class="fs-4 fw-bold text-primary">MAS</span>
         </a>
         
         <ul class="nav nav-pills flex-column mb-auto pt-2">
@@ -20,7 +20,11 @@ export default {
             <li class="mt-3 text-muted small fw-bold text-uppercase ls-1 ps-2">Transaksi</li>
             <li>
                 <router-link to="/transaksi" class="nav-link link-dark" active-class="active bg-primary text-white">
-                    <i class="bi bi-file-earmark-text me-2"></i> Input Usulan KGB
+                    <i class="bi bi-file-earmark-text me-2"></i> Input KGB
+                </router-link>
+
+                <router-link to="/penomoran" class="nav-link link-dark" active-class="bg-primary text-white">
+                    <i class="bi bi-file-earmark-text me-2"></i> Penomoran KGB
                 </router-link>
 
                 <router-link to="/laporan" class="nav-link link-dark" active-class="active bg-primary text-white">

@@ -18,13 +18,13 @@ export function formatRupiah(number) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number || 0);
 }
 
-// 3. Format Tanggal Indo (1 Januari 2025)
-export function formatTanggal(dateString) {
-    if (!dateString) return '-';
+
+export function formatTanggal(dateString){
+    //01 September 2025
+    if(!dateString) return '-';
     const date = new Date(dateString);
-    // Cek validitas tanggal
-    if (isNaN(date.getTime())) return dateString; 
-    return new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(date);
+    if(isNaN(date.getTime())) return dateString;
+    return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(date);
 }
 
 // 4. SweetAlert Toast (Notifikasi Pojok Kanan Atas)

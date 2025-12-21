@@ -17,6 +17,7 @@ import MasterPejabat from './components/MasterPejabat.js';
 import MasterTemplate from './components/MasterTemplate.js';
 import MasterGolongan from './components/MasterGolongan.js';
 import MasterJabatan from './components/MasterJabatan.js';
+import Penomoran from './components/Penomoran.js';
 // --- KONFIGURASI ROUTER ---
 const routes = [
     // 1. Dashboard
@@ -24,7 +25,8 @@ const routes = [
     
     // 2. Transaksi (Sudah Aktif)
     { path: '/transaksi', component: TransaksiKgb },
-
+    { path: '/penomoran', component: Penomoran },
+    
     // 3. Laporan
     { path: '/laporan', component: Laporan },
     // 4. Master Data CRUD
