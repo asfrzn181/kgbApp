@@ -1,4 +1,4 @@
-import { ref, reactive, onMounted, computed, nextTick } from 'vue';
+import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue';
 import { 
     db, auth, collection, getDocs, getDoc, doc, query, orderBy, where, 
     serverTimestamp, runTransaction, updateDoc, deleteDoc, setDoc 
@@ -7,9 +7,79 @@ import { showToast, showConfirm, formatTanggal, formatRupiah } from '../utils.js
 import { store } from '../store.js';
 
 // IMPORT VIEW
-import { TplPenomoran } from '../views/PenomoranView.js';
+import { TplPenomoran, TplAutocompleteUsulan } from '../views/PenomoranView.js';
 
+// --- KOMPONEN AUTOCOMPLETE MANUAL (PENGGANTI SELECT2) ---
+const AutocompleteUsulan = {
+    props: ['options', 'modelValue', 'disabled'],
+    emits: ['update:modelValue', 'change'],
+    template: TplAutocompleteUsulan,
+    setup(props, { emit }) {
+        const isOpen = ref(false);
+        const search = ref('');
+        const displayValue = ref('');
+
+        // 1. Filter Data Berdasarkan Input
+        const filteredOptions = computed(() => {
+            if (!search.value) return props.options.slice(0, 50); // Tampilkan 50 data awal
+            const term = search.value.toLowerCase();
+            return props.options.filter(item => 
+                item.nama_snapshot.toLowerCase().includes(term) || 
+                item.nip.includes(term)
+            ).slice(0, 50);
+        });
+
+        // 2. Saat User Mengetik
+        const handleInput = (e) => {
+            search.value = e.target.value;
+            displayValue.value = e.target.value;
+            isOpen.value = true;
+        };
+
+        // 3. Saat User Memilih Item
+        const selectItem = (item) => {
+            displayValue.value = `${item.nama_snapshot}`; // Tampilkan Nama saja di input
+            emit('update:modelValue', item.id); // Kirim ID ke parent
+            emit('change'); // Trigger event change
+            isOpen.value = false;
+            search.value = ''; // Reset search internal
+        };
+
+        // 4. Delay Close (Agar click event list keburu jalan)
+        const delayClose = () => {
+            setTimeout(() => { isOpen.value = false; }, 200);
+        };
+
+        // 5. Watcher: Jika modelValue berubah dari luar (misal: Edit Mode), update text input
+        watch(() => props.modelValue, (newVal) => {
+            if (newVal && props.options.length > 0) {
+                const found = props.options.find(o => o.id === newVal);
+                if (found) {
+                    displayValue.value = `${found.nama_snapshot}`;
+                }
+            } else {
+                displayValue.value = '';
+            }
+        }, { immediate: true });
+
+        // 6. Watcher: Jika Options baru loading (Async), update text input
+        watch(() => props.options, (newOpts) => {
+            if (props.modelValue && newOpts.length > 0) {
+                const found = newOpts.find(o => o.id === props.modelValue);
+                if (found) displayValue.value = `${found.nama_snapshot}`;
+            }
+        });
+
+        return { 
+            isOpen, search, displayValue, filteredOptions, 
+            handleInput, selectItem, delayClose 
+        };
+    }
+};
+
+// --- MAIN COMPONENT ---
 export default {
+    components: { AutocompleteUsulan },
     template: TplPenomoran,
     setup() {
         const listData = ref([]);
@@ -85,40 +155,6 @@ export default {
             }
         };
 
-        // --- INISIALISASI SELECT2 (PENTING) ---
-        const initSelect2 = () => {
-            // Tunggu DOM Render (karena v-if modal)
-            setTimeout(() => {
-                const $select = $('#selectUsulan');
-                
-                // Hancurkan jika sudah ada (untuk refresh)
-                if ($select.hasClass("select2-hidden-accessible")) {
-                    $select.select2('destroy');
-                }
-
-                $select.select2({
-                    theme: 'bootstrap-5', // Gunakan tema bootstrap 5
-                    dropdownParent: $('.modal'), // Agar bisa dicari/fokus di dalam modal
-                    width: '85%' // Sesuaikan lebar
-                });
-
-                // Set Value jika ada (mode edit)
-                if(form.usulan_id) {
-                    $select.val(form.usulan_id).trigger('change.select2');
-                } else {
-                    $select.val('').trigger('change.select2');
-                }
-
-                // EVENT LISTENER: Saat user memilih di Select2
-                $select.off('change').on('change', function (e) {
-                    const val = $(this).val();
-                    form.usulan_id = val;
-                    handleUsulanChange(); // Panggil fungsi Vue
-                });
-
-            }, 200); // Delay 200ms agar modal muncul dulu
-        };
-
         // --- HITUNG NOMOR ---
         const previewNomor = async () => {
             if (!form.usulan_id) return showToast("Pilih usulan dulu!", 'warning');
@@ -151,10 +187,12 @@ export default {
                             nama_pegawai: form.nama_pegawai,
                             nip: form.nip,
                         });
+                        
                         if (oldUsulanId.value && oldUsulanId.value !== form.usulan_id) {
                             const oldRef = doc(db, "usulan_kgb", oldUsulanId.value);
                             transaction.update(oldRef, { nomor_naskah: null, tanggal_naskah: null });
                         }
+                        
                         const newRef = doc(db, "usulan_kgb", form.usulan_id);
                         transaction.update(newRef, { 
                             nomor_naskah: form.nomor_custom,
@@ -221,9 +259,8 @@ export default {
             form.nomor_custom = item.nomor_lengkap;
             form.no_urut = item.no_urut;
 
-            await fetchUsulanList(); // Fetch dulu
+            await fetchUsulanList(); 
             showModal.value = true;
-            initSelect2(); // Init Select2 setelah modal terbuka
         };
 
         const hapusNomor = async (item) => {
@@ -254,16 +291,13 @@ export default {
             }
         };
 
-    // VERSI KHUSUS PENOMORAN.JS (Memakai usulanId)
         const generateDocBlob = async (usulanId) => {
             if (!window.PizZip || !window.docxtemplater) throw new Error("Library Cetak Error");
             
-            // 1. FETCH DATA LENGKAP DULU (Karena di tabel penomoran datanya tidak lengkap)
             const snap = await getDoc(doc(db, "usulan_kgb", usulanId));
             if(!snap.exists()) throw new Error("Data Usulan tidak ditemukan!");
-            const item = snap.data(); // <--- Ini data lengkapnya
+            const item = snap.data();
 
-            // 2. Fetch Template & Config
             const tplId = item.tipe_asn === 'PPPK' ? "PPPK" : "PNS"; 
             const ts = await getDoc(doc(db, "config_template", tplId)); 
             if(!ts.exists()) throw new Error("Template Belum Diupload!");
@@ -272,7 +306,6 @@ export default {
             const gv = await getDoc(doc(db, "config_template", "GLOBAL_VARS")); 
             const gvd = gv.exists() ? gv.data() : {};
             
-            // 3. Logic Kop
             const golKode = item.golongan || "";
             const isSetda = item.tipe_asn === 'PNS' && (golKode.startsWith('IV') || golKode.startsWith('4'));
 
@@ -280,7 +313,6 @@ export default {
             if (isSetda) { kopT = gvd.kop_setda?.judul; kopA = gvd.kop_setda?.alamat; } 
             else { kopT = gvd.kop_bkpsdmd?.judul; kopA = gvd.kop_bkpsdmd?.alamat; }
 
-            // 4. Logic Pejabat
             let targetNip = item.pejabat_baru_nip;
             if (!targetNip) {
                 if (isSetda) targetNip = gvd.kop_setda?.pejabat_nip;
@@ -302,26 +334,21 @@ export default {
                 } 
             }
             
-            // 5. Logic TTE vs BASAH (Update Terbaru: Tanggal & Sifat)
             let ttdContent = "";
             let sifatSurat = "Biasa"; 
-            let tanggalSurat = ""; // Variabel baru
+            let tanggalSurat = ""; 
 
             if (previewTab.value === 'TTE') {
-                // TTE: Placeholder Srikandi
                 sifatSurat = "Biasa";
                 ttdContent = "\n\n\n${ttd_pengirim}\n\n\n\n\n"; 
-                tanggalSurat = "${tanggal_naskah}"; // Placeholder Tanggal Srikandi
+                tanggalSurat = "${tanggal_naskah}"; 
             } else {
-                // BASAH: Tanggal Database / Hari Ini
                 sifatSurat = "Biasa";
                 ttdContent = "\n\n\n\n"; 
-                // Jika sudah ada tanggal di DB pakai itu, jika null pakai hari ini
                 const dateObj = item.tanggal_naskah ? item.tanggal_naskah.toDate() : new Date();
                 tanggalSurat = formatTanggal(dateObj);
             }
 
-            // 6. Render
             const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
             const toTitle = (s) => s ? s.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
             const twoDigits = (val) => (val||0).toString().padStart(2, '0');
@@ -335,8 +362,8 @@ export default {
                 NIP: item.nip || "", Nip: item.nip || "", nip: item.nip || "",
                 PANGKAT: item.pangkat || "", Pangkat: item.pangkat || "",
                 JABATAN: item.jabatan || "", Jabatan: item.jabatan || "",
-                UNIT_KERJA: toTitle(item.unit_kerja), Unit_Kerja: toTitle(item.unit_kerja),
-                UNIT_KERJA_INDUK: toTitle(item.perangkat_daerah),
+                UNIT_KERJA: item.unit_kerja, Unit_Kerja: item.unit_kerja,
+                UNIT_KERJA_INDUK: item.perangkat_daerah,
                 TGL_LAHIR: formatTanggal(item.tgl_lahir),
                 GOLONGAN: item.golongan || "", DALAM_GOLONGAN: item.golongan || "",
                 DASAR_NOMOR: item.dasar_nomor || "-", NOMOR: item.dasar_nomor || "-",
@@ -352,33 +379,36 @@ export default {
                 TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
                 MASA_PERJANJIAN_KERJA: item.masa_perjanjian || "-",
                 PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian || "-",
-                
                 KOP: kopT, ALAMAT_KOP: kopA,
                 NOMOR_NASKAH: item.nomor_naskah || "....................", 
-                
-                // MENGGUNAKAN LOGIC BARU
                 TANGGAL_NASKAH: tanggalSurat, 
-                
                 SIFAT: sifatSurat, TTD_PENGIRIM: ttdContent, 
                 JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp, JABATAN_PEJABAT_TTD: pjj || "${jabatan_pejabat_ttd}", 
                 NAMA_PENGIRIM: pjn || "${nama_pengirim}", NIP_PENGIRIM: pjnip || "${nip_pengirim}"
             });
 
-            return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 7 } });
+            return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
         };
 
         const previewSK = async (logItem) => {
             if (!window.docx) return showToast("Library Preview belum dimuat!", 'error');
+            
             showPreviewModal.value = true;
             previewLoading.value = true;
             currentPreviewItem.value = logItem;
             previewTab.value = 'BASAH'; 
+            
+            await nextTick();
+            
             await renderCurrentPreview();
         };
 
         const changePreviewTab = async (tabName) => {
             previewTab.value = tabName;
             previewLoading.value = true;
+
+            await nextTick();
+
             await renderCurrentPreview();
         };
 
@@ -387,7 +417,10 @@ export default {
                 if(!currentPreviewItem.value) return;
                 const blob = await generateDocBlob(currentPreviewItem.value.usulan_id);
                 const container = document.getElementById('docx-preview-container');
-                if(container) { container.innerHTML = ''; await window.docx.renderAsync(blob, container); }
+                if(container) { 
+                    container.innerHTML = ''; 
+                    await window.docx.renderAsync(blob, container); 
+                }
             } catch (e) { console.error(e); showToast("Gagal Preview: " + e.message, 'error'); } 
             finally { previewLoading.value = false; }
         };
@@ -424,7 +457,6 @@ export default {
             
             await fetchUsulanList(); 
             showModal.value = true;
-            initSelect2(); // Init Select2 saat modal baru dibuka
         };
         const closeModal = () => showModal.value = false;
 

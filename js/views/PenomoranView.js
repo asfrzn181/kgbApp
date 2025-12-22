@@ -1,5 +1,41 @@
-import { store } from '../store.js';
+// 1. TEMPLATE AUTOCOMPLETE USULAN (PENGGANTI SELECT2)
+export const TplAutocompleteUsulan = `
+    <div class="position-relative w-100">
+        <div class="input-group">
+            <input type="text" class="form-control" 
+                :value="displayValue" 
+                @input="handleInput"
+                @focus="isOpen = true" 
+                @blur="delayClose"
+                placeholder="Ketik Nama atau NIP..." 
+                autocomplete="off"
+                :disabled="disabled">
+            <button class="btn btn-outline-secondary" type="button" @click="isOpen = !isOpen" :disabled="disabled">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+        
+        <div v-if="isOpen" class="card position-absolute w-100 shadow mt-1 overflow-auto" style="z-index: 1050; max-height: 250px;">
+            <ul class="list-group list-group-flush">
+                <li v-if="filteredOptions.length === 0" class="list-group-item text-muted small p-3 text-center">
+                    Data tidak ditemukan.
+                </li>
+                <li v-for="item in filteredOptions" :key="item.id" 
+                    class="list-group-item list-group-item-action cursor-pointer p-2"
+                    @mousedown.prevent="selectItem(item)">
+                    <div class="fw-bold text-primary">{{ item.nama_snapshot }}</div>
+                    <div class="small text-muted d-flex justify-content-between">
+                        <span>{{ item.nip }}</span>
+                        <span class="badge bg-light text-dark border">{{ item.golongan }}</span>
+                    </div>
+                    <div class="small text-secondary fst-italic truncate">{{ item.jabatan_snapshot }}</div>
+                </li>
+            </ul>
+        </div>
+    </div>
+`;
 
+// 2. TEMPLATE UTAMA
 export const TplPenomoran = `
 <div class="p-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -86,17 +122,17 @@ export const TplPenomoran = `
                         
                         <div class="mb-3">
                             <label class="form-label fw-bold small">Pilih Usulan KGB</label>
-                            <div class="input-group">
-                                <button class="btn btn-outline-secondary" type="button" @click="fetchUsulanList" title="Refresh">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-secondary" type="button" @click="fetchUsulanList" title="Refresh Data">
                                     <i class="bi bi-arrow-clockwise"></i>
                                 </button>
                                 
-                                <select id="selectUsulan" class="form-select" required style="width: 85%;">
-                                    <option value="" disabled selected>-- Cari Pegawai / NIP --</option>
-                                    <option v-for="u in listUsulan" :key="u.id" :value="u.id">
-                                        {{ u.nama_snapshot }} - {{ u.nip }} (TMT: {{ u.tmt_sekarang }})
-                                    </option>
-                                </select>
+                                <AutocompleteUsulan 
+                                    :options="listUsulan" 
+                                    v-model="form.usulan_id" 
+                                    @change="handleUsulanChange"
+                                    :disabled="false" 
+                                />
                             </div>
                         </div>
 
@@ -160,7 +196,8 @@ export const TplPenomoran = `
                         <button type="button" class="btn-close btn-close-white" @click="closePreview"></button>
                     </div>
                 </div>
-                <div class="modal-body p-0 d-flex flex-column bg-light">
+                
+                <div class="modal-body p-0 d-flex flex-column bg-light position-relative">
                     <ul class="nav nav-tabs nav-justified bg-white border-bottom shadow-sm">
                         <li class="nav-item">
                             <a class="nav-link rounded-0 py-3 fw-bold" 
@@ -179,13 +216,16 @@ export const TplPenomoran = `
                             </a>
                         </li>
                     </ul>
-                    <div class="flex-grow-1 bg-secondary d-flex justify-content-center overflow-auto py-4">
-                        <div id="docx-preview-container" class="bg-white shadow-lg transition-all" style="width: 210mm; min-height: 297mm; padding: 20px;">
-                            <div v-if="previewLoading" class="text-center py-5">
-                                <div class="spinner-border text-primary" role="status"></div>
-                                <div class="mt-2 text-muted">Sedang merender preview...</div>
-                            </div>
+
+                    <div class="flex-grow-1 bg-secondary d-flex justify-content-center overflow-auto py-4 position-relative">
+                        
+                        <div v-if="previewLoading" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-secondary bg-opacity-75" style="z-index: 10;">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+                            <div class="mt-2 text-white fw-bold text-shadow">Sedang merender preview...</div>
                         </div>
+
+                        <div id="docx-preview-container" class="bg-white shadow-lg transition-all" style="width: 210mm; min-height: 297mm; padding: 20px;"></div>
+
                     </div>
                 </div>
             </div>

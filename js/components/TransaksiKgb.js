@@ -265,12 +265,21 @@ export default {
                 if(snap.exists()){
                     const d=snap.data(); 
                     let finalTgl = d.tgl_lahir; if (!finalTgl || finalTgl === '' || finalTgl === 'Invalid Date') finalTgl = dateFromNip;
+                    
+                    // [UPDATED] Ambil Pangkat & Trigger Golongan
                     Object.assign(form, {
                         nama:d.nama, tempat_lahir:d.tempat_lahir||'', tgl_lahir: finalTgl, 
                         perangkat_daerah:d.perangkat_daerah||'', unit_kerja:d.unit_kerja||'', 
                         jabatan:d.jabatan||'', tipe_asn:d.tipe_asn||'PNS',
-                        jenis_jabatan: d.jenis_jabatan || 'Pelaksana'
+                        jenis_jabatan: d.jenis_jabatan || 'Pelaksana',
+                        pangkat: d.pangkat || '' // Copy Pangkat
                     });
+                    
+                    if(d.golongan_kode) {
+                         form.golongan = d.golongan_kode;
+                         handleGolonganChange(d.golongan_kode); // Sync Gaji & Pangkat
+                    }
+
                     if(form.jabatan){
                         const q=query(collection(db,"master_jabatan"),where("nama_jabatan","==",form.jabatan),limit(1));
                         const s=await getDocs(q); if(!s.empty) currentBup.value=s.docs[0].data().bup||58;
@@ -367,7 +376,9 @@ export default {
                 await setDoc(doc(db,"master_pegawai",form.nip), {
                     nip:form.nip, nama:form.nama, tempat_lahir:form.tempat_lahir, tgl_lahir:form.tgl_lahir,
                     perangkat_daerah:form.perangkat_daerah, unit_kerja:form.unit_kerja, jabatan:form.jabatan,
-                    tipe_asn:form.tipe_asn, jenis_jabatan: safeForm.jenis_jabatan, updated_at:serverTimestamp()
+                    tipe_asn:form.tipe_asn, jenis_jabatan: safeForm.jenis_jabatan, 
+                    pangkat: safeForm.pangkat || '', // Simpan juga pangkat ke master
+                    updated_at:serverTimestamp()
                 }, {merge:true});
                 
                 if(form.jabatan) {
@@ -388,7 +399,7 @@ export default {
             if(await showConfirm("Hapus?","Data hilang.")) { await deleteDoc(doc(db,"usulan_kgb",item.id)); fetchTable(); } 
         };
 
-        // --- PREVIEW & CETAK (UPDATED: LOGIC COMPLETE) ---
+        // --- PREVIEW & CETAK (UPDATED: LOGIC COMPLETE + NEXTTICK) ---
         const generateDocBlob = async (item) => {
             if (!window.PizZip || !window.docxtemplater) throw new Error("Library Cetak Error");
             
@@ -399,6 +410,28 @@ export default {
             const url = ts.data().url || `./templates/${ts.data().nama_file}`;
             const gv = await getDoc(doc(db, "config_template", "GLOBAL_VARS")); 
             const gvd = gv.exists() ? gv.data() : {};
+
+            // --- [BARU] AUTO-FIX PANGKAT BY SYSTEM ---
+            // Kita cari nama pangkat resmi berdasarkan Golongan, abaikan inputan user yang mungkin salah.
+            let pangkatFinal = item.pangkat || ""; 
+            if (item.golongan) {
+                try {
+                    // Cari di Master Golongan: "Siapa yang kodenya III/a?"
+                    const qPkt = query(collection(db, "master_golongan"), where("kode", "==", item.golongan));
+                    const snapPkt = await getDocs(qPkt);
+                    if (!snapPkt.empty) {
+                        // Ketemu! Pakai nama pangkat resmi dari master
+                        // Pastikan di master_golongan ada field 'pangkat' (Contoh: "Penata Muda")
+                        const dataMaster = snapPkt.docs[0].data();
+                        if (dataMaster.pangkat) {
+                            pangkatFinal = dataMaster.pangkat;
+                        }
+                    }
+                } catch (e) {
+                    console.log("Gagal auto-fetch pangkat, menggunakan data inputan.");
+                }
+            }
+            // -----------------------------------------
             
             // 1. Logic Kop & Fallback Pejabat
             const golKode = item.golongan || "";
@@ -430,24 +463,18 @@ export default {
                 } 
             }
             
-            // 3. Logic TTE vs BASAH (Tanda Tangan & Sifat)
+            // 3. Logic TTE vs BASAH
             let ttdContent = "";
             let sifatSurat = "Biasa"; 
-            
-            // [BARU] Logic Tanggal Naskah
             let tanggalSurat = "";
 
             if (previewTab.value === 'TTE') {
-                // --- MODE TTE ---
                 sifatSurat = "Biasa";
                 ttdContent = "\n\n\n${ttd_pengirim}\n\n\n\n\n"; 
-                // Tanggal Placeholder Srikandi
                 tanggalSurat = "${tanggal_naskah}"; 
             } else {
-                // --- MODE BASAH ---
                 sifatSurat = "Biasa";
                 ttdContent = "\n\n\n\n"; 
-                // Tanggal Hari Ini (jika DB kosong) atau Tanggal DB
                 const dateObj = item.tanggal_naskah ? item.tanggal_naskah.toDate() : new Date();
                 tanggalSurat = formatTanggal(dateObj);
             }
@@ -464,10 +491,13 @@ export default {
             docRender.render({
                 NAMA: item.nama || "", Nama: item.nama || "", nama: item.nama || "",
                 NIP: item.nip || "", Nip: item.nip || "", nip: item.nip || "",
-                PANGKAT: item.pangkat || "", Pangkat: item.pangkat || "",
+                
+                // [PENTING] Menggunakan pangkatFinal hasil pencarian otomatis
+                PANGKAT: pangkatFinal, Pangkat: pangkatFinal, 
+                
                 JABATAN: item.jabatan || "", Jabatan: item.jabatan || "",
-                UNIT_KERJA: toTitle(item.unit_kerja), Unit_Kerja: toTitle(item.unit_kerja),
-                UNIT_KERJA_INDUK: toTitle(item.perangkat_daerah),
+                UNIT_KERJA: item.unit_kerja, Unit_Kerja: item.unit_kerja,
+                UNIT_KERJA_INDUK: item.perangkat_daerah,
                 TGL_LAHIR: formatTanggal(item.tgl_lahir),
                 GOLONGAN: item.golongan || "", DALAM_GOLONGAN: item.golongan || "",
                 DASAR_NOMOR: item.dasar_nomor || "-", NOMOR: item.dasar_nomor || "-",
@@ -486,8 +516,6 @@ export default {
                 
                 KOP: kopT, ALAMAT_KOP: kopA,
                 NOMOR_NASKAH: item.nomor_naskah || "....................", 
-                
-                // [UPDATED] Menggunakan variabel logic baru
                 TANGGAL_NASKAH: tanggalSurat, 
                 
                 SIFAT: sifatSurat, TTD_PENGIRIM: ttdContent, 
@@ -500,10 +528,13 @@ export default {
 
         const previewSK = async (item) => {
             if (!window.docx) return showToast("Library Preview belum dimuat!", 'error');
+            
             showPreviewModal.value = true;
             previewLoading.value = true;
             currentPreviewItem.value = item;
-            previewTab.value = 'BASAH'; // Reset default
+            previewTab.value = 'BASAH'; 
+            
+            await nextTick(); // [FIXED] Tunggu DOM
             
             await renderCurrentPreview();
         };
@@ -511,6 +542,9 @@ export default {
         const changePreviewTab = async (tabName) => {
             previewTab.value = tabName;
             previewLoading.value = true;
+
+            await nextTick(); // [FIXED] Tunggu DOM
+
             await renderCurrentPreview();
         };
 
@@ -519,7 +553,10 @@ export default {
                 if(!currentPreviewItem.value) return;
                 const blob = await generateDocBlob(currentPreviewItem.value);
                 const container = document.getElementById('docx-preview-container');
-                if(container) { container.innerHTML = ''; await window.docx.renderAsync(blob, container); }
+                if(container) { 
+                    container.innerHTML = ''; 
+                    await window.docx.renderAsync(blob, container); 
+                }
             } catch (e) { console.error(e); showToast("Gagal Preview: " + e.message, 'error'); } 
             finally { previewLoading.value = false; }
         };
@@ -552,9 +589,7 @@ export default {
             nextPage, prevPage, openModal, closeModal, simpanTransaksi, hapusTransaksi, cetakSK, 
             handleNipInput, cariGajiBaru, cariGajiLama, handleGolonganChange, handleJabatanSelect, formatRupiah, formatTanggal,
             showPreviewModal, previewLoading, previewSK, closePreview, downloadFromPreview,
-            // [NEW]
             previewTab, changePreviewTab,
-            // Status helpers
             statusColor, updateStatus
         };
     }

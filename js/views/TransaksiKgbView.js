@@ -114,9 +114,7 @@ export const TplMain = `
                                 <td class="text-end pe-4">
                                     <div class="btn-group">
                                         <button @click="previewSK(item)" class="btn btn-sm btn-light border text-primary" title="Preview"><i class="bi bi-eye-fill"></i></button>
-                                        
                                         <button @click="openModal(item)" class="btn btn-sm btn-light border text-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
-                                        
                                         <button v-if="!item.nomor_naskah" @click="hapusTransaksi(item)" class="btn btn-sm btn-light border text-danger" title="Hapus"><i class="bi bi-trash"></i></button>
                                     </div>
                                 </td>
@@ -142,7 +140,6 @@ export const TplMain = `
                 </div>
                 <div class="modal-body bg-light p-4">
                     <form @submit.prevent="simpanTransaksi">
-                        
                         <div class="card shadow-sm border-0 mb-3">
                             <div class="card-header bg-white py-3"><h6 class="fw-bold text-primary mb-0">1. Identitas Pegawai</h6></div>
                             <div class="card-body">
@@ -267,7 +264,7 @@ export const TplMain = `
                     </div>
                 </div>
                 
-                <div class="modal-body p-0 d-flex flex-column bg-light">
+                <div class="modal-body p-0 d-flex flex-column bg-light position-relative">
                     <ul class="nav nav-tabs nav-justified bg-white border-bottom shadow-sm">
                         <li class="nav-item">
                             <a class="nav-link rounded-0 py-3 fw-bold" 
@@ -287,18 +284,19 @@ export const TplMain = `
                         </li>
                     </ul>
 
-                    <div class="flex-grow-1 bg-secondary d-flex justify-content-center overflow-auto py-4">
-                        <div id="docx-preview-container" class="bg-white shadow-lg transition-all" style="width: 210mm; min-height: 297mm; padding: 20px;">
-                            <div v-if="previewLoading" class="text-center py-5">
-                                <div class="spinner-border text-primary" role="status"></div>
-                                <div class="mt-2 text-muted">Sedang merender preview...</div>
-                            </div>
+                    <div class="flex-grow-1 bg-secondary d-flex justify-content-center overflow-auto py-4 position-relative">
+                        
+                        <div v-if="previewLoading" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-secondary bg-opacity-75" style="z-index: 10;">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+                            <div class="mt-2 text-white fw-bold text-shadow">Sedang merender preview...</div>
                         </div>
+
+                        <div id="docx-preview-container" class="bg-white shadow-lg transition-all" style="width: 210mm; min-height: 297mm; padding: 20px;"></div>
+
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
 </div>
 `;
