@@ -493,16 +493,18 @@ export default {
             let ttdContent = "";
             let sifatSurat = "Biasa"; 
             let tanggalSurat = "";
-
+            let nomor_naskah = "";
             if (previewTab.value === 'TTE') {
                 sifatSurat = "Biasa";
                 ttdContent = "\n\n\n${ttd_pengirim}\n\n\n\n\n"; 
                 tanggalSurat = "${tanggal_naskah}"; 
+                nomor_naskah = item.nomor_naskah || "${nomor_naskah}";
             } else {
                 sifatSurat = "Biasa";
                 ttdContent = "\n\n\n\n"; 
                 const dateObj = item.tanggal_naskah ? item.tanggal_naskah.toDate() : new Date();
                 tanggalSurat = formatTanggal(dateObj);
+                nomor_naskah = item.nomor_naskah || "";
             }
 
             // 4. Render
@@ -541,7 +543,7 @@ export default {
                 PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian || "-",
                 
                 KOP: kopT, ALAMAT_KOP: kopA,
-                NOMOR_NASKAH: item.nomor_naskah || "....................", 
+                NOMOR_NASKAH: nomor_naskah, 
                 TANGGAL_NASKAH: tanggalSurat, 
                 
                 SIFAT: sifatSurat, TTD_PENGIRIM: ttdContent, 
