@@ -1,8 +1,8 @@
 import { store } from '../store.js';
 
 export const TplLaporan = `
-<div class="p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="p-3 p-md-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <div>
             <h3 class="fw-bold text-primary mb-1">Laporan & Analisis</h3>
             <p class="text-muted small mb-0">Export data KGB & Visualisasi Statistik Pegawai.</p>
@@ -10,11 +10,11 @@ export const TplLaporan = `
     </div>
 
     <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body bg-light">
+        <div class="card-body bg-light p-3 p-md-4">
             <form @submit.prevent="fetchPreview">
                 <div class="row g-3 align-items-end">
                     
-                    <div class="col-md-2">
+                    <div class="col-12 col-md-2">
                         <label class="form-label small fw-bold text-muted">Jenis Tanggal</label>
                         <select v-model="filterType" class="form-select shadow-sm">
                             <option value="TMT">Berdasarkan TMT</option>
@@ -22,17 +22,17 @@ export const TplLaporan = `
                         </select>
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <label class="form-label small fw-bold text-muted">Mulai Tanggal</label>
                         <input v-model="startDate" type="date" class="form-control shadow-sm" required>
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-6 col-md-3">
                         <label class="form-label small fw-bold text-muted">Sampai Tanggal</label>
                         <input v-model="endDate" type="date" class="form-control shadow-sm" required>
                     </div>
 
-                    <div class="col-md-2" v-if="store.isAdmin">
+                    <div class="col-12 col-md-2" v-if="store.isAdmin">
                         <label class="form-label small fw-bold text-muted">Filter User</label>
                         <select v-model="selectedUser" class="form-select shadow-sm">
                             <option value="ALL">Semua User</option>
@@ -40,7 +40,7 @@ export const TplLaporan = `
                         </select>
                     </div>
 
-                    <div class="col-md-2">
+                    <div class="col-12 col-md-2">
                         <button type="submit" class="btn btn-primary w-100 shadow-sm" :disabled="loading">
                             <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
                             {{ loading ? 'Memuat...' : 'Analisis Data' }}
@@ -93,12 +93,12 @@ export const TplLaporan = `
     </div>
 
     <div v-if="hasSearched" class="fade-in">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
             <h5 class="fw-bold text-secondary mb-0">
                 Rincian Data 
                 <span class="badge bg-secondary ms-2">{{ previewData.length }} Data</span>
             </h5>
-            <button v-if="previewData.length > 0" @click="downloadExcel" class="btn btn-success shadow-sm">
+            <button v-if="previewData.length > 0" @click="downloadExcel" class="btn btn-success shadow-sm w-100 w-md-auto">
                 <i class="bi bi-file-earmark-excel me-2"></i>Download Excel
             </button>
         </div>
@@ -106,7 +106,7 @@ export const TplLaporan = `
         <div class="card shadow-sm border-0">
             <div class="card-body p-0">
                 <div class="table-responsive" style="max-height: 500px;">
-                    <table class="table table-hover table-striped mb-0 small">
+                    <table class="table table-hover table-striped mb-0 small" style="min-width: 1000px;">
                         <thead class="table-dark sticky-top">
                             <tr>
                                 <th class="ps-3">Nama Pegawai</th>

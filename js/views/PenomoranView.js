@@ -37,13 +37,13 @@ export const TplAutocompleteUsulan = `
 
 // 2. TEMPLATE UTAMA
 export const TplPenomoran = `
-<div class="p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="p-3 p-md-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <div>
             <h3 class="fw-bold text-primary mb-1">Registrasi Nomor SK</h3>
             <p class="text-muted small mb-0">Generator Nomor Surat Otomatis (Auto-Increment).</p>
         </div>
-        <button @click="openModal()" class="btn btn-primary shadow-sm">
+        <button @click="openModal()" class="btn btn-primary shadow-sm w-100 w-md-auto">
             <i class="bi bi-plus-lg me-2"></i> Registrasi Nomor
         </button>
     </div>
@@ -51,7 +51,7 @@ export const TplPenomoran = `
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0" style="min-width: 800px;">
                     <thead class="table-light">
                         <tr>
                             <th class="ps-4">No. Surat Lengkap</th>
@@ -104,15 +104,15 @@ export const TplPenomoran = `
     </div>
 
     <div v-if="showModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1" @click.self="closeModal">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
+        <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
+            <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title fw-bold">
                         {{ isEditMode ? 'Edit Data Nomor SK' : 'Generate Nomor SK' }}
                     </h5>
                     <button type="button" class="btn-close btn-close-white" @click="closeModal"></button>
                 </div>
-                <div class="modal-body p-4">
+                <div class="modal-body p-4 bg-light">
                     <div v-if="isEditMode" class="alert alert-warning d-flex align-items-center mb-3">
                         <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
                         <small>Anda sedang mengedit data untuk <strong>No Urut #{{ String(form.no_urut).padStart(4,'0') }}</strong>. Nomor urut tidak akan berubah, hanya kepemilikan data yang berubah.</small>
@@ -120,57 +120,84 @@ export const TplPenomoran = `
 
                     <form @submit.prevent="simpanFinal">
                         
-                        <div class="mb-3">
-                            <label class="form-label fw-bold small">Pilih Usulan KGB</label>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-outline-secondary" type="button" @click="fetchUsulanList" title="Refresh Data">
-                                    <i class="bi bi-arrow-clockwise"></i>
-                                </button>
+                        <div class="card border-0 shadow-sm mb-3">
+                            <div class="card-body">
+                                <label class="form-label fw-bold small text-muted">1. Pilih Usulan KGB</label>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-secondary" type="button" @click="fetchUsulanList" title="Refresh Data">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                    
+                                    <AutocompleteUsulan 
+                                        :options="listUsulan" 
+                                        v-model="form.usulan_id" 
+                                        @change="handleUsulanChange"
+                                        :disabled="false" 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card border-0 shadow-sm mb-3">
+                            <div class="card-body">
+                                <label class="form-label fw-bold small text-muted mb-3">2. Detail Penomoran</label>
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small fw-bold">Jenis Jabatan</label>
+                                        <select v-model="form.jenis_jabatan" class="form-select" :disabled="isEditMode" required>
+                                            <option value="Struktural">Struktural</option>
+                                            <option value="Fungsional">Fungsional</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label small fw-bold">Tahun</label>
+                                        <select v-model="form.tahun" class="form-select" :disabled="isEditMode" required>
+                                            <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label small fw-bold">Golongan</label>
+                                        <input v-model="form.golongan" type="text" class="form-control" placeholder="III/a" :readonly="isEditMode" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card border-0 shadow-sm mb-3 border-start border-4 border-warning">
+                            <div class="card-body bg-warning bg-opacity-10">
+                                <label class="form-label fw-bold text-dark mb-2">3. Nomor Surat (Final)</label>
                                 
-                                <AutocompleteUsulan 
-                                    :options="listUsulan" 
-                                    v-model="form.usulan_id" 
-                                    @change="handleUsulanChange"
-                                    :disabled="false" 
-                                />
+                                <div class="input-group">
+                                    <input v-model="form.nomor_custom" type="text" class="form-control font-monospace fw-bold fs-5 text-dark" placeholder="Klik tombol Hitung atau Ketik Manual..." required>
+                                    <button v-if="!isEditMode" type="button" class="btn btn-warning shadow-sm" @click="previewNomor" :disabled="isSaving || !form.usulan_id">
+                                        <i class="bi bi-calculator me-md-2"></i><span class="d-none d-md-inline">Generate</span>
+                                    </button>
+                                </div>
+
+                                <div v-if="customNumberStatus" class="alert py-2 small mb-0 mt-2 d-flex align-items-center shadow-sm" 
+                                     :class="{
+                                         'alert-info': customNumberStatus === 'checking',
+                                         'alert-success': customNumberStatus === 'available',
+                                         'alert-danger': customNumberStatus === 'taken',
+                                         'alert-warning': customNumberStatus === 'warning' || customNumberStatus === 'invalid'
+                                     }">
+                                    <i class="bi me-2 fs-5" :class="{
+                                        'bi-hourglass-split': customNumberStatus === 'checking',
+                                        'bi-check-circle-fill': customNumberStatus === 'available',
+                                        'bi-x-circle-fill': customNumberStatus === 'taken',
+                                        'bi-exclamation-triangle-fill': customNumberStatus === 'warning' || customNumberStatus === 'invalid'
+                                    }"></i>
+                                    <div>
+                                        <strong>{{ customNumberMsg }}</strong>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
 
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold small">Jenis Jabatan</label>
-                                <select v-model="form.jenis_jabatan" class="form-select" :disabled="isEditMode" required>
-                                    <option value="Struktural">Struktural</option>
-                                    <option value="Fungsional">Fungsional</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold small">Tahun</label>
-                                <select v-model="form.tahun" class="form-select" :disabled="isEditMode" required>
-                                    <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold small">Golongan</label>
-                                <input v-model="form.golongan" type="text" class="form-control" placeholder="III/a" :readonly="isEditMode" required>
-                            </div>
-                        </div>
-
-                        <hr>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-primary">Nomor Surat (Final)</label>
-                            <div class="input-group">
-                                <input v-model="form.nomor_custom" type="text" class="form-control font-monospace fw-bold fs-5 text-dark" placeholder="Klik tombol Hitung..." required :readonly="isEditMode">
-                                <button v-if="!isEditMode" type="button" class="btn btn-warning" @click="previewNomor" :disabled="isSaving || !form.usulan_id">
-                                    <i class="bi bi-calculator me-2"></i>Hitung Otomatis
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="d-grid mt-4 gap-2 d-md-flex justify-content-md-end">
-                            <button type="button" class="btn btn-light border px-4" @click="closeModal">Batal</button>
-                            <button type="submit" class="btn btn-primary px-4" :disabled="isSaving">
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <button type="button" class="btn btn-light border px-4 py-2" @click="closeModal">Batal</button>
+                            <button type="submit" class="btn btn-primary px-4 py-2 shadow" :disabled="isSaving || customNumberStatus === 'taken'">
                                 <span v-if="isSaving" class="spinner-border spinner-border-sm me-2"></span>
                                 {{ isEditMode ? 'Update Data' : 'Simpan Nomor' }}
                             </button>
@@ -185,13 +212,13 @@ export const TplPenomoran = `
             style="background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); z-index: 1060;" 
             tabindex="-1"
             @click.self="closePreview">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable" style="height: 95vh;">
+        <div class="modal-dialog modal-xl modal-fullscreen-sm-down modal-dialog-scrollable" style="height: 95vh;">
             <div class="modal-content h-100 border-0">
                 <div class="modal-header bg-dark text-white border-0 py-2 align-items-center justify-content-between">
-                    <h6 class="modal-title mb-0"><i class="bi bi-eye me-2"></i>Preview Dokumen SK</h6>
+                    <h6 class="modal-title mb-0"><i class="bi bi-eye me-2"></i>Preview SK</h6>
                     <div>
                         <button class="btn btn-sm btn-success me-2" @click="downloadFromPreview">
-                            <i class="bi bi-download me-1"></i> Download Word ({{ previewTab === 'TTE' ? 'TTE' : 'Basah' }})
+                            <i class="bi bi-download me-1"></i> <span class="d-none d-md-inline">Download Word</span>
                         </button>
                         <button type="button" class="btn-close btn-close-white" @click="closePreview"></button>
                     </div>
@@ -204,7 +231,7 @@ export const TplPenomoran = `
                                :class="previewTab === 'BASAH' ? 'active text-primary border-bottom-0' : 'text-muted'"
                                style="cursor: pointer;"
                                @click="changePreviewTab('BASAH')">
-                                <i class="bi bi-pen me-2"></i>TTD BASAH (Konvensional)
+                                <i class="bi bi-pen me-2"></i><span class="d-none d-md-inline">TTD BASAH</span>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -212,7 +239,7 @@ export const TplPenomoran = `
                                :class="previewTab === 'TTE' ? 'active text-success border-bottom-0' : 'text-muted'"
                                style="cursor: pointer;"
                                @click="changePreviewTab('TTE')">
-                                <i class="bi bi-qr-code me-2"></i>TTE (Srikandi / Elektronik)
+                                <i class="bi bi-qr-code me-2"></i><span class="d-none d-md-inline">TTE (Srikandi)</span>
                             </a>
                         </li>
                     </ul>

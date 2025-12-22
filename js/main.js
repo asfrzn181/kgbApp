@@ -9,8 +9,9 @@ import Sidebar from './components/Sidebar.js';
 import Auth from './components/Auth.js';
 import Dashboard from './components/Dashboard.js';
 import Laporan from './components/Laporan.js';
+
 // --- IMPORT MODUL UTAMA ---
-import TransaksiKgb from './components/TransaksiKgb.js'; // Module Transaksi
+import TransaksiKgb from './components/TransaksiKgb.js'; 
 import MasterPegawai from './components/MasterPegawai.js'; 
 import MasterGaji from './components/MasterGaji.js';
 import MasterPejabat from './components/MasterPejabat.js';
@@ -18,17 +19,19 @@ import MasterTemplate from './components/MasterTemplate.js';
 import MasterGolongan from './components/MasterGolongan.js';
 import MasterJabatan from './components/MasterJabatan.js';
 import Penomoran from './components/Penomoran.js';
+
 // --- KONFIGURASI ROUTER ---
 const routes = [
     // 1. Dashboard
     { path: '/', component: Dashboard },
     
-    // 2. Transaksi (Sudah Aktif)
+    // 2. Transaksi & Penomoran
     { path: '/transaksi', component: TransaksiKgb },
     { path: '/penomoran', component: Penomoran },
     
     // 3. Laporan
     { path: '/laporan', component: Laporan },
+
     // 4. Master Data CRUD
     { path: '/master/pegawai', component: MasterPegawai },
     { path: '/master/gaji', component: MasterGaji },
@@ -50,7 +53,7 @@ const app = createApp({
         <div v-if="store.isLoading" class="position-fixed top-0 start-0 w-100 h-100 bg-white d-flex justify-content-center align-items-center" style="z-index: 9999;">
             <div class="text-center">
                 <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
-                <h6 class="text-muted fw-bold animate-pulse">Memuat Aplikasi...</h6>
+                <h6 class="text-secondary fw-bold animate-pulse">Memuat Aplikasi...</h6>
             </div>
         </div>
 
@@ -58,11 +61,14 @@ const app = createApp({
             <Auth />
         </div>
 
-        <div v-else class="d-flex">
-            <Sidebar @logout="handleLogout" />
+        <div v-else class="d-flex flex-column flex-md-row vh-100 w-100 overflow-hidden">
             
-            <div class="flex-grow-1 bg-light" style="height: 100vh; overflow-y: auto;">
-                <router-view></router-view>
+            <Sidebar @logout="handleLogout" class="flex-shrink-0 border-end" />
+            
+            <div class="flex-grow-1 bg-light position-relative overflow-auto h-100 w-100">
+                <div style="min-height: 100%;">
+                    <router-view></router-view>
+                </div>
             </div>
         </div>
     `,
@@ -105,4 +111,4 @@ const app = createApp({
 });
 
 app.use(router);
-app.mount('#app');
+app.mount('#app'); // Pastikan div id="app" ada di index.html

@@ -3,13 +3,13 @@ import {
     db, auth, collection, getDocs, getDoc, doc, query, orderBy, where, 
     serverTimestamp, runTransaction, updateDoc, deleteDoc, setDoc 
 } from '../firebase.js';
-import { showToast, showConfirm, formatTanggal, formatRupiah } from '../utils.js';
+import { showToast, showConfirm, formatTanggal, formatRupiah, debounce } from '../utils.js'; // Pastikan debounce diimport
 import { store } from '../store.js';
 
 // IMPORT VIEW
 import { TplPenomoran, TplAutocompleteUsulan } from '../views/PenomoranView.js';
 
-// --- KOMPONEN AUTOCOMPLETE MANUAL (PENGGANTI SELECT2) ---
+// --- KOMPONEN AUTOCOMPLETE MANUAL ---
 const AutocompleteUsulan = {
     props: ['options', 'modelValue', 'disabled'],
     emits: ['update:modelValue', 'change'],
@@ -19,9 +19,8 @@ const AutocompleteUsulan = {
         const search = ref('');
         const displayValue = ref('');
 
-        // 1. Filter Data Berdasarkan Input
         const filteredOptions = computed(() => {
-            if (!search.value) return props.options.slice(0, 50); // Tampilkan 50 data awal
+            if (!search.value) return props.options.slice(0, 50);
             const term = search.value.toLowerCase();
             return props.options.filter(item => 
                 item.nama_snapshot.toLowerCase().includes(term) || 
@@ -29,40 +28,31 @@ const AutocompleteUsulan = {
             ).slice(0, 50);
         });
 
-        // 2. Saat User Mengetik
         const handleInput = (e) => {
             search.value = e.target.value;
             displayValue.value = e.target.value;
             isOpen.value = true;
         };
 
-        // 3. Saat User Memilih Item
         const selectItem = (item) => {
-            displayValue.value = `${item.nama_snapshot}`; // Tampilkan Nama saja di input
-            emit('update:modelValue', item.id); // Kirim ID ke parent
-            emit('change'); // Trigger event change
+            displayValue.value = `${item.nama_snapshot}`;
+            emit('update:modelValue', item.id);
+            emit('change');
             isOpen.value = false;
-            search.value = ''; // Reset search internal
+            search.value = '';
         };
 
-        // 4. Delay Close (Agar click event list keburu jalan)
-        const delayClose = () => {
-            setTimeout(() => { isOpen.value = false; }, 200);
-        };
+        const delayClose = () => { setTimeout(() => { isOpen.value = false; }, 200); };
 
-        // 5. Watcher: Jika modelValue berubah dari luar (misal: Edit Mode), update text input
         watch(() => props.modelValue, (newVal) => {
             if (newVal && props.options.length > 0) {
                 const found = props.options.find(o => o.id === newVal);
-                if (found) {
-                    displayValue.value = `${found.nama_snapshot}`;
-                }
+                if (found) displayValue.value = `${found.nama_snapshot}`;
             } else {
                 displayValue.value = '';
             }
         }, { immediate: true });
 
-        // 6. Watcher: Jika Options baru loading (Async), update text input
         watch(() => props.options, (newOpts) => {
             if (props.modelValue && newOpts.length > 0) {
                 const found = newOpts.find(o => o.id === props.modelValue);
@@ -70,10 +60,7 @@ const AutocompleteUsulan = {
             }
         });
 
-        return { 
-            isOpen, search, displayValue, filteredOptions, 
-            handleInput, selectItem, delayClose 
-        };
+        return { isOpen, search, displayValue, filteredOptions, handleInput, selectItem, delayClose };
     }
 };
 
@@ -96,6 +83,10 @@ export default {
         const previewLoading = ref(false);
         const currentPreviewItem = ref(null);
         const previewTab = ref('BASAH');
+
+        // STATE UNTUK CUSTOM NUMBER CHECK
+        const customNumberStatus = ref(null); // 'checking', 'available', 'taken', 'invalid'
+        const customNumberMsg = ref('');
 
         const form = reactive({
             usulan_id: '',
@@ -155,7 +146,56 @@ export default {
             }
         };
 
-        // --- HITUNG NOMOR ---
+        // --- CEK KETERSEDIAAN NOMOR ---
+        const checkCustomNumber = debounce(async (nomor) => {
+            if (!nomor) {
+                customNumberStatus.value = null;
+                customNumberMsg.value = '';
+                return;
+            }
+
+            customNumberStatus.value = 'checking';
+            customNumberMsg.value = 'Mengecek ketersediaan...';
+
+            try {
+                // Cek di koleksi nomor_surat apakah ada yang punya nomor_lengkap sama
+                const q = query(collection(db, "nomor_surat"), where("nomor_lengkap", "==", nomor));
+                const snap = await getDocs(q);
+
+                if (!snap.empty) {
+                    // Jika ketemu, cek apakah itu miliknya sendiri (saat edit)
+                    if (isEditMode.value && snap.docs[0].id === editId.value) {
+                        customNumberStatus.value = 'available';
+                        customNumberMsg.value = 'Nomor ini milik dokumen ini (Aman).';
+                    } else {
+                        const owner = snap.docs[0].data();
+                        customNumberStatus.value = 'taken';
+                        customNumberMsg.value = `Nomor TIDAK DAPAT DIGUNAKAN. Dimiliki oleh: ${owner.nama_pegawai}`;
+                    }
+                } else {
+                    // Jika tidak ada di database, berarti kosong/tersedia
+                    // Validasi tambahan: Pastikan format mengandung "B-800" dll jika perlu
+                    if (!nomor.includes('B-800')) {
+                         customNumberStatus.value = 'warning';
+                         customNumberMsg.value = 'Format nomor tidak standar, tapi tersedia.';
+                    } else {
+                        customNumberStatus.value = 'available';
+                        customNumberMsg.value = 'Nomor KOSONG / TERSEDIA. Silakan gunakan.';
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+                customNumberStatus.value = 'invalid';
+                customNumberMsg.value = 'Gagal mengecek nomor.';
+            }
+        }, 800);
+
+        // Watch perubahan input nomor custom
+        watch(() => form.nomor_custom, (newVal) => {
+            checkCustomNumber(newVal);
+        });
+
+        // --- HITUNG NOMOR (AUTO) ---
         const previewNomor = async () => {
             if (!form.usulan_id) return showToast("Pilih usulan dulu!", 'warning');
             try {
@@ -170,15 +210,33 @@ export default {
                 const noUrutStr = String(nextCount).padStart(4, '0'); 
                 
                 form.nomor_custom = `B-800.1.11.13/${golRomawi}/${noUrutStr}/BKPSDMD/${form.tahun}`;
+                form.no_urut = nextCount; // Simpan sementara, nanti di save dicek lagi
+                
+                // Trigger check manual karena kita set via code
+                checkCustomNumber(form.nomor_custom);
+
             } catch (e) { showToast("Gagal hitung: " + e.message, 'error'); }
         };
 
         // --- SIMPAN FINAL ---
         const simpanFinal = async () => {
             if (!form.nomor_custom) return showToast("Nomor belum diisi!", 'warning');
+            if (customNumberStatus.value === 'taken') return showToast("Nomor sudah terpakai! Ganti nomor lain.", 'error');
+            
             isSaving.value = true;
 
             try {
+                // Ekstrak no urut dari string nomor (jika format standar)
+                // Contoh: .../III/0005/... -> ambil 0005
+                const parts = form.nomor_custom.split('/');
+                let currentUrut = 0;
+                if(parts.length > 2 && !isNaN(parseInt(parts[2]))) { 
+                    currentUrut = parseInt(parts[2]); 
+                } else {
+                    // Jika custom banget, pake no_urut yang ada atau 0
+                    currentUrut = form.no_urut || 0;
+                }
+
                 if (isEditMode.value) {
                     await runTransaction(db, async (transaction) => {
                         const logRef = doc(db, "nomor_surat", editId.value);
@@ -186,6 +244,8 @@ export default {
                             usulan_id: form.usulan_id,
                             nama_pegawai: form.nama_pegawai,
                             nip: form.nip,
+                            nomor_lengkap: form.nomor_custom,
+                            no_urut: currentUrut
                         });
                         
                         if (oldUsulanId.value && oldUsulanId.value !== form.usulan_id) {
@@ -202,13 +262,10 @@ export default {
                     showToast("Data Nomor berhasil diperbarui!", 'success');
                 } 
                 else {
+                    // Cek Counter Max hanya jika nomor ini LEBIH BESAR dari counter sekarang
+                    // Jika nomor ini mengisi bolong (lebih kecil), counter JANGAN diupdate.
                     const counterId = `${form.tahun}_${form.jenis_jabatan.toUpperCase()}`;
                     const counterRef = doc(db, "counters_nomor", counterId);
-                    
-                    const parts = form.nomor_custom.split('/');
-                    let currentUrut = 0;
-                    if(parts.length > 2 && !isNaN(parts[2])) { currentUrut = parseInt(parts[2]); }
-
                     const snapCount = await getDoc(counterRef);
                     let dbCount = 0;
                     if (snapCount.exists()) dbCount = snapCount.data().count;
@@ -258,6 +315,10 @@ export default {
             form.tahun = item.tahun;
             form.nomor_custom = item.nomor_lengkap;
             form.no_urut = item.no_urut;
+
+            // Reset status
+            customNumberStatus.value = null;
+            customNumberMsg.value = '';
 
             await fetchUsulanList(); 
             showModal.value = true;
@@ -455,6 +516,10 @@ export default {
             form.nomor_custom = '';
             form.no_urut = 0;
             
+            // Reset status number check
+            customNumberStatus.value = null;
+            customNumberMsg.value = '';
+
             await fetchUsulanList(); 
             showModal.value = true;
         };
@@ -469,7 +534,10 @@ export default {
             previewNomor, simpanFinal, hapusNomor, editNomor,
             openModal, closeModal,
             previewSK, cetakSK, downloadFromPreview, closePreview, changePreviewTab,
-            showPreviewModal, previewLoading
+            showPreviewModal, previewLoading,
+            
+            // [NEW] Return status number check
+            customNumberStatus, customNumberMsg
         };
     }
 };
