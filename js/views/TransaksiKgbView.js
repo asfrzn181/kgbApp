@@ -114,7 +114,9 @@ export const TplMain = `
                                 <td class="text-end pe-4">
                                     <div class="btn-group">
                                         <button @click="previewSK(item)" class="btn btn-sm btn-light border text-primary" title="Preview"><i class="bi bi-eye-fill"></i></button>
+                                        
                                         <button @click="openModal(item)" class="btn btn-sm btn-light border text-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
+                                        
                                         <button v-if="!item.nomor_naskah" @click="hapusTransaksi(item)" class="btn btn-sm btn-light border text-danger" title="Hapus"><i class="bi bi-trash"></i></button>
                                     </div>
                                 </td>
@@ -140,6 +142,7 @@ export const TplMain = `
                 </div>
                 <div class="modal-body bg-light p-4">
                     <form @submit.prevent="simpanTransaksi">
+                        
                         <div class="card shadow-sm border-0 mb-3">
                             <div class="card-header bg-white py-3"><h6 class="fw-bold text-primary mb-0">1. Identitas Pegawai</h6></div>
                             <div class="card-body">
@@ -176,13 +179,6 @@ export const TplMain = `
                                             <option value="Fungsional">Fungsional</option>
                                             <option value="Struktural">Struktural</option>
                                         </select>
-                                    </div>
-                                    <div class="col-md-12">
-                                        <div class="form-check form-switch bg-light p-2 rounded border">
-                                            <input class="form-check-input ms-0 me-2" type="checkbox" v-model="form.is_pensiun_manual" id="manualPensiunCheck">
-                                            <label class="form-check-label small fw-bold text-danger" for="manualPensiunCheck">Pegawai ini Pensiun (Manual Override)</label>
-                                        </div>
-                                        <div class="form-text small text-end" v-if="pensiunMsg" :class="isPensiun ? 'text-danger fw-bold' : 'text-success'">Status: {{ pensiunMsg }}</div>
                                     </div>
                                 </div>
                             </div>
@@ -229,15 +225,38 @@ export const TplMain = `
                                     </div>
 
                                     <div class="col-md-3"><label class="form-label small fw-bold">TMT Sekarang</label><input v-model="form.tmt_sekarang" type="date" class="form-control" required></div>
-                                    <div class="col-md-3">
+                                    
+                                    <div class="col-md-4">
                                         <label class="form-label small text-muted">TMT YAD (Selanjutnya)</label>
-                                        <input v-model="form.tmt_selanjutnya" type="date" class="form-control bg-white">
-                                        <div v-if="isPensiun" class="small text-danger fw-bold mt-1">Info: Pegawai BUP</div>
+                                        <div class="input-group">
+                                            <input v-model="form.tmt_selanjutnya" type="date" class="form-control bg-white">
+                                            <button type="button" @click="setTmtPensiun" class="btn btn-danger text-white btn-sm fw-bold" title="Set Pensiun (00 00 0000)">
+                                                <i class="bi bi-stop-circle me-1"></i> STOP
+                                            </button>
+                                        </div>
+                                        <div class="small text-danger fw-bold mt-1" v-if="pensiunMsg">{{ pensiunMsg }}</div>
                                     </div>
-                                    <div class="col-md-6"><label class="form-label small fw-bold text-primary">Pejabat Penandatangan SK</label><SearchSelect :options="listPejabat" v-model="form.pejabat_baru_nip" label-key="jabatan" value-key="nip" placeholder="Pilih Pejabat..." /></div>
+
+                                    <div class="col-md-5"><label class="form-label small fw-bold text-primary">Pejabat Penandatangan SK</label><SearchSelect :options="listPejabat" v-model="form.pejabat_baru_nip" label-key="jabatan" value-key="nip" placeholder="Pilih Pejabat..." /></div>
                                 </div>
                             </div>
                         </div>
+
+                        <div class="card shadow-sm border-0 border-start border-4 border-danger">
+                            <div class="card-header bg-danger bg-opacity-10 py-3"><h6 class="fw-bold text-danger mb-0">4. Status Akhir (Opsional)</h6></div>
+                            <div class="card-body">
+                                <div class="form-check form-switch p-2">
+                                    <input class="form-check-input ms-0 me-2" type="checkbox" v-model="form.is_pensiun_manual" id="manualPensiunCheck" style="transform: scale(1.2);">
+                                    <label class="form-check-label small fw-bold text-danger pt-1" for="manualPensiunCheck">
+                                        Set Status: Berhenti Berkala (Pensiun/Meninggal)
+                                    </label>
+                                </div>
+                                <div class="text-muted small ms-4">
+                                    <i>Centang ini jika pegawai akan pensiun sebelum periode KGB berikutnya. TMT YAD akan dikosongkan.</i>
+                                </div>
+                            </div>
+                        </div>
+
                     </form>
                 </div>
                 <div class="modal-footer bg-white">

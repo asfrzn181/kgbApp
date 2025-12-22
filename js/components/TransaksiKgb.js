@@ -266,18 +266,23 @@ export default {
                     const d=snap.data(); 
                     let finalTgl = d.tgl_lahir; if (!finalTgl || finalTgl === '' || finalTgl === 'Invalid Date') finalTgl = dateFromNip;
                     
-                    // [UPDATED] Ambil Pangkat & Trigger Golongan
+                    // 1. Masukkan data dasar dulu (KECUALI PANGKAT)
                     Object.assign(form, {
                         nama:d.nama, tempat_lahir:d.tempat_lahir||'', tgl_lahir: finalTgl, 
                         perangkat_daerah:d.perangkat_daerah||'', unit_kerja:d.unit_kerja||'', 
                         jabatan:d.jabatan||'', tipe_asn:d.tipe_asn||'PNS',
-                        jenis_jabatan: d.jenis_jabatan || 'Pelaksana',
-                        pangkat: d.pangkat || '' // Copy Pangkat
+                        jenis_jabatan: d.jenis_jabatan || 'Pelaksana'
                     });
                     
+                    // 2. Proses Golongan (Ini akan mengisi Pangkat secara Default/Standar)
                     if(d.golongan_kode) {
                          form.golongan = d.golongan_kode;
-                         handleGolonganChange(d.golongan_kode); // Sync Gaji & Pangkat
+                         handleGolonganChange(d.golongan_kode); 
+                    }
+
+                    // 3. [PERBAIKAN] Timpa Pangkat dengan data Asli Pegawai (Prioritas Utama)
+                    if (d.pangkat) {
+                        form.pangkat = d.pangkat;
                     }
 
                     if(form.jabatan){
@@ -301,15 +306,37 @@ export default {
             
             const bd = new Date(form.tgl_lahir); const tmt = new Date(form.tmt_sekarang); const bup = currentBup.value || 58;
             const pd = new Date(bd); pd.setFullYear(bd.getFullYear() + bup); pd.setDate(1); pd.setMonth(pd.getMonth() + 1);
-            const next = new Date(tmt); next.setFullYear(next.getFullYear() + 2);
-            form.tmt_selanjutnya = next.toISOString().split('T')[0];
+            
+            // LOGIKA TMT SELANJUTNYA
+            // Jika Manual Pensiun dicentang, jangan otomatis hitung TMT
+            if (!form.is_pensiun_manual) {
+                const next = new Date(tmt); next.setFullYear(next.getFullYear() + 2);
+                form.tmt_selanjutnya = next.toISOString().split('T')[0];
+            }
 
-            if (form.is_pensiun_manual) { isPensiun.value = true; pensiunMsg.value = "Manual Pensiun"; } 
-            else if (next >= pd) { isPensiun.value = true; pensiunMsg.value = `Masuk BUP (${formatTanggal(pd.toISOString())})`; } 
-            else { isPensiun.value = false; pensiunMsg.value = `Batas: ${formatTanggal(pd.toISOString())}`; }
+            // LOGIKA STATUS PENSIN MSG
+            if (form.is_pensiun_manual) { 
+                isPensiun.value = true; 
+                pensiunMsg.value = "Status: Pensiun (Stop KGB)"; 
+            } 
+            else if (new Date(form.tmt_selanjutnya) >= pd) { 
+                isPensiun.value = true; 
+                pensiunMsg.value = `Peringatan: Masuk BUP (${formatTanggal(pd.toISOString())})`; 
+            } 
+            else { 
+                isPensiun.value = false; 
+                pensiunMsg.value = `BUP: ${formatTanggal(pd.toISOString())}`; 
+            }
             form.tahun_pembuatan = tmt.getFullYear();
         };
         watch(()=>[form.tmt_sekarang,form.tgl_lahir,currentBup.value,form.is_pensiun_manual], checkBup);
+
+        // --- FUNGSI BUTTON STOP ---
+        const setTmtPensiun = () => {
+            form.tmt_selanjutnya = ''; // Kosongkan tanggal
+            form.is_pensiun_manual = true; // Auto centang switch manual
+            showToast("TMT Selanjutnya dikosongkan (Pensiun).", "warning");
+        };
 
         const handleJabatanSelect = (item) => {
             form.jabatan=item.nama_jabatan; form.jenis_jabatan = item.jenis_jabatan || 'Pelaksana'; currentBup.value=item.bup||58; checkBup();
@@ -421,7 +448,6 @@ export default {
                     const snapPkt = await getDocs(qPkt);
                     if (!snapPkt.empty) {
                         // Ketemu! Pakai nama pangkat resmi dari master
-                        // Pastikan di master_golongan ada field 'pangkat' (Contoh: "Penata Muda")
                         const dataMaster = snapPkt.docs[0].data();
                         if (dataMaster.pangkat) {
                             pangkatFinal = dataMaster.pangkat;
@@ -590,7 +616,9 @@ export default {
             handleNipInput, cariGajiBaru, cariGajiLama, handleGolonganChange, handleJabatanSelect, formatRupiah, formatTanggal,
             showPreviewModal, previewLoading, previewSK, closePreview, downloadFromPreview,
             previewTab, changePreviewTab,
-            statusColor, updateStatus
+            statusColor, updateStatus,
+            // [NEW]
+            setTmtPensiun 
         };
     }
 };
