@@ -411,7 +411,6 @@ export default {
             }
 
             const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
-            const toTitle = (s) => s ? s.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
             const twoDigits = (val) => (val||0).toString().padStart(2, '0');
 
             const res = await fetch(url); const buf = await res.arrayBuffer();

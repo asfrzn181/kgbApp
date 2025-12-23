@@ -498,7 +498,6 @@ export default {
             let nomor_naskah = previewTab.value === 'TTE' ? (item.nomor_naskah || "${nomor_naskah}") : (item.nomor_naskah || "....................");
 
             const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
-            const toTitle = (s) => s ? s.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
             const twoDigits = (val) => (val||0).toString().padStart(2, '0');
 
             const res = await fetch(url); const buf = await res.arrayBuffer();
@@ -507,7 +506,7 @@ export default {
 
             docRender.render({
                 NAMA: item.nama || "", NIP: item.nip || "", PANGKAT: pangkatFinal, JABATAN: item.jabatan || "",
-                UNIT_KERJA: toTitle(item.unit_kerja), UNIT_KERJA_INDUK: toTitle(item.perangkat_daerah),
+                UNIT_KERJA: item.unit_kerja, UNIT_KERJA_INDUK: item.perangkat_daerah,
                 TGL_LAHIR: formatTanggal(item.tgl_lahir), GOLONGAN: item.golongan || "",
                 DASAR_NOMOR: item.dasar_nomor || "-", DASAR_TANGGAL: formatTanggal(item.dasar_tanggal), DASAR_PEJABAT: item.dasar_pejabat || "-",
                 DASAR_TMT: formatTanggal(item.dasar_tmt), DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
