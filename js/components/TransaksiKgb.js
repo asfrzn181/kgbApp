@@ -7,7 +7,7 @@ import { showToast, showConfirm, debounce, formatRupiah, formatTanggal } from '.
 import { store } from '../store.js';
 
 // --- IMPORT VIEW ---
-import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplMain } from '../views/TransaksiKgbView.js';
+import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplAutocompletePerangkatDaerah, TplMain } from '../views/TransaksiKgbView.js';
 
 // --- SUB-COMPONENTS ---
 const SearchSelect = {
@@ -58,7 +58,7 @@ const AutocompleteJabatan = {
     }
 };
 
-// [PERBAIKAN] Autocomplete Unit Kerja dengan Security Rules Compliance
+// [SMART FALLBACK] Autocomplete Unit Kerja
 const AutocompleteUnitKerja = {
     props: ['modelValue'],
     emits: ['update:modelValue'],
@@ -67,30 +67,75 @@ const AutocompleteUnitKerja = {
         const showSuggestions = ref(false);
         const suggestions = ref([]);
         
+        const processSnap = (snap, keyword) => {
+            const units = new Set();
+            const keyLower = keyword.toLowerCase();
+            snap.forEach(doc => {
+                const val = doc.data().unit_kerja;
+                if(val && val.toLowerCase().includes(keyLower)) units.add(val);
+            });
+            return Array.from(units).slice(0, 5);
+        };
+
         const fetchSuggestions = debounce(async (keyword) => {
             if (!keyword || keyword.length < 3) { suggestions.value = []; return; }
             try {
-                // Gunakan constraints yang aman sesuai role user
-                const constraints = [orderBy("created_at", "desc"), limit(50)];
-                
-                // JIKA BUKAN ADMIN, filter hanya data miliknya sendiri agar tidak kena "Permission Denied"
-                if (!store.isAdmin && auth.currentUser) {
-                    constraints.unshift(where("created_by", "==", auth.currentUser.uid));
-                }
-
-                const q = query(collection(db, "usulan_kgb"), ...constraints);
-                const snap = await getDocs(q);
-                
-                const units = new Set();
-                snap.forEach(doc => {
-                    const uk = doc.data().unit_kerja;
-                    if(uk && uk.toLowerCase().includes(keyword.toLowerCase())) units.add(uk);
-                });
-                
-                suggestions.value = Array.from(units).slice(0, 5); 
+                const qGlobal = query(collection(db, "usulan_kgb"), orderBy("created_at", "desc"), limit(50)); 
+                const snap = await getDocs(qGlobal);
+                suggestions.value = processSnap(snap, keyword);
             } catch (e) {
-                console.error("Autocomplete Error (Unit Kerja):", e.message); 
-                // Silent fail agar tidak mengganggu user jika index belum dibuat
+                if (auth.currentUser) {
+                    try {
+                        const qOwn = query(collection(db, "usulan_kgb"), where("created_by", "==", auth.currentUser.uid), orderBy("created_at", "desc"), limit(50));
+                        const snapOwn = await getDocs(qOwn);
+                        suggestions.value = processSnap(snapOwn, keyword);
+                    } catch (err2) { }
+                }
+            }
+        }, 500);
+
+        const handleInput = (e) => { emit('update:modelValue', e.target.value); fetchSuggestions(e.target.value); showSuggestions.value = true; };
+        const selectItem = (item) => { emit('update:modelValue', item); showSuggestions.value = false; };
+        const delayHide = () => setTimeout(() => showSuggestions.value = false, 200);
+        return { showSuggestions, suggestions, handleInput, selectItem, delayHide };
+    }
+};
+
+// [NEW] Autocomplete Perangkat Daerah (Sama persis logikanya)
+const AutocompletePerangkatDaerah = {
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+    template: TplAutocompletePerangkatDaerah,
+    setup(props, { emit }) {
+        const showSuggestions = ref(false);
+        const suggestions = ref([]);
+        
+        const processSnap = (snap, keyword) => {
+            const results = new Set();
+            const keyLower = keyword.toLowerCase();
+            snap.forEach(doc => {
+                const val = doc.data().perangkat_daerah;
+                if(val && val.toLowerCase().includes(keyLower)) results.add(val);
+            });
+            return Array.from(results).slice(0, 5);
+        };
+
+        const fetchSuggestions = debounce(async (keyword) => {
+            if (!keyword || keyword.length < 3) { suggestions.value = []; return; }
+            try {
+                // 1. Coba Global
+                const qGlobal = query(collection(db, "usulan_kgb"), orderBy("created_at", "desc"), limit(50)); 
+                const snap = await getDocs(qGlobal);
+                suggestions.value = processSnap(snap, keyword);
+            } catch (e) {
+                // 2. Fallback ke Data Sendiri
+                if (auth.currentUser) {
+                    try {
+                        const qOwn = query(collection(db, "usulan_kgb"), where("created_by", "==", auth.currentUser.uid), orderBy("created_at", "desc"), limit(50));
+                        const snapOwn = await getDocs(qOwn);
+                        suggestions.value = processSnap(snapOwn, keyword);
+                    } catch (err2) { }
+                }
             }
         }, 500);
 
@@ -103,14 +148,13 @@ const AutocompleteUnitKerja = {
 
 // --- MAIN COMPONENT ---
 export default {
-    components: { SearchSelect, AutocompleteJabatan, AutocompleteUnitKerja },
+    components: { SearchSelect, AutocompleteJabatan, AutocompleteUnitKerja, AutocompletePerangkatDaerah },
     template: TplMain, 
     setup() {
         const listData = ref([]);
         const tableLoading = ref(true);
         const tableSearch = ref('');
         
-        // PAGINATION STATES
         const currentPage = ref(1);
         const itemsPerPage = ref(10); 
         const pageStack = ref([]); 
@@ -209,7 +253,6 @@ export default {
                 if (filterEndDate.value) constraints.push(where("tmt_sekarang", "<=", filterEndDate.value));
 
                 if (pageTarget === 1 || pageTarget === 'first') {
-                    // Hitung total data untuk pagination angka
                     const snapshotCount = await getCountFromServer(query(collRef, ...constraints));
                     totalItems.value = snapshotCount.data().count;
                     pageStack.value = []; 
@@ -247,7 +290,6 @@ export default {
                                 currentPage.value = pageTarget;
                             }
                             else {
-                                // Lompat Jauh (Reset ke 1 demi keamanan kursor)
                                 q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
                                 currentPage.value = 1;
                                 pageStack.value = [];
@@ -282,7 +324,7 @@ export default {
             if (p === currentPage.value + 1 || p === currentPage.value - 1) {
                 fetchTable(p);
             } else {
-                fetchTable(1); // Reset jika lompat jauh
+                fetchTable(1);
             }
         };
         
@@ -493,7 +535,7 @@ export default {
                 if(ps.exists()){ const d = ps.data(); pjp = d.pangkat || pjp; pjj = d.jabatan || pjj; pjn = d.nama || ""; pjnip = d.nip || ""; } 
             }
             
-            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n\n\n" : "\n\n\n\n";
+            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n\n\n" : "\n\n\n";
             let tanggalSurat = previewTab.value === 'TTE' ? "${tanggal_naskah}" : formatTanggal(item.tanggal_naskah ? item.tanggal_naskah.toDate() : new Date());
             let nomor_naskah = previewTab.value === 'TTE' ? (item.nomor_naskah || "${nomor_naskah}") : (item.nomor_naskah || "....................");
 
