@@ -1,9 +1,10 @@
 import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue';
 import { 
     db, auth, collection, getDocs, getDoc, doc, query, orderBy, where, 
-    serverTimestamp, runTransaction, updateDoc, deleteDoc, setDoc 
+    serverTimestamp, runTransaction, updateDoc, deleteDoc, setDoc,
+    limit, startAfter, getCountFromServer
 } from '../firebase.js';
-import { showToast, showConfirm, formatTanggal, formatRupiah, debounce } from '../utils.js'; // Pastikan debounce diimport
+import { showToast, showConfirm, formatTanggal, formatRupiah, debounce } from '../utils.js';
 import { store } from '../store.js';
 
 // IMPORT VIEW
@@ -28,29 +29,15 @@ const AutocompleteUsulan = {
             ).slice(0, 50);
         });
 
-        const handleInput = (e) => {
-            search.value = e.target.value;
-            displayValue.value = e.target.value;
-            isOpen.value = true;
-        };
-
-        const selectItem = (item) => {
-            displayValue.value = `${item.nama_snapshot}`;
-            emit('update:modelValue', item.id);
-            emit('change');
-            isOpen.value = false;
-            search.value = '';
-        };
-
+        const handleInput = (e) => { search.value = e.target.value; displayValue.value = e.target.value; isOpen.value = true; };
+        const selectItem = (item) => { displayValue.value = `${item.nama_snapshot}`; emit('update:modelValue', item.id); emit('change'); isOpen.value = false; search.value = ''; };
         const delayClose = () => { setTimeout(() => { isOpen.value = false; }, 200); };
 
         watch(() => props.modelValue, (newVal) => {
             if (newVal && props.options.length > 0) {
                 const found = props.options.find(o => o.id === newVal);
                 if (found) displayValue.value = `${found.nama_snapshot}`;
-            } else {
-                displayValue.value = '';
-            }
+            } else { displayValue.value = ''; }
         }, { immediate: true });
 
         watch(() => props.options, (newOpts) => {
@@ -75,6 +62,15 @@ export default {
         const showModal = ref(false);
         const isSaving = ref(false);
         
+        // PAGINATION & FILTER STATE
+        const currentPage = ref(1);
+        const itemsPerPage = ref(10);
+        const pageStack = ref([]);
+        const totalItems = ref(0);
+        const filterStartDate = ref('');
+        const filterEndDate = ref('');
+        const tableSearch = ref('');
+
         const isEditMode = ref(false);
         const editId = ref(null);
         const oldUsulanId = ref(null);
@@ -84,19 +80,13 @@ export default {
         const currentPreviewItem = ref(null);
         const previewTab = ref('BASAH');
 
-        // STATE UNTUK CUSTOM NUMBER CHECK
-        const customNumberStatus = ref(null); // 'checking', 'available', 'taken', 'invalid'
+        // CHECK NUMBER STATE
+        const customNumberStatus = ref(null);
         const customNumberMsg = ref('');
 
         const form = reactive({
-            usulan_id: '',
-            nama_pegawai: '',
-            nip: '',
-            jenis_jabatan: 'Fungsional',
-            golongan: '',
-            tahun: new Date().getFullYear(),
-            nomor_custom: '',
-            no_urut: 0 
+            usulan_id: '', nama_pegawai: '', nip: '', jenis_jabatan: 'Fungsional',
+            golongan: '', tahun: new Date().getFullYear(), nomor_custom: '', no_urut: 0 
         });
 
         const yearOptions = computed(() => {
@@ -104,15 +94,119 @@ export default {
             return Array.from({ length: 6 }, (_, i) => current + i);
         });
 
-        const fetchData = async () => {
+        const totalPages = computed(() => Math.ceil(totalItems.value / itemsPerPage.value) || 1);
+        
+        const visiblePages = computed(() => {
+            const pages = [];
+            const total = totalPages.value;
+            const current = currentPage.value;
+            let start = Math.max(1, current - 2);
+            let end = Math.min(total, start + 4);
+            if (end - start < 4) start = Math.max(1, end - 4);
+            for (let i = start; i <= end; i++) { pages.push(i); }
+            return pages;
+        });
+
+        const mapDoc = (d) => {
+            const data = d.data();
+            data.id = d.id;
+            if(data.created_at?.toDate) data.created_at_formatted = formatTanggal(data.created_at.toDate());
+            return data;
+        };
+
+        const fetchData = async (pageTarget) => {
             loading.value = true;
             try {
-                const q = query(collection(db, "nomor_surat"), orderBy("created_at", "desc"));
-                const snap = await getDocs(q);
-                listData.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                const collRef = collection(db, "nomor_surat");
+                const limitVal = parseInt(itemsPerPage.value) || 10;
+                let q;
+
+                const constraints = [];
+                // FILTER TANGGAL
+                if (filterStartDate.value) {
+                    const start = new Date(filterStartDate.value);
+                    constraints.push(where("created_at", ">=", start));
+                }
+                if (filterEndDate.value) {
+                    const end = new Date(filterEndDate.value);
+                    end.setHours(23, 59, 59); // Sampai akhir hari
+                    constraints.push(where("created_at", "<=", end));
+                }
+
+                if (pageTarget === 1 || pageTarget === 'first') {
+                    const snapshotCount = await getCountFromServer(query(collRef, ...constraints));
+                    totalItems.value = snapshotCount.data().count;
+                    pageStack.value = [];
+                    currentPage.value = 1;
+                }
+
+                if (tableSearch.value.trim()) {
+                    // Search Mode (Client side filter on top 50 matches)
+                    const qAll = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(50));
+                    const snap = await getDocs(qAll);
+                    const term = tableSearch.value.toLowerCase();
+                    listData.value = snap.docs.map(mapDoc).filter(d => 
+                        (d.nomor_lengkap||'').toLowerCase().includes(term) || 
+                        (d.nama_pegawai||'').toLowerCase().includes(term)
+                    );
+                } else {
+                    // Pagination Mode
+                    if (typeof pageTarget === 'number') {
+                        if (pageTarget === 1) {
+                            q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
+                            currentPage.value = 1;
+                            pageStack.value = [];
+                        } else {
+                            if (pageTarget === currentPage.value + 1) {
+                                const lastDoc = pageStack.value[pageStack.value.length - 1];
+                                q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(lastDoc), limit(limitVal));
+                                currentPage.value = pageTarget;
+                            } 
+                            else if (pageTarget === currentPage.value - 1) {
+                                const cursorIndex = pageTarget - 2;
+                                if (cursorIndex < 0) {
+                                    q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
+                                    pageStack.value = [];
+                                } else {
+                                    const cursor = pageStack.value[cursorIndex];
+                                    q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(cursor), limit(limitVal));
+                                    pageStack.value = pageStack.value.slice(0, cursorIndex + 1);
+                                }
+                                currentPage.value = pageTarget;
+                            } else {
+                                fetchTable(1); // Reset if jump too far
+                                return;
+                            }
+                        }
+                    } else {
+                        q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
+                        currentPage.value = 1;
+                        pageStack.value = [];
+                    }
+
+                    const snap = await getDocs(q);
+                    listData.value = snap.docs.map(mapDoc);
+
+                    if (snap.docs.length > 0) {
+                        if (currentPage.value === 1) {
+                            pageStack.value = [snap.docs[snap.docs.length - 1]];
+                        } else if (pageStack.value.length < currentPage.value) {
+                            pageStack.value.push(snap.docs[snap.docs.length - 1]);
+                        }
+                    }
+                }
             } catch (e) { console.error(e); } 
             finally { loading.value = false; }
         };
+
+        const goToPage = (p) => {
+            if (p < 1 || p > totalPages.value || p === currentPage.value) return;
+            if (p === currentPage.value + 1 || p === currentPage.value - 1) fetchData(p);
+            else fetchData(1);
+        };
+
+        // Watch search debounce
+        watch(tableSearch, debounce(() => fetchData(1), 800));
 
         const fetchUsulanList = async () => {
             try {
@@ -120,14 +214,10 @@ export default {
                 if (!store.isAdmin && auth.currentUser) {
                     constraints.push(where("created_by", "==", auth.currentUser.uid));
                 }
-
                 const q = query(collection(db, "usulan_kgb"), ...constraints);
                 const snap = await getDocs(q);
-                
-                listUsulan.value = snap.docs
-                    .map(d => ({ id: d.id, ...d.data() }))
+                listUsulan.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
                     .filter(u => !u.nomor_naskah || (isEditMode.value && u.id === form.usulan_id)); 
-
             } catch (e) { console.error(e); }
         };
 
@@ -136,7 +226,6 @@ export default {
             if (selected) {
                 form.nama_pegawai = selected.nama_snapshot;
                 form.nip = selected.nip;
-                
                 if(!isEditMode.value) {
                     form.golongan = selected.golongan;
                     const j = (selected.jenis_jabatan || '').toLowerCase();
@@ -146,208 +235,112 @@ export default {
             }
         };
 
-        // --- CEK KETERSEDIAAN NOMOR ---
         const checkCustomNumber = debounce(async (nomor) => {
-            if (!nomor) {
-                customNumberStatus.value = null;
-                customNumberMsg.value = '';
-                return;
-            }
-
-            customNumberStatus.value = 'checking';
-            customNumberMsg.value = 'Mengecek ketersediaan...';
-
+            if (!nomor) { customNumberStatus.value = null; customNumberMsg.value = ''; return; }
+            customNumberStatus.value = 'checking'; customNumberMsg.value = 'Mengecek...';
             try {
-                // Cek di koleksi nomor_surat apakah ada yang punya nomor_lengkap sama
                 const q = query(collection(db, "nomor_surat"), where("nomor_lengkap", "==", nomor));
                 const snap = await getDocs(q);
-
                 if (!snap.empty) {
-                    // Jika ketemu, cek apakah itu miliknya sendiri (saat edit)
                     if (isEditMode.value && snap.docs[0].id === editId.value) {
-                        customNumberStatus.value = 'available';
-                        customNumberMsg.value = 'Nomor ini milik dokumen ini (Aman).';
+                        customNumberStatus.value = 'available'; customNumberMsg.value = 'Nomor milik dokumen ini.';
                     } else {
                         const owner = snap.docs[0].data();
-                        customNumberStatus.value = 'taken';
-                        customNumberMsg.value = `Nomor TIDAK DAPAT DIGUNAKAN. Dimiliki oleh: ${owner.nama_pegawai}`;
+                        customNumberStatus.value = 'taken'; customNumberMsg.value = `Dipakai: ${owner.nama_pegawai}`;
                     }
                 } else {
-                    // Jika tidak ada di database, berarti kosong/tersedia
-                    // Validasi tambahan: Pastikan format mengandung "B-800" dll jika perlu
-                    if (!nomor.includes('B-800')) {
-                         customNumberStatus.value = 'warning';
-                         customNumberMsg.value = 'Format nomor tidak standar, tapi tersedia.';
-                    } else {
-                        customNumberStatus.value = 'available';
-                        customNumberMsg.value = 'Nomor KOSONG / TERSEDIA. Silakan gunakan.';
-                    }
+                    if (!nomor.includes('B-800')) { customNumberStatus.value = 'warning'; customNumberMsg.value = 'Format tidak standar.'; } 
+                    else { customNumberStatus.value = 'available'; customNumberMsg.value = 'Tersedia.'; }
                 }
-            } catch (e) {
-                console.error(e);
-                customNumberStatus.value = 'invalid';
-                customNumberMsg.value = 'Gagal mengecek nomor.';
-            }
+            } catch (e) { console.error(e); customNumberStatus.value = 'invalid'; customNumberMsg.value = 'Gagal cek.'; }
         }, 800);
 
-        // Watch perubahan input nomor custom
-        watch(() => form.nomor_custom, (newVal) => {
-            checkCustomNumber(newVal);
-        });
+        watch(() => form.nomor_custom, (newVal) => checkCustomNumber(newVal));
 
-        // --- HITUNG NOMOR (AUTO) ---
         const previewNomor = async () => {
             if (!form.usulan_id) return showToast("Pilih usulan dulu!", 'warning');
             try {
                 const counterId = `${form.tahun}_${form.jenis_jabatan.toUpperCase()}`;
                 const counterRef = doc(db, "counters_nomor", counterId);
                 const snap = await getDoc(counterRef);
-                
                 let nextCount = 1;
                 if (snap.exists()) { nextCount = snap.data().count + 1; }
-
                 const golRomawi = form.golongan ? form.golongan.split('/')[0] : '';
                 const noUrutStr = String(nextCount).padStart(4, '0'); 
-                
                 form.nomor_custom = `B-800.1.11.13/${golRomawi}/${noUrutStr}/BKPSDMD/${form.tahun}`;
-                form.no_urut = nextCount; // Simpan sementara, nanti di save dicek lagi
-                
-                // Trigger check manual karena kita set via code
+                form.no_urut = nextCount; 
                 checkCustomNumber(form.nomor_custom);
-
             } catch (e) { showToast("Gagal hitung: " + e.message, 'error'); }
         };
 
-        // --- SIMPAN FINAL ---
         const simpanFinal = async () => {
             if (!form.nomor_custom) return showToast("Nomor belum diisi!", 'warning');
-            if (customNumberStatus.value === 'taken') return showToast("Nomor sudah terpakai! Ganti nomor lain.", 'error');
-            
+            if (customNumberStatus.value === 'taken') return showToast("Nomor terpakai!", 'error');
             isSaving.value = true;
-
             try {
-                // Ekstrak no urut dari string nomor (jika format standar)
-                // Contoh: .../III/0005/... -> ambil 0005
                 const parts = form.nomor_custom.split('/');
                 let currentUrut = 0;
-                if(parts.length > 2 && !isNaN(parseInt(parts[2]))) { 
-                    currentUrut = parseInt(parts[2]); 
-                } else {
-                    // Jika custom banget, pake no_urut yang ada atau 0
-                    currentUrut = form.no_urut || 0;
-                }
+                if(parts.length > 2 && !isNaN(parseInt(parts[2]))) { currentUrut = parseInt(parts[2]); } 
+                else { currentUrut = form.no_urut || 0; }
 
                 if (isEditMode.value) {
                     await runTransaction(db, async (transaction) => {
                         const logRef = doc(db, "nomor_surat", editId.value);
                         transaction.update(logRef, {
-                            usulan_id: form.usulan_id,
-                            nama_pegawai: form.nama_pegawai,
-                            nip: form.nip,
-                            nomor_lengkap: form.nomor_custom,
-                            no_urut: currentUrut
+                            usulan_id: form.usulan_id, nama_pegawai: form.nama_pegawai, nip: form.nip,
+                            nomor_lengkap: form.nomor_custom, no_urut: currentUrut
                         });
-                        
                         if (oldUsulanId.value && oldUsulanId.value !== form.usulan_id) {
                             const oldRef = doc(db, "usulan_kgb", oldUsulanId.value);
                             transaction.update(oldRef, { nomor_naskah: null, tanggal_naskah: null });
                         }
-                        
                         const newRef = doc(db, "usulan_kgb", form.usulan_id);
-                        transaction.update(newRef, { 
-                            nomor_naskah: form.nomor_custom,
-                            tanggal_naskah: serverTimestamp()
-                        });
+                        transaction.update(newRef, { nomor_naskah: form.nomor_custom, tanggal_naskah: serverTimestamp() });
                     });
-                    showToast("Data Nomor berhasil diperbarui!", 'success');
-                } 
-                else {
-                    // Cek Counter Max hanya jika nomor ini LEBIH BESAR dari counter sekarang
-                    // Jika nomor ini mengisi bolong (lebih kecil), counter JANGAN diupdate.
+                    showToast("Update berhasil!", 'success');
+                } else {
                     const counterId = `${form.tahun}_${form.jenis_jabatan.toUpperCase()}`;
                     const counterRef = doc(db, "counters_nomor", counterId);
                     const snapCount = await getDoc(counterRef);
                     let dbCount = 0;
                     if (snapCount.exists()) dbCount = snapCount.data().count;
-
-                    if (currentUrut > dbCount) {
-                        await setDoc(counterRef, { count: currentUrut }, { merge: true });
-                    }
+                    if (currentUrut > dbCount) { await setDoc(counterRef, { count: currentUrut }, { merge: true }); }
 
                     await setDoc(doc(collection(db, "nomor_surat")), {
-                        usulan_id: form.usulan_id,
-                        nama_pegawai: form.nama_pegawai,
-                        nip: form.nip,
-                        jenis_jabatan: form.jenis_jabatan,
-                        tahun: form.tahun,
-                        golongan: form.golongan,
-                        no_urut: currentUrut,
-                        nomor_lengkap: form.nomor_custom,
-                        created_at: serverTimestamp()
+                        usulan_id: form.usulan_id, nama_pegawai: form.nama_pegawai, nip: form.nip,
+                        jenis_jabatan: form.jenis_jabatan, tahun: form.tahun, golongan: form.golongan,
+                        no_urut: currentUrut, nomor_lengkap: form.nomor_custom, created_at: serverTimestamp()
                     });
-
-                    await updateDoc(doc(db, "usulan_kgb", form.usulan_id), {
-                        nomor_naskah: form.nomor_custom,
-                        tanggal_naskah: serverTimestamp()
-                    });
-                    showToast("Nomor berhasil disimpan!", 'success');
+                    await updateDoc(doc(db, "usulan_kgb", form.usulan_id), { nomor_naskah: form.nomor_custom, tanggal_naskah: serverTimestamp() });
+                    showToast("Nomor disimpan!", 'success');
                 }
-
-                closeModal();
-                fetchData();
-
-            } catch (e) {
-                console.error(e);
-                showToast("Gagal simpan: " + e.message, 'error');
-            } finally { isSaving.value = false; }
+                closeModal(); fetchData(1);
+            } catch (e) { console.error(e); showToast("Gagal: " + e.message, 'error'); } finally { isSaving.value = false; }
         };
 
         const editNomor = async (item) => {
-            isEditMode.value = true;
-            editId.value = item.id;
-            oldUsulanId.value = item.usulan_id;
-
-            form.usulan_id = item.usulan_id;
-            form.nama_pegawai = item.nama_pegawai;
-            form.nip = item.nip;
-            form.jenis_jabatan = item.jenis_jabatan;
-            form.golongan = item.golongan;
-            form.tahun = item.tahun;
-            form.nomor_custom = item.nomor_lengkap;
-            form.no_urut = item.no_urut;
-
-            // Reset status
-            customNumberStatus.value = null;
-            customNumberMsg.value = '';
-
-            await fetchUsulanList(); 
-            showModal.value = true;
+            isEditMode.value = true; editId.value = item.id; oldUsulanId.value = item.usulan_id;
+            Object.assign(form, { ...item, nomor_custom: item.nomor_lengkap });
+            customNumberStatus.value = null; customNumberMsg.value = '';
+            await fetchUsulanList(); showModal.value = true;
         };
 
         const hapusNomor = async (item) => {
-            if (await showConfirm('Batalkan Nomor?', 'Jika nomor terakhir, counter akan mundur.')) {
+            if (await showConfirm('Batalkan Nomor?', 'Counter akan mundur jika nomor terakhir.')) {
                 try {
                     const counterId = `${item.tahun}_${item.jenis_jabatan.toUpperCase()}`;
                     const counterRef = doc(db, "counters_nomor", counterId);
-                    
                     await runTransaction(db, async (transaction) => {
                         const counterDoc = await transaction.get(counterRef);
                         if (counterDoc.exists()) {
-                            const currentMax = counterDoc.data().count;
-                            if (Number(currentMax) === Number(item.no_urut)) {
-                                transaction.update(counterRef, { count: currentMax - 1 });
+                            if (Number(counterDoc.data().count) === Number(item.no_urut)) {
+                                transaction.update(counterRef, { count: Number(item.no_urut) - 1 });
                             }
                         }
-                        const logRef = doc(db, "nomor_surat", item.id);
-                        transaction.delete(logRef);
-                        if(item.usulan_id) {
-                            const usulanRef = doc(db, "usulan_kgb", item.usulan_id);
-                            transaction.update(usulanRef, { nomor_naskah: null, tanggal_naskah: null });
-                        }
+                        transaction.delete(doc(db, "nomor_surat", item.id));
+                        if(item.usulan_id) transaction.update(doc(db, "usulan_kgb", item.usulan_id), { nomor_naskah: null, tanggal_naskah: null });
                     });
-
-                    fetchData();
-                    showToast("Nomor dibatalkan.");
+                    fetchData(1); showToast("Dibatalkan.");
                 } catch (e) { console.error(e); showToast(e.message, 'error'); }
             }
         };
@@ -358,6 +351,22 @@ export default {
             const snap = await getDoc(doc(db, "usulan_kgb", usulanId));
             if(!snap.exists()) throw new Error("Data Usulan tidak ditemukan!");
             const item = snap.data();
+
+            // --- [FIX] AMBIL PANGKAT DARI MASTER GOLONGAN ---
+            let pangkatFinal = item.pangkat || ""; 
+            if (item.golongan) {
+                try {
+                    const qPkt = query(collection(db, "master_golongan"), where("kode", "==", item.golongan));
+                    const snapPkt = await getDocs(qPkt);
+                    if (!snapPkt.empty) {
+                        const d = snapPkt.docs[0].data();
+                        if(d.pangkat) pangkatFinal = d.pangkat;
+                    }
+                } catch (e) { 
+                    console.error("Gagal load pangkat", e);
+                }
+            }
+            // --------------------------------------------------
 
             const tplId = item.tipe_asn === 'PPPK' ? "PPPK" : "PNS"; 
             const ts = await getDoc(doc(db, "config_template", tplId)); 
@@ -411,6 +420,7 @@ export default {
             }
 
             const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
+            const toTitle = (s) => s ? s.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
             const twoDigits = (val) => (val||0).toString().padStart(2, '0');
 
             const res = await fetch(url); const buf = await res.arrayBuffer();
@@ -420,7 +430,10 @@ export default {
             docRender.render({
                 NAMA: item.nama || "", Nama: item.nama || "", nama: item.nama || "",
                 NIP: item.nip || "", Nip: item.nip || "", nip: item.nip || "",
-                PANGKAT: item.pangkat || "", Pangkat: item.pangkat || "",
+                
+                // [FIX] Gunakan variabel pangkatFinal yang sudah dicari di atas
+                PANGKAT: pangkatFinal, Pangkat: pangkatFinal,
+                
                 JABATAN: item.jabatan || "", Jabatan: item.jabatan || "",
                 UNIT_KERJA: item.unit_kerja, Unit_Kerja: item.unit_kerja,
                 UNIT_KERJA_INDUK: item.perangkat_daerah,
@@ -451,92 +464,48 @@ export default {
         };
 
         const previewSK = async (logItem) => {
-            if (!window.docx) return showToast("Library Preview belum dimuat!", 'error');
-            
-            showPreviewModal.value = true;
-            previewLoading.value = true;
-            currentPreviewItem.value = logItem;
-            previewTab.value = 'BASAH'; 
-            
-            await nextTick();
-            
-            await renderCurrentPreview();
+            if (!window.docx) return showToast("Library Error", 'error');
+            showPreviewModal.value = true; previewLoading.value = true; currentPreviewItem.value = logItem; previewTab.value = 'BASAH'; 
+            await nextTick(); await renderCurrentPreview();
         };
-
-        const changePreviewTab = async (tabName) => {
-            previewTab.value = tabName;
-            previewLoading.value = true;
-
-            await nextTick();
-
-            await renderCurrentPreview();
-        };
-
+        const changePreviewTab = async (tabName) => { previewTab.value = tabName; previewLoading.value = true; await nextTick(); await renderCurrentPreview(); };
         const renderCurrentPreview = async () => {
             try {
                 if(!currentPreviewItem.value) return;
                 const blob = await generateDocBlob(currentPreviewItem.value.usulan_id);
                 const container = document.getElementById('docx-preview-container');
-                if(container) { 
-                    container.innerHTML = ''; 
-                    await window.docx.renderAsync(blob, container); 
-                }
-            } catch (e) { console.error(e); showToast("Gagal Preview: " + e.message, 'error'); } 
-            finally { previewLoading.value = false; }
+                if(container) { container.innerHTML = ''; await window.docx.renderAsync(blob, container); }
+            } catch (e) { showToast("Gagal Preview", 'error'); } finally { previewLoading.value = false; }
         };
-
-        const downloadFromPreview = async () => {
-            if(currentPreviewItem.value) await cetakSK(currentPreviewItem.value);
-        };
-
+        const downloadFromPreview = async () => { if(currentPreviewItem.value) await cetakSK(currentPreviewItem.value); };
         const closePreview = () => { showPreviewModal.value = false; currentPreviewItem.value = null; };
-
         const cetakSK = async (logItem) => {
             try {
                 showToast("Menyiapkan download...", 'info');
                 const blob = await generateDocBlob(logItem.usulan_id);
                 const prefix = previewTab.value === 'TTE' ? 'DRAFT_TTE_' : 'SK_';
-                const safeName = (logItem.nama_pegawai || 'doc').replace(/[^a-zA-Z0-9]/g,'_');
-                window.saveAs(blob, `${prefix}KGB_${safeName}.docx`);
-            } catch(e) { console.error(e); showToast("Gagal: " + e.message, 'error'); }
+                window.saveAs(blob, `${prefix}KGB_${logItem.nama_pegawai.replace(/\W/g,'')}.docx`);
+            } catch(e) { showToast("Gagal: " + e.message, 'error'); }
         };
 
         const openModal = async () => {
-            isEditMode.value = false; 
-            editId.value = null;
-            oldUsulanId.value = null;
-            
-            form.usulan_id = '';
-            form.nama_pegawai = '';
-            form.nip = '';
-            form.jenis_jabatan = 'Fungsional';
-            form.golongan = '';
-            form.tahun = new Date().getFullYear();
-            form.nomor_custom = '';
-            form.no_urut = 0;
-            
-            // Reset status number check
-            customNumberStatus.value = null;
-            customNumberMsg.value = '';
-
-            await fetchUsulanList(); 
-            showModal.value = true;
+            isEditMode.value = false; editId.value = null; oldUsulanId.value = null;
+            Object.assign(form, { usulan_id:'', nama_pegawai:'', nip:'', jenis_jabatan:'Fungsional', golongan:'', tahun: new Date().getFullYear(), nomor_custom:'', no_urut: 0 });
+            customNumberStatus.value = null; customNumberMsg.value = '';
+            await fetchUsulanList(); showModal.value = true;
         };
         const closeModal = () => showModal.value = false;
 
-        onMounted(() => { fetchData(); });
+        onMounted(() => fetchData(1));
 
         return {
-            listData, listUsulan, loading, showModal, isSaving, form, isEditMode,
-            yearOptions, previewTab,
-            fetchUsulanList, handleUsulanChange, 
-            previewNomor, simpanFinal, hapusNomor, editNomor,
-            openModal, closeModal,
-            previewSK, cetakSK, downloadFromPreview, closePreview, changePreviewTab,
-            showPreviewModal, previewLoading,
-            
-            // [NEW] Return status number check
-            customNumberStatus, customNumberMsg
+            listData, listUsulan, loading, showModal, isSaving, form, isEditMode, yearOptions, previewTab,
+            fetchUsulanList, handleUsulanChange, previewNomor, simpanFinal, hapusNomor, editNomor, openModal, closeModal,
+            previewSK, cetakSK, downloadFromPreview, closePreview, changePreviewTab, showPreviewModal, previewLoading,
+            customNumberStatus, customNumberMsg,
+            // EXPORT PAGINATION STATES
+            currentPage, totalPages, visiblePages, itemsPerPage, totalItems, goToPage, fetchData,
+            filterStartDate, filterEndDate, tableSearch
         };
     }
 };
