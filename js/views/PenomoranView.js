@@ -51,6 +51,7 @@ export const TplPenomoran = `
     <div class="card shadow-sm border-0 mb-3">
         <div class="card-body p-3">
             <div class="row g-2 align-items-center">
+                
                 <div class="col-6 col-md-auto">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-light border-end-0">Show</span>
@@ -63,11 +64,11 @@ export const TplPenomoran = `
                 </div>
 
                 <div class="col-12 col-md-auto d-flex gap-2 align-items-center">
-                    <input type="date" v-model="filterStartDate" class="form-control form-control-sm" title="Dari Tanggal">
-                    <span class="text-muted">-</span>
+                    <input type="date" v-model="filterStartDate" class="form-control form-control-sm" title="Mulai Tanggal">
+                    <span class="text-muted small">s/d</span>
                     <input type="date" v-model="filterEndDate" class="form-control form-control-sm" title="Sampai Tanggal">
                     <button class="btn btn-sm btn-outline-primary" @click="fetchData(1)" title="Terapkan Filter">
-                        <i class="bi bi-funnel-fill"></i>
+                        <i class="bi bi-search"></i>
                     </button>
                 </div>
 
@@ -92,7 +93,8 @@ export const TplPenomoran = `
                             <th class="ps-4">No. Surat Lengkap</th>
                             <th>Nama Pegawai</th>
                             <th>Jenis & Tahun</th>
-                            <th>Tanggal Buat</th> <th>Urutan</th>
+                            <th>Tanggal Dibuat</th>
+                            <th>Urutan</th>
                             <th class="text-end pe-4">Aksi</th>
                         </tr>
                     </thead>
@@ -142,9 +144,12 @@ export const TplPenomoran = `
 
         <div class="card-footer bg-white p-3">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
-                <small class="text-muted">Halaman <strong>{{ currentPage }}</strong> dari {{ totalPages }} (Total: {{ totalItems }} Data)</small>
+                <small class="text-muted">
+                    Halaman <strong>{{ currentPage }}</strong> dari {{ totalPages }} 
+                    <span v-if="totalItems > 0">(Total: {{ totalItems }} Data)</span>
+                </small>
                 
-                <nav aria-label="Page navigation">
+                <nav aria-label="Page navigation" v-if="totalPages > 1">
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item" :class="{ disabled: currentPage === 1 }">
                             <button class="page-link" @click="goToPage(currentPage - 1)" aria-label="Previous">
@@ -156,7 +161,7 @@ export const TplPenomoran = `
                             <button class="page-link" @click="goToPage(page)">{{ page }}</button>
                         </li>
 
-                        <li class="page-item" :class="{ disabled: currentPage === totalPages || totalPages === 0 }">
+                        <li class="page-item" :class="{ disabled: currentPage === totalPages }">
                             <button class="page-link" @click="goToPage(currentPage + 1)" aria-label="Next">
                                 <span aria-hidden="true">&raquo;</span>
                             </button>

@@ -129,7 +129,7 @@ export default {
                 }
                 if (filterEndDate.value) {
                     const end = new Date(filterEndDate.value);
-                    end.setHours(23, 59, 59); // Sampai akhir hari
+                    end.setHours(23, 59, 59); 
                     constraints.push(where("created_at", "<=", end));
                 }
 
@@ -141,7 +141,7 @@ export default {
                 }
 
                 if (tableSearch.value.trim()) {
-                    // Search Mode (Client side filter on top 50 matches)
+                    // Search Mode
                     const qAll = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(50));
                     const snap = await getDocs(qAll);
                     const term = tableSearch.value.toLowerCase();
@@ -174,7 +174,7 @@ export default {
                                 }
                                 currentPage.value = pageTarget;
                             } else {
-                                fetchTable(1); // Reset if jump too far
+                                fetchData(1); 
                                 return;
                             }
                         }
@@ -205,7 +205,6 @@ export default {
             else fetchData(1);
         };
 
-        // Watch search debounce
         watch(tableSearch, debounce(() => fetchData(1), 800));
 
         const fetchUsulanList = async () => {
@@ -235,18 +234,33 @@ export default {
             }
         };
 
+        // --- [FIX] LOGIKA PENGECEKAN KETERSEDIAAN NOMOR ---
+        // Menambahkan filter `where("jenis_jabatan", "==", form.jenis_jabatan)`
+        // Agar nomor yang sama di jenis jabatan berbeda TIDAK dianggap bentrok.
         const checkCustomNumber = debounce(async (nomor) => {
             if (!nomor) { customNumberStatus.value = null; customNumberMsg.value = ''; return; }
-            customNumberStatus.value = 'checking'; customNumberMsg.value = 'Mengecek...';
+            
+            customNumberStatus.value = 'checking'; 
+            customNumberMsg.value = 'Mengecek...';
+            
             try {
-                const q = query(collection(db, "nomor_surat"), where("nomor_lengkap", "==", nomor));
+                // QUERY: Cari nomor yang stringnya sama DAN jenis jabatannya sama
+                const q = query(
+                    collection(db, "nomor_surat"), 
+                    where("nomor_lengkap", "==", nomor),
+                    where("jenis_jabatan", "==", form.jenis_jabatan) 
+                );
+                
                 const snap = await getDocs(q);
+                
                 if (!snap.empty) {
+                    // Jika ketemu, cek apakah itu miliknya sendiri (saat edit)
                     if (isEditMode.value && snap.docs[0].id === editId.value) {
                         customNumberStatus.value = 'available'; customNumberMsg.value = 'Nomor milik dokumen ini.';
                     } else {
                         const owner = snap.docs[0].data();
-                        customNumberStatus.value = 'taken'; customNumberMsg.value = `Dipakai: ${owner.nama_pegawai}`;
+                        customNumberStatus.value = 'taken'; 
+                        customNumberMsg.value = `Dipakai di ${form.jenis_jabatan}: ${owner.nama_pegawai}`;
                     }
                 } else {
                     if (!nomor.includes('B-800')) { customNumberStatus.value = 'warning'; customNumberMsg.value = 'Format tidak standar.'; } 
@@ -255,20 +269,33 @@ export default {
             } catch (e) { console.error(e); customNumberStatus.value = 'invalid'; customNumberMsg.value = 'Gagal cek.'; }
         }, 800);
 
+        // Watch jika jenis jabatan berubah, cek ulang ketersediaan (karena scope berubah)
+        watch(() => form.jenis_jabatan, () => {
+            if(form.nomor_custom) checkCustomNumber(form.nomor_custom);
+        });
+
         watch(() => form.nomor_custom, (newVal) => checkCustomNumber(newVal));
 
+        // --- PREVIEW NOMOR (STANDAR) ---
         const previewNomor = async () => {
             if (!form.usulan_id) return showToast("Pilih usulan dulu!", 'warning');
             try {
+                // Counter terpisah berdasarkan jenis jabatan
                 const counterId = `${form.tahun}_${form.jenis_jabatan.toUpperCase()}`;
                 const counterRef = doc(db, "counters_nomor", counterId);
                 const snap = await getDoc(counterRef);
                 let nextCount = 1;
                 if (snap.exists()) { nextCount = snap.data().count + 1; }
+                
                 const golRomawi = form.golongan ? form.golongan.split('/')[0] : '';
                 const noUrutStr = String(nextCount).padStart(4, '0'); 
+                
+                // Format Standar (TANPA SUFFIX)
+                // Keduanya (Struktural & Fungsional) menghasilkan string yang sama jika urutannya sama
+                // Tapi validasi di database nanti membedakannya berdasarkan field `jenis_jabatan`
                 form.nomor_custom = `B-800.1.11.13/${golRomawi}/${noUrutStr}/BKPSDMD/${form.tahun}`;
                 form.no_urut = nextCount; 
+                
                 checkCustomNumber(form.nomor_custom);
             } catch (e) { showToast("Gagal hitung: " + e.message, 'error'); }
         };
@@ -288,6 +315,7 @@ export default {
                         const logRef = doc(db, "nomor_surat", editId.value);
                         transaction.update(logRef, {
                             usulan_id: form.usulan_id, nama_pegawai: form.nama_pegawai, nip: form.nip,
+                            // Jenis jabatan tidak diubah saat edit untuk keamanan konsistensi
                             nomor_lengkap: form.nomor_custom, no_urut: currentUrut
                         });
                         if (oldUsulanId.value && oldUsulanId.value !== form.usulan_id) {
@@ -308,7 +336,8 @@ export default {
 
                     await setDoc(doc(collection(db, "nomor_surat")), {
                         usulan_id: form.usulan_id, nama_pegawai: form.nama_pegawai, nip: form.nip,
-                        jenis_jabatan: form.jenis_jabatan, tahun: form.tahun, golongan: form.golongan,
+                        jenis_jabatan: form.jenis_jabatan, // Simpan jenis jabatan agar bisa difilter
+                        tahun: form.tahun, golongan: form.golongan,
                         no_urut: currentUrut, nomor_lengkap: form.nomor_custom, created_at: serverTimestamp()
                     });
                     await updateDoc(doc(db, "usulan_kgb", form.usulan_id), { nomor_naskah: form.nomor_custom, tanggal_naskah: serverTimestamp() });
@@ -346,13 +375,12 @@ export default {
         };
 
         const generateDocBlob = async (usulanId) => {
-            if (!window.PizZip || !window.docxtemplater) throw new Error("Library Cetak Error");
-            
+            if (!window.PizZip || !window.docxtemplater) throw new Error("Library Error");
             const snap = await getDoc(doc(db, "usulan_kgb", usulanId));
             if(!snap.exists()) throw new Error("Data Usulan tidak ditemukan!");
             const item = snap.data();
 
-            // --- [FIX] AMBIL PANGKAT DARI MASTER GOLONGAN ---
+            // [FIX] AMBIL PANGKAT DARI MASTER GOLONGAN
             let pangkatFinal = item.pangkat || ""; 
             if (item.golongan) {
                 try {
@@ -362,104 +390,45 @@ export default {
                         const d = snapPkt.docs[0].data();
                         if(d.pangkat) pangkatFinal = d.pangkat;
                     }
-                } catch (e) { 
-                    console.error("Gagal load pangkat", e);
-                }
+                } catch (e) { console.error("Gagal load pangkat", e); }
             }
-            // --------------------------------------------------
 
             const tplId = item.tipe_asn === 'PPPK' ? "PPPK" : "PNS"; 
             const ts = await getDoc(doc(db, "config_template", tplId)); 
             if(!ts.exists()) throw new Error("Template Belum Diupload!");
-            
             const url = ts.data().url || `./templates/${ts.data().nama_file}`;
             const gv = await getDoc(doc(db, "config_template", "GLOBAL_VARS")); 
             const gvd = gv.exists() ? gv.data() : {};
-            
             const golKode = item.golongan || "";
             const isSetda = item.tipe_asn === 'PNS' && (golKode.startsWith('IV') || golKode.startsWith('4'));
-
-            let kopT='', kopA=''; 
-            if (isSetda) { kopT = gvd.kop_setda?.judul; kopA = gvd.kop_setda?.alamat; } 
-            else { kopT = gvd.kop_bkpsdmd?.judul; kopA = gvd.kop_bkpsdmd?.alamat; }
-
-            let targetNip = item.pejabat_baru_nip;
-            if (!targetNip) {
-                if (isSetda) targetNip = gvd.kop_setda?.pejabat_nip;
-                else targetNip = gvd.kop_bkpsdmd?.pejabat_nip;
-            }
-
-            let pjp = item.pejabat_baru_pangkat || "";
-            let pjj = item.pejabat_baru_nama || "BUPATI BANGKA";
-            let pjn = ""; let pjnip = ""; 
-
+            let kopT=isSetda ? gvd.kop_setda?.judul : gvd.kop_bkpsdmd?.judul;
+            let kopA=isSetda ? gvd.kop_setda?.alamat : gvd.kop_bkpsdmd?.alamat;
+            let targetNip = item.pejabat_baru_nip || (isSetda ? gvd.kop_setda?.pejabat_nip : gvd.kop_bkpsdmd?.pejabat_nip);
+            let pjp="", pjj="BUPATI BANGKA", pjn="", pjnip="";
             if (targetNip) { 
                 const ps = await getDoc(doc(db, "master_pejabat", targetNip)); 
-                if(ps.exists()){ 
-                    const d = ps.data();
-                    pjp = d.pangkat || pjp; 
-                    pjj = d.jabatan || pjj; 
-                    pjn = d.nama || ""; 
-                    pjnip = d.nip || "";
-                } 
+                if(ps.exists()){ const d = ps.data(); pjp=d.pangkat||pjp; pjj=d.jabatan||pjj; pjn=d.nama||""; pjnip=d.nip||""; } 
             }
-            
-            let ttdContent = "";
-            let sifatSurat = "Biasa"; 
-            let tanggalSurat = ""; 
-
-            if (previewTab.value === 'TTE') {
-                sifatSurat = "Biasa";
-                ttdContent = "\n\n\n${ttd_pengirim}\n\n\n\n\n"; 
-                tanggalSurat = "${tanggal_naskah}"; 
-            } else {
-                sifatSurat = "Biasa";
-                ttdContent = "\n\n\n\n"; 
-                const dateObj = item.tanggal_naskah ? item.tanggal_naskah.toDate() : new Date();
-                tanggalSurat = formatTanggal(dateObj);
-            }
-
+            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n\n\n" : "\n\n\n\n";
+            let tanggalSurat = previewTab.value === 'TTE' ? "${tanggal_naskah}" : formatTanggal(item.tanggal_naskah ? item.tanggal_naskah.toDate() : new Date());
             const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
-            const toTitle = (s) => s ? s.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
-            const twoDigits = (val) => (val||0).toString().padStart(2, '0');
-
             const res = await fetch(url); const buf = await res.arrayBuffer();
             const zip = new window.PizZip(buf);
             const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => p.value.startsWith('$') ? `{${p.value}}` : "" });
-
             docRender.render({
-                NAMA: item.nama || "", Nama: item.nama || "", nama: item.nama || "",
-                NIP: item.nip || "", Nip: item.nip || "", nip: item.nip || "",
-                
-                // [FIX] Gunakan variabel pangkatFinal yang sudah dicari di atas
-                PANGKAT: pangkatFinal, Pangkat: pangkatFinal,
-                
-                JABATAN: item.jabatan || "", Jabatan: item.jabatan || "",
-                UNIT_KERJA: item.unit_kerja, Unit_Kerja: item.unit_kerja,
-                UNIT_KERJA_INDUK: item.perangkat_daerah,
-                TGL_LAHIR: formatTanggal(item.tgl_lahir),
-                GOLONGAN: item.golongan || "", DALAM_GOLONGAN: item.golongan || "",
-                DASAR_NOMOR: item.dasar_nomor || "-", NOMOR: item.dasar_nomor || "-",
-                DASAR_TANGGAL: formatTanggal(item.dasar_tanggal),
-                DASAR_PEJABAT: item.dasar_pejabat || "-", PEJABAT_LAMA: item.dasar_pejabat || "-", OLEH_PEJABAT: item.dasar_pejabat || "-",
-                DASAR_TMT: formatTanggal(item.dasar_tmt),
-                DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
-                DASAR_MK_LAMA: `${twoDigits(item.dasar_mk_tahun)} Tahun ${twoDigits(item.dasar_mk_bulan)} Bulan`,
-                DASAR_HUKUM: textHukum, KONSIDERANS: textHukum,
-                MK_BARU: `${twoDigits(item.mk_baru_tahun)} Tahun ${twoDigits(item.mk_baru_bulan)} Bulan`,
-                GAJI_BARU: formatRupiah(item.gaji_baru),
-                TMT_SEKARANG: formatTanggal(item.tmt_sekarang),
-                TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
-                MASA_PERJANJIAN_KERJA: item.masa_perjanjian || "-",
-                PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian || "-",
-                KOP: kopT, ALAMAT_KOP: kopA,
-                NOMOR_NASKAH: item.nomor_naskah || "....................", 
-                TANGGAL_NASKAH: tanggalSurat, 
-                SIFAT: sifatSurat, TTD_PENGIRIM: ttdContent, 
-                JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp, JABATAN_PEJABAT_TTD: pjj || "${jabatan_pejabat_ttd}", 
-                NAMA_PENGIRIM: pjn || "${nama_pengirim}", NIP_PENGIRIM: pjnip || "${nip_pengirim}"
+                NAMA: item.nama||"", NIP: item.nip||"", PANGKAT: pangkatFinal, JABATAN: item.jabatan||"",
+                UNIT_KERJA: item.unit_kerja, UNIT_KERJA_INDUK: item.perangkat_daerah,
+                TGL_LAHIR: formatTanggal(item.tgl_lahir), GOLONGAN: item.golongan||"",
+                DASAR_NOMOR: item.dasar_nomor||"-", DASAR_TANGGAL: formatTanggal(item.dasar_tanggal), DASAR_PEJABAT: item.dasar_pejabat||"-",
+                DASAR_TMT: formatTanggal(item.dasar_tmt), DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
+                DASAR_MK_LAMA: `${(item.dasar_mk_tahun||0).toString().padStart(2,'0')} Tahun ${(item.dasar_mk_bulan||0).toString().padStart(2,'0')} Bulan`,
+                DASAR_HUKUM: textHukum, MK_BARU: `${(item.mk_baru_tahun||0).toString().padStart(2,'0')} Tahun ${(item.mk_baru_bulan||0).toString().padStart(2,'0')} Bulan`,
+                GAJI_BARU: formatRupiah(item.gaji_baru), TMT_SEKARANG: formatTanggal(item.tmt_sekarang), TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
+                MASA_PERJANJIAN_KERJA: item.masa_perjanjian||"-", PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian||"-",
+                KOP: kopT, ALAMAT_KOP: kopA, NOMOR_NASKAH: item.nomor_naskah||"....................", TANGGAL_NASKAH: tanggalSurat, 
+                SIFAT: "Biasa", TTD_PENGIRIM: ttdContent, JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp, 
+                NAMA_PENGIRIM: pjn||"${nama_pengirim}", NIP_PENGIRIM: pjnip||"${nip_pengirim}"
             });
-
             return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
         };
 

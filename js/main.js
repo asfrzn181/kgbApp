@@ -19,7 +19,7 @@ import MasterTemplate from './components/MasterTemplate.js';
 import MasterGolongan from './components/MasterGolongan.js';
 import MasterJabatan from './components/MasterJabatan.js';
 import Penomoran from './components/Penomoran.js';
-
+import TransaksiInpassing from './components/TransaksiInpassing.js';
 // --- KONFIGURASI ROUTER ---
 const routes = [
     // 1. Dashboard
@@ -38,7 +38,8 @@ const routes = [
     { path: '/master/pejabat', component: MasterPejabat },
     { path: '/master/template', component: MasterTemplate },
     { path: '/master/golongan', component: MasterGolongan },
-    { path: '/master/jabatan', component: MasterJabatan }
+    { path: '/master/jabatan', component: MasterJabatan },
+    { path: '/inpassing', component: TransaksiInpassing, meta: { requiresAuth: true } }
 ];
 
 const router = createRouter({
