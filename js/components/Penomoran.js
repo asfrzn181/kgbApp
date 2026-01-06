@@ -409,7 +409,7 @@ export default {
                 const ps = await getDoc(doc(db, "master_pejabat", targetNip)); 
                 if(ps.exists()){ const d = ps.data(); pjp=d.pangkat||pjp; pjj=d.jabatan||pjj; pjn=d.nama||""; pjnip=d.nip||""; } 
             }
-            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n\n\n" : "\n\n\n\n";
+            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n" : "\n\n\n\n";
             let tanggalSurat = previewTab.value === 'TTE' ? "${tanggal_naskah}" : formatTanggal(item.tanggal_naskah ? item.tanggal_naskah.toDate() : new Date());
             const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
             const res = await fetch(url); const buf = await res.arrayBuffer();

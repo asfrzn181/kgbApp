@@ -535,7 +535,7 @@ export default {
                 if(ps.exists()){ const d = ps.data(); pjp = d.pangkat || pjp; pjj = d.jabatan || pjj; pjn = d.nama || ""; pjnip = d.nip || ""; } 
             }
             
-            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n\n\n" : "\n\n\n";
+            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n" : "\n\n\n";
             let tanggalSurat = previewTab.value === 'TTE' ? "${tanggal_naskah}" : formatTanggal(item.tanggal_naskah ? item.tanggal_naskah.toDate() : new Date());
             let nomor_naskah = previewTab.value === 'TTE' ? (item.nomor_naskah || "${nomor_naskah}") : (item.nomor_naskah || "....................");
 
