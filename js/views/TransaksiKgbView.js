@@ -276,7 +276,7 @@ export const TplMain = `
                                     <div class="col-6 col-md-3"><label class="form-label small text-muted">Tgl Lahir</label><input v-model="form.tgl_lahir" type="date" class="form-control border-warning" required></div>
                                     <div class="col-12 col-md-6"><label class="form-label small text-muted">Jabatan</label><AutocompleteJabatan v-model="form.jabatan" @select="handleJabatanSelect" /></div>
                                     
-                                    <div class="col-12 col-md-6"><label class="form-label small text-muted">Unit Kerja (Lokasi)</label><AutocompleteUnitKerja v-model="form.unit_kerja" /></div>
+                                    <div class="col-12 col-md-6"><label class="form-label small text-muted">Unit Kerja</label><AutocompleteUnitKerja v-model="form.unit_kerja" /></div>
                                     
                                     <div class="col-12 col-md-6"><label class="form-label small text-muted">Perangkat Daerah</label><AutocompletePerangkatDaerah v-model="form.perangkat_daerah" /></div>
                                     
