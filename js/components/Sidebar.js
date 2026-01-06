@@ -11,7 +11,7 @@ export default {
             
             <a href="#" class="d-flex align-items-center link-dark text-decoration-none">
                 <i class="bi bi-person-workspace fs-3 text-primary me-2"></i>
-                <span class="fs-4 fw-bold text-primary">MAS</span>
+                <span class="fs-4 fw-bold text-primary">MAS PRI</span>
             </a>
             
             <button class="btn btn-light border d-md-none" type="button" @click.stop="toggleMenu">
