@@ -1,3 +1,7 @@
+// ==========================================
+// FILE: src/views/PenomoranView.js
+// ==========================================
+
 // 1. TEMPLATE AUTOCOMPLETE USULAN
 export const TplAutocompleteUsulan = `
     <div class="position-relative w-100">
@@ -43,15 +47,19 @@ export const TplPenomoran = `
             <h3 class="fw-bold text-primary mb-1">Registrasi Nomor SK</h3>
             <p class="text-muted small mb-0">Generator Nomor Surat Otomatis & Log Penomoran.</p>
         </div>
-        <button @click="openModal()" class="btn btn-primary shadow-sm w-100 w-md-auto">
-            <i class="bi bi-plus-lg me-2"></i> Registrasi Nomor
-        </button>
+        <div class="d-flex gap-2">
+            <button @click="showGapModal = true; checkGaps()" class="btn btn-outline-primary shadow-sm text-nowrap">
+                <i class="bi bi-search me-2"></i>Cek No. Kosong
+            </button>
+            <button @click="openModal()" class="btn btn-primary shadow-sm text-nowrap">
+                <i class="bi bi-plus-lg me-2"></i> Registrasi Nomor
+            </button>
+        </div>
     </div>
 
     <div class="card shadow-sm border-0 mb-3">
         <div class="card-body p-3">
             <div class="row g-2 align-items-center">
-                
                 <div class="col-6 col-md-auto">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-light border-end-0">Show</span>
@@ -62,7 +70,6 @@ export const TplPenomoran = `
                         </select>
                     </div>
                 </div>
-
                 <div class="col-12 col-md-auto d-flex gap-2 align-items-center">
                     <input type="date" v-model="filterStartDate" class="form-control form-control-sm" title="Mulai Tanggal">
                     <span class="text-muted small">s/d</span>
@@ -71,9 +78,7 @@ export const TplPenomoran = `
                         <i class="bi bi-search"></i>
                     </button>
                 </div>
-
                 <div class="col d-none d-md-block"></div>
-
                 <div class="col-12 col-md-auto">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
@@ -128,6 +133,12 @@ export const TplPenomoran = `
                                     <button @click="previewSK(item)" class="btn btn-sm btn-light border text-primary" title="Preview">
                                         <i class="bi bi-eye-fill"></i>
                                     </button>
+                                    <button @click="editNomor(item)" class="btn btn-sm btn-light border text-warning" title="Edit">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <button @click="hapusNomor(item)" class="btn btn-sm btn-light border text-danger" title="Hapus">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -142,23 +153,16 @@ export const TplPenomoran = `
                     Halaman <strong>{{ currentPage }}</strong> dari {{ totalPages }} 
                     <span v-if="totalItems > 0">(Total: {{ totalItems }} Data)</span>
                 </small>
-                
                 <nav aria-label="Page navigation" v-if="totalPages > 1">
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item" :class="{ disabled: currentPage === 1 }">
-                            <button class="page-link" @click="goToPage(currentPage - 1)" aria-label="Previous">
-                                <span aria-hidden="true">&laquo;</span>
-                            </button>
+                            <button class="page-link" @click="goToPage(currentPage - 1)" aria-label="Previous"><span aria-hidden="true">&laquo;</span></button>
                         </li>
-                        
                         <li class="page-item" v-for="page in visiblePages" :key="page" :class="{ active: currentPage === page }">
                             <button class="page-link" @click="goToPage(page)">{{ page }}</button>
                         </li>
-
                         <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-                            <button class="page-link" @click="goToPage(currentPage + 1)" aria-label="Next">
-                                <span aria-hidden="true">&raquo;</span>
-                            </button>
+                            <button class="page-link" @click="goToPage(currentPage + 1)" aria-label="Next"><span aria-hidden="true">&raquo;</span></button>
                         </li>
                     </ul>
                 </nav>
@@ -182,7 +186,6 @@ export const TplPenomoran = `
                     </div>
 
                     <form @submit.prevent="simpanFinal">
-                        
                         <div class="card border-0 shadow-sm mb-3">
                             <div class="card-body">
                                 <label class="form-label fw-bold small text-muted">1. Pilih Usulan KGB</label>
@@ -207,8 +210,8 @@ export const TplPenomoran = `
                                     <div class="col-12 col-md-4">
                                         <label class="form-label small fw-bold">Jenis Jabatan</label>
                                         <select v-model="form.jenis_jabatan" class="form-select" :disabled="isEditMode" required>
-                                            <option value="Struktural">Struktural</option>
                                             <option value="Fungsional">Fungsional</option>
+                                            <option value="Struktural">Struktural</option>
                                         </select>
                                     </div>
                                     <div class="col-6 col-md-4">
@@ -236,10 +239,10 @@ export const TplPenomoran = `
                                 </div>
                                 <div v-if="customNumberStatus" class="alert py-2 small mb-0 mt-2 d-flex align-items-center shadow-sm" 
                                      :class="{
-                                         'alert-info': customNumberStatus === 'checking',
-                                         'alert-success': customNumberStatus === 'available',
-                                         'alert-danger': customNumberStatus === 'taken',
-                                         'alert-warning': customNumberStatus === 'warning' || customNumberStatus === 'invalid'
+                                        'alert-info': customNumberStatus === 'checking',
+                                        'alert-success': customNumberStatus === 'available',
+                                        'alert-danger': customNumberStatus === 'taken',
+                                        'alert-warning': customNumberStatus === 'warning' || customNumberStatus === 'invalid'
                                      }">
                                     <i class="bi me-2 fs-5" :class="{
                                         'bi-hourglass-split': customNumberStatus === 'checking',
@@ -260,6 +263,77 @@ export const TplPenomoran = `
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="showGapModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); z-index: 1060;" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-white border-bottom">
+                    <div>
+                        <h5 class="modal-title fw-bold text-primary"><i class="bi bi-sort-numeric-down me-2"></i>Nomor Urut Kosong</h5>
+                        <small class="text-muted">Mencari celah nomor yang terlewat berdasarkan counter maksimal.</small>
+                    </div>
+                    <button type="button" class="btn-close" @click="showGapModal = false"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-body">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Tahun</label>
+                                    <select v-model="gapForm.tahun" class="form-select">
+                                        <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label small fw-bold">Jenis Jabatan</label>
+                                    <select v-model="gapForm.jenis_jabatan" class="form-select">
+                                        <option value="Fungsional">Fungsional</option>
+                                        <option value="Struktural">Struktural</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <button @click="checkGaps" class="btn btn-primary w-100" :disabled="gapLoading">
+                                        <i class="bi" :class="gapLoading ? 'bi-hourglass-split' : 'bi-search'"></i> Cari
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="gapLoading" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <div class="mt-2 small text-muted">Memindai database...</div>
+                    </div>
+
+                    <div v-else>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="badge bg-secondary">Max Counter: {{ maxCounterVal }}</span>
+                            <span class="small text-muted">Ditemukan: <strong>{{ emptyNumbers.length }}</strong> celah kosong</span>
+                        </div>
+
+                        <div v-if="emptyNumbers.length === 0" class="alert alert-success d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill fs-4 me-3"></i>
+                            <div>
+                                <strong>Sempurna!</strong> Tidak ada nomor urut yang terlewat (kosong) hingga urutan ke-{{ maxCounterVal }}.
+                            </div>
+                        </div>
+
+                        <div v-else class="d-flex flex-wrap gap-2">
+                            <button v-for="num in emptyNumbers" :key="num" 
+                                @click="useGapNumber(num)"
+                                class="btn btn-outline-danger btn-sm px-3 py-2 fw-bold"
+                                title="Klik untuk gunakan nomor ini">
+                                #{{ String(num).padStart(4, '0') }}
+                            </button>
+                        </div>
+                        <div v-if="emptyNumbers.length > 0" class="mt-3 small text-muted fst-italic">
+                            *Klik salah satu nomor untuk langsung menggunakannya pada form registrasi.
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

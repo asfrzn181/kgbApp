@@ -24,8 +24,8 @@ const AutocompleteUsulan = {
             if (!search.value) return props.options.slice(0, 50);
             const term = search.value.toLowerCase();
             return props.options.filter(item => 
-                item.nama_snapshot.toLowerCase().includes(term) || 
-                item.nip.includes(term)
+                (item.nama_snapshot||'').toLowerCase().includes(term) || 
+                (item.nip||'').includes(term)
             ).slice(0, 50);
         });
 
@@ -84,6 +84,16 @@ export default {
         const customNumberStatus = ref(null);
         const customNumberMsg = ref('');
 
+        // GAP DETECTOR STATE
+        const showGapModal = ref(false);
+        const gapLoading = ref(false);
+        const emptyNumbers = ref([]);
+        const maxCounterVal = ref(0);
+        const gapForm = reactive({
+            tahun: new Date().getFullYear(),
+            jenis_jabatan: 'Fungsional'
+        });
+
         const form = reactive({
             usulan_id: '', nama_pegawai: '', nip: '', jenis_jabatan: 'Fungsional',
             golongan: '', tahun: new Date().getFullYear(), nomor_custom: '', no_urut: 0 
@@ -122,7 +132,6 @@ export default {
                 let q;
 
                 const constraints = [];
-                // FILTER TANGGAL
                 if (filterStartDate.value) {
                     const start = new Date(filterStartDate.value);
                     constraints.push(where("created_at", ">=", start));
@@ -141,7 +150,6 @@ export default {
                 }
 
                 if (tableSearch.value.trim()) {
-                    // Search Mode
                     const qAll = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(50));
                     const snap = await getDocs(qAll);
                     const term = tableSearch.value.toLowerCase();
@@ -150,7 +158,6 @@ export default {
                         (d.nama_pegawai||'').toLowerCase().includes(term)
                     );
                 } else {
-                    // Pagination Mode
                     if (typeof pageTarget === 'number') {
                         if (pageTarget === 1) {
                             q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
@@ -228,39 +235,27 @@ export default {
                 if(!isEditMode.value) {
                     form.golongan = selected.golongan;
                     const j = (selected.jenis_jabatan || '').toLowerCase();
-                    if (j.includes('struktural')) form.jenis_jabatan = 'Struktural';
+                    if (j.includes('struktural') || j.includes('pelaksana')) form.jenis_jabatan = 'Struktural';
                     else form.jenis_jabatan = 'Fungsional';
                 }
             }
         };
 
-        // --- [FIX] LOGIKA PENGECEKAN KETERSEDIAAN NOMOR ---
-        // Menambahkan filter `where("jenis_jabatan", "==", form.jenis_jabatan)`
-        // Agar nomor yang sama di jenis jabatan berbeda TIDAK dianggap bentrok.
         const checkCustomNumber = debounce(async (nomor) => {
             if (!nomor) { customNumberStatus.value = null; customNumberMsg.value = ''; return; }
-            
-            customNumberStatus.value = 'checking'; 
-            customNumberMsg.value = 'Mengecek...';
-            
+            customNumberStatus.value = 'checking'; customNumberMsg.value = 'Mengecek...';
             try {
-                // QUERY: Cari nomor yang stringnya sama DAN jenis jabatannya sama
-                const q = query(
-                    collection(db, "nomor_surat"), 
+                const q = query(collection(db, "nomor_surat"), 
                     where("nomor_lengkap", "==", nomor),
-                    where("jenis_jabatan", "==", form.jenis_jabatan) 
-                );
+                    where("jenis_jabatan", "==", form.jenis_jabatan));
                 
                 const snap = await getDocs(q);
-                
                 if (!snap.empty) {
-                    // Jika ketemu, cek apakah itu miliknya sendiri (saat edit)
                     if (isEditMode.value && snap.docs[0].id === editId.value) {
                         customNumberStatus.value = 'available'; customNumberMsg.value = 'Nomor milik dokumen ini.';
                     } else {
                         const owner = snap.docs[0].data();
-                        customNumberStatus.value = 'taken'; 
-                        customNumberMsg.value = `Dipakai di ${form.jenis_jabatan}: ${owner.nama_pegawai}`;
+                        customNumberStatus.value = 'taken'; customNumberMsg.value = `Dipakai di ${form.jenis_jabatan}: ${owner.nama_pegawai}`;
                     }
                 } else {
                     if (!nomor.includes('B-800')) { customNumberStatus.value = 'warning'; customNumberMsg.value = 'Format tidak standar.'; } 
@@ -269,18 +264,66 @@ export default {
             } catch (e) { console.error(e); customNumberStatus.value = 'invalid'; customNumberMsg.value = 'Gagal cek.'; }
         }, 800);
 
-        // Watch jika jenis jabatan berubah, cek ulang ketersediaan (karena scope berubah)
-        watch(() => form.jenis_jabatan, () => {
-            if(form.nomor_custom) checkCustomNumber(form.nomor_custom);
-        });
-
+        watch(() => form.jenis_jabatan, () => { if(form.nomor_custom) checkCustomNumber(form.nomor_custom); });
         watch(() => form.nomor_custom, (newVal) => checkCustomNumber(newVal));
 
-        // --- PREVIEW NOMOR (STANDAR) ---
+        // --- GAP DETECTOR LOGIC ---
+        const checkGaps = async () => {
+            gapLoading.value = true;
+            emptyNumbers.value = [];
+            maxCounterVal.value = 0;
+            try {
+                // 1. Ambil Max Counter saat ini
+                const counterId = `${gapForm.tahun}_${gapForm.jenis_jabatan.toUpperCase()}`;
+                const snapCount = await getDoc(doc(db, "counters_nomor", counterId));
+                
+                if (!snapCount.exists()) { gapLoading.value = false; return; }
+
+                const maxVal = snapCount.data().count;
+                maxCounterVal.value = maxVal;
+                if (maxVal === 0) { gapLoading.value = false; return; }
+
+                // 2. Ambil semua nomor yang SUDAH TERPAKAI di range tsb
+                const q = query(collection(db, "nomor_surat"),
+                    where("tahun", "==", gapForm.tahun),
+                    where("jenis_jabatan", "==", gapForm.jenis_jabatan));
+                
+                const snapUsed = await getDocs(q);
+                const usedSet = new Set();
+                snapUsed.docs.forEach(d => usedSet.add(Number(d.data().no_urut)));
+
+                // 3. Loop dari 1 s/d Max, cari yang tidak ada
+                const gaps = [];
+                for(let i=1; i<=maxVal; i++) {
+                    if(!usedSet.has(i)) gaps.push(i);
+                }
+                emptyNumbers.value = gaps;
+            } catch (e) {
+                console.error(e); showToast("Gagal cek nomor kosong", 'error');
+            } finally { gapLoading.value = false; }
+        };
+
+        const useGapNumber = (no) => {
+            showGapModal.value = false;
+            openModal(); // Buka form
+            // Set Data
+            form.tahun = gapForm.tahun;
+            form.jenis_jabatan = gapForm.jenis_jabatan;
+            form.no_urut = no;
+            
+            // Generate
+            const noUrutStr = String(no).padStart(4, '0');
+            const romawi = "IX"; // Default sementara
+            form.nomor_custom = `B-800.1.11.13/${romawi}/${noUrutStr}/BKPSDMD/${form.tahun}`;
+            
+            showToast(`Menggunakan slot kosong #${no}`, 'info');
+            checkCustomNumber(form.nomor_custom);
+        };
+
+        // --- PREVIEW NOMOR ---
         const previewNomor = async () => {
             if (!form.usulan_id) return showToast("Pilih usulan dulu!", 'warning');
             try {
-                // Counter terpisah berdasarkan jenis jabatan
                 const counterId = `${form.tahun}_${form.jenis_jabatan.toUpperCase()}`;
                 const counterRef = doc(db, "counters_nomor", counterId);
                 const snap = await getDoc(counterRef);
@@ -290,9 +333,6 @@ export default {
                 const golRomawi = form.golongan ? form.golongan.split('/')[0] : '';
                 const noUrutStr = String(nextCount).padStart(4, '0'); 
                 
-                // Format Standar (TANPA SUFFIX)
-                // Keduanya (Struktural & Fungsional) menghasilkan string yang sama jika urutannya sama
-                // Tapi validasi di database nanti membedakannya berdasarkan field `jenis_jabatan`
                 form.nomor_custom = `B-800.1.11.13/${golRomawi}/${noUrutStr}/BKPSDMD/${form.tahun}`;
                 form.no_urut = nextCount; 
                 
@@ -300,23 +340,43 @@ export default {
             } catch (e) { showToast("Gagal hitung: " + e.message, 'error'); }
         };
 
+        // --- SIMPAN FINAL (CONDITIONAL COUNTER) ---
         const simpanFinal = async () => {
             if (!form.nomor_custom) return showToast("Nomor belum diisi!", 'warning');
             if (customNumberStatus.value === 'taken') return showToast("Nomor terpakai!", 'error');
             isSaving.value = true;
             try {
+                // Step A: Ekstraksi Nomor
                 const parts = form.nomor_custom.split('/');
-                let currentUrut = 0;
-                if(parts.length > 2 && !isNaN(parseInt(parts[2]))) { currentUrut = parseInt(parts[2]); } 
-                else { currentUrut = form.no_urut || 0; }
+                let inputUrut = 0;
+                if(parts.length > 2 && !isNaN(parseInt(parts[2]))) { 
+                    inputUrut = parseInt(parts[2]); 
+                } else { 
+                    inputUrut = form.no_urut || 0; 
+                }
 
+                // Step B: Double Check Server
+                if (!isEditMode.value || (isEditMode.value && inputUrut !== form.no_urut)) {
+                    const qCek = query(collection(db, "nomor_surat"),
+                        where("no_urut", "==", inputUrut),
+                        where("jenis_jabatan", "==", form.jenis_jabatan),
+                        where("tahun", "==", form.tahun)
+                    );
+                    const snapCek = await getDocs(qCek);
+                    if (!snapCek.empty) {
+                        if (!isEditMode.value || (isEditMode.value && snapCek.docs[0].id !== editId.value)) {
+                            throw new Error(`Nomor Urut ${inputUrut} sudah digunakan!`);
+                        }
+                    }
+                }
+
+                // Step C: Simpan
                 if (isEditMode.value) {
                     await runTransaction(db, async (transaction) => {
                         const logRef = doc(db, "nomor_surat", editId.value);
                         transaction.update(logRef, {
                             usulan_id: form.usulan_id, nama_pegawai: form.nama_pegawai, nip: form.nip,
-                            // Jenis jabatan tidak diubah saat edit untuk keamanan konsistensi
-                            nomor_lengkap: form.nomor_custom, no_urut: currentUrut
+                            nomor_lengkap: form.nomor_custom, no_urut: inputUrut
                         });
                         if (oldUsulanId.value && oldUsulanId.value !== form.usulan_id) {
                             const oldRef = doc(db, "usulan_kgb", oldUsulanId.value);
@@ -327,18 +387,22 @@ export default {
                     });
                     showToast("Update berhasil!", 'success');
                 } else {
+                    // NEW ENTRY: Conditional Counter Update
                     const counterId = `${form.tahun}_${form.jenis_jabatan.toUpperCase()}`;
                     const counterRef = doc(db, "counters_nomor", counterId);
                     const snapCount = await getDoc(counterRef);
-                    let dbCount = 0;
-                    if (snapCount.exists()) dbCount = snapCount.data().count;
-                    if (currentUrut > dbCount) { await setDoc(counterRef, { count: currentUrut }, { merge: true }); }
+                    let dbLastCount = 0;
+                    if (snapCount.exists()) dbLastCount = snapCount.data().count;
+
+                    // HANYA UPDATE COUNTER JIKA NOMOR BARU > COUNTER LAMA
+                    if (inputUrut > dbLastCount) {
+                        await setDoc(counterRef, { count: inputUrut }, { merge: true });
+                    }
 
                     await setDoc(doc(collection(db, "nomor_surat")), {
                         usulan_id: form.usulan_id, nama_pegawai: form.nama_pegawai, nip: form.nip,
-                        jenis_jabatan: form.jenis_jabatan, // Simpan jenis jabatan agar bisa difilter
-                        tahun: form.tahun, golongan: form.golongan,
-                        no_urut: currentUrut, nomor_lengkap: form.nomor_custom, created_at: serverTimestamp()
+                        jenis_jabatan: form.jenis_jabatan, tahun: form.tahun, golongan: form.golongan,
+                        no_urut: inputUrut, nomor_lengkap: form.nomor_custom, created_at: serverTimestamp()
                     });
                     await updateDoc(doc(db, "usulan_kgb", form.usulan_id), { nomor_naskah: form.nomor_custom, tanggal_naskah: serverTimestamp() });
                     showToast("Nomor disimpan!", 'success');
@@ -353,24 +417,34 @@ export default {
             customNumberStatus.value = null; customNumberMsg.value = '';
             await fetchUsulanList(); showModal.value = true;
         };
-
         const hapusNomor = async (item) => {
-            if (await showConfirm('Batalkan Nomor?', 'Counter akan mundur jika nomor terakhir.')) {
+            // Ubah pesan konfirmasi agar user sadar konsekuensinya
+            if (await showConfirm('Batalkan Nomor?', 'Nomor ini akan menjadi KOSONG (Gap). Counter nomor TIDAK akan mundur.')) {
                 try {
-                    const counterId = `${item.tahun}_${item.jenis_jabatan.toUpperCase()}`;
-                    const counterRef = doc(db, "counters_nomor", counterId);
                     await runTransaction(db, async (transaction) => {
-                        const counterDoc = await transaction.get(counterRef);
-                        if (counterDoc.exists()) {
-                            if (Number(counterDoc.data().count) === Number(item.no_urut)) {
-                                transaction.update(counterRef, { count: Number(item.no_urut) - 1 });
-                            }
+                        // 1. HAPUS LOGIC UPDATE COUNTER (Dibuang)
+                        // Kita tidak perlu membaca atau mengupdate collection 'counters_nomor'
+                        
+                        // 2. Hapus Dokumen Log Nomor
+                        const logRef = doc(db, "nomor_surat", item.id);
+                        transaction.delete(logRef);
+
+                        // 3. Reset Status di Data Usulan (Hapus referensi nomor di usulan_kgb)
+                        if (item.usulan_id) {
+                            const usulanRef = doc(db, "usulan_kgb", item.usulan_id);
+                            transaction.update(usulanRef, { 
+                                nomor_naskah: null, 
+                                tanggal_naskah: null 
+                            });
                         }
-                        transaction.delete(doc(db, "nomor_surat", item.id));
-                        if(item.usulan_id) transaction.update(doc(db, "usulan_kgb", item.usulan_id), { nomor_naskah: null, tanggal_naskah: null });
                     });
-                    fetchData(1); showToast("Dibatalkan.");
-                } catch (e) { console.error(e); showToast(e.message, 'error'); }
+
+                    fetchData(1); 
+                    showToast("Nomor dibatalkan. Slot nomor kini kosong.");
+                } catch (e) { 
+                    console.error(e); 
+                    showToast(e.message, 'error'); 
+                }
             }
         };
 
@@ -380,7 +454,6 @@ export default {
             if(!snap.exists()) throw new Error("Data Usulan tidak ditemukan!");
             const item = snap.data();
 
-            // [FIX] AMBIL PANGKAT DARI MASTER GOLONGAN
             let pangkatFinal = item.pangkat || ""; 
             if (item.golongan) {
                 try {
@@ -474,7 +547,9 @@ export default {
             customNumberStatus, customNumberMsg,
             // EXPORT PAGINATION STATES
             currentPage, totalPages, visiblePages, itemsPerPage, totalItems, goToPage, fetchData,
-            filterStartDate, filterEndDate, tableSearch
+            filterStartDate, filterEndDate, tableSearch,
+            // EXPORT GAP DETECTOR
+            showGapModal, gapLoading, emptyNumbers, maxCounterVal, gapForm, checkGaps, useGapNumber
         };
     }
 };
