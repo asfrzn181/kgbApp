@@ -33,30 +33,120 @@
         }
     }
     </script>
-    
+    <style>
+                /* 1. Backdrop Overlay (Kaca Buram) */
+        .loading-overlay {
+            position: fixed;
+            top: 0; 
+            left: 0;
+            width: 100%; 
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.85); /* Putih lebih solid */
+            backdrop-filter: blur(8px); /* Efek blur kuat */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* 2. Container Tengah */
+        .loading-content {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 3. Animasi Cincin (Pulse Ring) - Tanpa Gambar! */
+        .pulse-ring {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border: 4px solid var(--bs-primary); /* Menggunakan warna primary bootstrap */
+            border-radius: 50%;
+            opacity: 0;
+            animation: pulse-animation 2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+        }
+
+        .pulse-ring.delay {
+            animation-delay: 0.5s; /* Cincin kedua muncul belakangan */
+        }
+
+        /* 4. Teks Brand (MAS PRI) */
+        .brand-text {
+            font-size: 1.5rem;
+            font-weight: 900;
+            letter-spacing: 3px;
+            color: #333;
+            z-index: 2;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        /* 5. Teks Status (Memproses Data...) */
+        .loading-status {
+            font-size: 0.85rem;
+            color: #6c757d;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 50px; /* Jarak agar tidak menumpuk dengan cincin */
+        }
+
+        /* --- KEYFRAMES ANIMATION --- */
+
+        /* Animasi Cincin Membesar & Hilang */
+        @keyframes pulse-animation {
+            0% {
+                transform: scale(0.5);
+                opacity: 0.8;
+                border-width: 4px;
+            }
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+                border-width: 0px;
+            }
+        }
+
+        /* Animasi Titik (Dots) */
+        .dot-1, .dot-2, .dot-3 { opacity: 0; animation: dot-fade 1.5s infinite; }
+        .dot-1 { animation-delay: 0.0s; }
+        .dot-2 { animation-delay: 0.2s; }
+        .dot-3 { animation-delay: 0.4s; }
+
+        @keyframes dot-fade {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+    </style>
     </head>
 <body class="bg-light">
 
     <div id="app" v-cloak>
         
         <div v-show="store.isLoading" class="loading-overlay">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>
+            <div class="loading-content">
+                <div class="pulse-ring"></div>
+                <div class="pulse-ring delay"></div>
+                
+                <div class="brand-text">
+                    <span class="letter">M</span>
+                    <span class="letter">A</span>
+                    <span class="letter">S</span>
+                    <span class="spacer"></span>
+                    <span class="letter text-primary">P</span>
+                    <span class="letter text-primary">R</span>
+                    <span class="letter text-primary">I</span>
+                </div>
 
-        <nav v-if="store.user" class="navbar navbar-expand navbar-dark bg-primary shadow-sm mb-4">
-            <div class="container">
-                <span class="navbar-brand fw-bold">SIMPEG KGB</span>
-                <div class="d-flex align-items-center">
-                    <span class="text-white small me-3 d-none d-md-block">{{ store.user.email }}</span>
-                    <button @click="logout" class="btn btn-sm btn-danger">Keluar</button>
+                <div class="loading-status">
+                    Memproses Data
+                    <span class="dot-1">.</span><span class="dot-2">.</span><span class="dot-3">.</span>
                 </div>
             </div>
-        </nav>
-
-        <div class="container">
-            <component :is="currentViewComponent"></component>
         </div>
 
     </div>

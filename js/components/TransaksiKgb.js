@@ -333,22 +333,48 @@ export default {
         
         watch(tableSearch, debounce(() => fetchTable(1), 800));
 
+        // --- LOGIKA UPDATE STATUS (SWITCH SELESAI/BELUM) ---
         const updateStatus = async (item, newStatus) => {
             if(!item.id) return showToast("ID Error", "error");
+            
+            // Optimistic UI Update (Agar switch terasa responsif langsung berubah)
+            const oldStatus = item.status;
+            item.status = newStatus; 
+
             try {
                 const updateData = { status: newStatus };
-                if (newStatus === 'TEKEN') updateData.tgl_teken = serverTimestamp();
-                if (newStatus === 'DISTRIBUSI') updateData.tgl_distribusi = serverTimestamp();
+                
+                // Jika ditandai SELESAI, catat tanggal penyelesaian
+                if (newStatus === 'SELESAI') {
+                    updateData.tgl_selesai = serverTimestamp();
+                } else {
+                    // Jika dikembalikan ke DRAFT, hapus tanggal selesai (opsional)
+                    updateData.tgl_selesai = null; 
+                }
+
                 await updateDoc(doc(db, "usulan_kgb", item.id), updateData);
-                showToast(`Status: ${newStatus}`);
+                
+                // Pesan Feedback yang lebih jelas
+                if (newStatus === 'SELESAI') {
+                    showToast("Dokumen ditandai SELESAI.", "success");
+                } else {
+                    showToast("Dokumen dikembalikan ke PROSES.", "info");
+                }
+                
+                // Refresh data untuk memastikan konsistensi server
                 fetchTable(currentPage.value); 
-            } catch (e) { showToast(e.message, "error"); }
+
+            } catch (e) { 
+                // Jika gagal, kembalikan status tampilan ke semula
+                item.status = oldStatus;
+                console.error(e);
+                showToast("Gagal update status: " + e.message, "error"); 
+            }
         };
-        
+
+        // --- HELPER WARNA (Opsional, jika masih dipakai di Badge Mobile) ---
         const statusColor = (status) => {
-            if(status === 'TEKEN') return 'btn-warning text-dark';
-            if(status === 'DISTRIBUSI') return 'btn-success';
-            return 'btn-secondary'; 
+            return status === 'SELESAI' ? 'bg-success' : 'bg-secondary';
         };
 
         const initRefs = async () => {
@@ -499,10 +525,59 @@ export default {
             } catch(e){ console.error(e); showToast(e.message,'error');} finally{isSaving.value=false;}
         };
 
-        const hapusTransaksi = async(item)=>{ 
+        // Pastikan fungsi-fungsi ini sudah di-import dari firebase.js
+        // import { collection, query, where, getDocs, deleteDoc, doc } from '../firebase.js';
+
+        const hapusTransaksi = async(item) => { 
             if(!item || !item.id) return showToast("ID Error", 'error');
-            if (item.nomor_naskah) return showToast("Gagal! Data sudah memiliki Nomor SK.", 'error');
-            if(await showConfirm("Hapus?","Data hilang.")) { await deleteDoc(doc(db,"usulan_kgb",item.id)); fetchTable(1); } 
+
+            // --- LOGIKA BARU: JIKA DATA MEMILIKI NOMOR SK ---
+            if (item.nomor_naskah) {
+                try {
+                    // 1. Beri info sedang mengecek
+                    // showToast("Mengecek validasi nomor...", 'info'); 
+
+                    // 2. Query ke database: Cari semua data yang punya nomor naskah SAMA persis
+                    const q = query(
+                        collection(db, "usulan_kgb"), 
+                        where("nomor_naskah", "==", item.nomor_naskah)
+                    );
+                    
+                    // 3. Ambil snapshot datanya
+                    const snap = await getDocs(q);
+
+                    // 4. Cek jumlah data yang ditemukan (snap.size)
+                    if (snap.size > 1) {
+                        // KONDISI: DUPLIKASI (Ditemukan lebih dari 1 data dengan nomor ini)
+                        // Artinya: Aman dihapus salah satunya, karena nomor tidak akan hilang total.
+                        if(await showConfirm(
+                            "Hapus Data Duplikat?", 
+                            `Nomor SK "${item.nomor_naskah}" dipakai oleh ${snap.size} data. Hapus data ini?`
+                        )) { 
+                            await deleteDoc(doc(db, "usulan_kgb", item.id)); 
+                            fetchTable(1);
+                            showToast("Data duplikat berhasil dihapus.", 'success');
+                        }
+                    } else {
+                        // KONDISI: TIDAK DUPLIKASI (Hanya ketemu 1, yaitu dirinya sendiri)
+                        // Sesuai request: DILARANG HAPUS
+                        return showToast("Gagal! Data memiliki Nomor SK Tunggal (bukan duplikat). Dilarang menghapus!", 'error');
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                    showToast("Gagal mengecek duplikasi nomor.", 'error');
+                }
+                
+                return; // Stop eksekusi agar tidak lanjut ke logika bawah
+            }
+
+            // --- LOGIKA LAMA: JIKA TIDAK ADA NOMOR (DRAFT) ---
+            if(await showConfirm("Hapus Draft?", "Data yang dihapus tidak dapat dikembalikan.")) { 
+                await deleteDoc(doc(db, "usulan_kgb", item.id)); 
+                fetchTable(1); 
+                showToast("Draft dihapus.", 'success');
+            } 
         };
 
         const generateDocBlob = async (item) => {

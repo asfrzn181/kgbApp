@@ -1,4 +1,6 @@
+// ==========================================
 // 1. TAMPILAN COMPONENT SEARCH SELECT
+// ==========================================
 export const TplSearchSelect = `
     <div class="dropdown w-100" ref="dropdown">
         <button class="form-select text-start d-flex justify-content-between align-items-center" 
@@ -20,7 +22,9 @@ export const TplSearchSelect = `
     </div>
 `;
 
+// ==========================================
 // 2. TAMPILAN COMPONENT AUTOCOMPLETE JABATAN
+// ==========================================
 export const TplAutocompleteJabatan = `
     <div class="position-relative w-100">
         <input type="text" class="form-control" :value="modelValue" @input="handleInput"
@@ -38,7 +42,9 @@ export const TplAutocompleteJabatan = `
     </div>
 `;
 
+// ==========================================
 // 3. TAMPILAN COMPONENT AUTOCOMPLETE UNIT KERJA
+// ==========================================
 export const TplAutocompleteUnitKerja = `
     <div class="position-relative w-100">
         <input type="text" class="form-control" :value="modelValue" @input="handleInput"
@@ -52,7 +58,9 @@ export const TplAutocompleteUnitKerja = `
     </div>
 `;
 
-// 4. [BARU] TAMPILAN COMPONENT AUTOCOMPLETE PERANGKAT DAERAH
+// ==========================================
+// 4. TAMPILAN COMPONENT AUTOCOMPLETE PERANGKAT DAERAH
+// ==========================================
 export const TplAutocompletePerangkatDaerah = `
     <div class="position-relative w-100">
         <input type="text" class="form-control" :value="modelValue" @input="handleInput"
@@ -66,7 +74,9 @@ export const TplAutocompletePerangkatDaerah = `
     </div>
 `;
 
-// 5. TAMPILAN UTAMA
+// ==========================================
+// 5. TAMPILAN UTAMA (UPDATE TERBARU: SWITCH SELESAI)
+// ==========================================
 export const TplMain = `
 <div class="p-3 p-md-4">
     <div v-if="!showModal && !showPreviewModal">
@@ -130,7 +140,7 @@ export const TplMain = `
                                     <th class="ps-2 py-3 small fw-bold">Pegawai</th>
                                     <th class="py-3 small fw-bold">Gaji Baru</th>
                                     <th class="py-3 small fw-bold">TMT</th>
-                                    <th class="py-3 small fw-bold text-center">Status</th>
+                                    <th class="py-3 small fw-bold text-center" style="width: 120px;">Selesai</th>
                                     <th class="text-end pe-4 py-3 small fw-bold">Aksi</th>
                                 </tr>
                             </thead>
@@ -148,17 +158,27 @@ export const TplMain = `
                                         </td>
                                         <td class="fw-bold text-success font-monospace">{{ formatRupiah(item.gaji_baru) }}</td>
                                         <td>{{ formatTanggal(item.tmt_sekarang) }}</td>
+                                        
                                         <td class="text-center">
-                                            <span class="badge rounded-pill" :class="{'bg-secondary': !item.status || item.status==='DRAFT', 'bg-warning text-dark': item.status==='TEKEN', 'bg-success': item.status==='DISTRIBUSI'}">{{ item.status || 'DRAFT' }}</span>
+                                            <div class="form-check form-switch d-flex justify-content-center align-items-center gap-2">
+                                                <input class="form-check-input cursor-pointer" type="checkbox" role="switch"
+                                                    :checked="item.status === 'SELESAI'"
+                                                    @change="updateStatus(item, $event.target.checked ? 'SELESAI' : 'DRAFT')">
+                                                <label class="form-check-label small" :class="item.status === 'SELESAI' ? 'text-success fw-bold' : 'text-muted'">
+                                                    {{ item.status === 'SELESAI' ? 'Ya' : 'Belum' }}
+                                                </label>
+                                            </div>
                                         </td>
+
                                         <td class="text-end pe-4">
                                             <div class="btn-group btn-group-sm">
                                                 <button @click="previewSK(item)" class="btn btn-light border text-primary" title="Preview"><i class="bi bi-eye"></i></button>
                                                 <button @click="openModal(item)" class="btn btn-light border text-secondary" title="Edit"><i class="bi bi-pencil"></i></button>
-                                                <button v-if="!item.nomor_naskah" @click="hapusTransaksi(item)" class="btn btn-light border text-danger" title="Hapus"><i class="bi bi-trash"></i></button>
+                                                <button  @click="hapusTransaksi(item)" class="btn btn-light border text-danger" title="Hapus"><i class="bi bi-trash"></i></button>
                                             </div>
                                         </td>
                                     </tr>
+                                    
                                     <tr v-if="isExpanded(item.id)" class="bg-light border-bottom fade-in">
                                         <td colspan="6" class="p-3 ps-5">
                                             <div class="row g-3 small">
@@ -183,14 +203,6 @@ export const TplMain = `
                                                         <span class="text-muted">No. SK:</span> <span class="fw-bold font-monospace text-dark">{{ item.nomor_naskah }}</span>
                                                     </div>
                                                     <div v-else class="text-muted fst-italic mb-1">Belum ada nomor SK</div>
-                                                    <div class="mt-2">
-                                                        <button class="btn btn-xs btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">Update Status</button>
-                                                        <ul class="dropdown-menu">
-                                                            <li><a class="dropdown-item" href="#" @click.prevent="updateStatus(item, 'DRAFT')">Ke Draft</a></li>
-                                                            <li><a class="dropdown-item" href="#" @click.prevent="updateStatus(item, 'TEKEN')">Ke Teken</a></li>
-                                                            <li><a class="dropdown-item" href="#" @click.prevent="updateStatus(item, 'DISTRIBUSI')">Ke Distribusi</a></li>
-                                                        </ul>
-                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
@@ -204,9 +216,15 @@ export const TplMain = `
                         <div v-for="item in listData" :key="'mob-'+item.id" class="card border-0 shadow-sm">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div><h6 class="fw-bold mb-0 text-primary">{{ item.nama_snapshot }}</h6><small class="text-muted font-monospace">{{ item.nip }}</small></div>
-                                    <span class="badge rounded-pill" :class="{'bg-secondary': !item.status || item.status==='DRAFT', 'bg-warning text-dark': item.status==='TEKEN', 'bg-success': item.status==='DISTRIBUSI'}">{{ item.status || 'DRAFT' }}</span>
+                                    <div>
+                                        <h6 class="fw-bold mb-0 text-primary">{{ item.nama_snapshot }}</h6>
+                                        <small class="text-muted font-monospace">{{ item.nip }}</small>
+                                    </div>
+                                    <span class="small fw-bold" :class="item.status==='SELESAI' ? 'text-success' : 'text-muted'">
+                                        {{ item.status==='SELESAI' ? 'Selesai' : 'Belum Selesai' }}
+                                    </span>
                                 </div>
+                                
                                 <div class="bg-light p-2 rounded small mb-3">
                                     <div class="row g-2">
                                         <div class="col-6"><span class="text-muted d-block">TMT</span> <strong>{{ formatTanggal(item.tmt_sekarang) }}</strong></div>
@@ -214,19 +232,19 @@ export const TplMain = `
                                         <div class="col-12"><span class="text-muted d-block">Jabatan</span> <strong>{{ item.jabatan_snapshot }}</strong></div>
                                     </div>
                                 </div>
-                                <div class="d-flex justify-content-between align-items-center gap-2">
-                                    <div class="dropdown flex-fill">
-                                        <button class="btn btn-sm btn-outline-secondary w-100 dropdown-toggle" type="button" data-bs-toggle="dropdown">Status</button>
-                                        <ul class="dropdown-menu">
-                                            <li><a class="dropdown-item" href="#" @click.prevent="updateStatus(item, 'DRAFT')">DRAFT</a></li>
-                                            <li><a class="dropdown-item" href="#" @click.prevent="updateStatus(item, 'TEKEN')">TEKEN</a></li>
-                                            <li><a class="dropdown-item" href="#" @click.prevent="updateStatus(item, 'DISTRIBUSI')">DISTRIBUSI</a></li>
-                                        </ul>
+                                
+                                <div class="d-flex justify-content-between align-items-center gap-2 bg-white border rounded p-2">
+                                    <div class="form-check form-switch m-0 d-flex align-items-center gap-2">
+                                        <input class="form-check-input" type="checkbox" role="switch"
+                                            :checked="item.status === 'SELESAI'"
+                                            @change="updateStatus(item, $event.target.checked ? 'SELESAI' : 'DRAFT')">
+                                        <label class="form-check-label small fw-bold">Selesai?</label>
                                     </div>
-                                    <div class="btn-group flex-fill">
-                                        <button @click="previewSK(item)" class="btn btn-sm btn-primary"><i class="bi bi-eye"></i></button>
-                                        <button @click="openModal(item)" class="btn btn-sm btn-warning text-white"><i class="bi bi-pencil"></i></button>
-                                        <button v-if="!item.nomor_naskah" @click="hapusTransaksi(item)" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button>
+
+                                    <div class="btn-group btn-group-sm">
+                                        <button @click="previewSK(item)" class="btn btn-outline-primary"><i class="bi bi-eye"></i></button>
+                                        <button @click="openModal(item)" class="btn btn-outline-secondary"><i class="bi bi-pencil"></i></button>
+                                        <button  @click="hapusTransaksi(item)" class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
                                     </div>
                                 </div>
                             </div>
