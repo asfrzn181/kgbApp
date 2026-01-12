@@ -566,7 +566,17 @@ export default {
             let tanggalSurat = item.tanggal_naskah ? formatTanggal(item.tanggal_naskah.toDate ? item.tanggal_naskah.toDate() : new Date(item.tanggal_naskah)) : "....................";
             let nomor_naskah = previewTab.value === 'TTE' ? (item.nomor_naskah) : (item.nomor_naskah || "....................");
 
-            const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
+            // --- LOGIKA DASAR HUKUM ---
+            const mapH = gvd.dasar_hukum || []; 
+            
+            // Logika: Jika Nomor Inpassing ada, paksa cari judul "INPASSING"
+            // Jika belum ada nomor, gunakan dasar_hukum bawaan data (atau "-" jika kosong)
+            const searchKey = item.nomor_inpassing ? "INPASSING" : item.dasar_hukum;
+
+            const foundH = mapH.find(h => h.judul === searchKey);
+            
+            // Ambil isinya (Jika ketemu pakai isinya, jika tidak strip)
+            const textHukum = foundH ? foundH.isi : "-";
             const twoDigits = (val) => (val||0).toString().padStart(2, '0');
 
             const res = await fetch(url); const buf = await res.arrayBuffer();

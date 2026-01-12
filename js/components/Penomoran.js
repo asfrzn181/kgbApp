@@ -547,7 +547,17 @@ export default {
             }
             let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n" : "\n\n\n\n";
             let tanggalSurat = item.tanggal_naskah ? formatTanggal(item.tanggal_naskah.toDate ? item.tanggal_naskah.toDate() : new Date(item.tanggal_naskah)) : "....................";
-            const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
+            // --- LOGIKA DASAR HUKUM ---
+            const mapH = gvd.dasar_hukum || []; 
+            
+            // Logika: Jika Nomor Inpassing ada, paksa cari judul "INPASSING"
+            // Jika belum ada nomor, gunakan dasar_hukum bawaan data (atau "-" jika kosong)
+            const searchKey = item.nomor_inpassing ? "INPASSING" : item.dasar_hukum;
+
+            const foundH = mapH.find(h => h.judul === searchKey);
+            
+            // Ambil isinya (Jika ketemu pakai isinya, jika tidak strip)
+            const textHukum = foundH ? foundH.isi : "-";
             const res = await fetch(url); const buf = await res.arrayBuffer();
             const zip = new window.PizZip(buf);
             const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => p.value.startsWith('$') ? `{${p.value}}` : "" });

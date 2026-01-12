@@ -624,10 +624,6 @@ export default {
                 
                 tanggalSurat = formatTanggal(tglObj);
             } 
-            // 2. Jika Manual Kosong & Mode TTE -> Pakai Placeholder
-            else if (previewTab.value === 'TTE') {
-                tanggalSurat = "{TANGGAL_BUAT}"; // Jangan pakai ${}, pakai {} sesuai delimiter
-            } 
             // 3. Default: Pakai Tanggal Naskah atau Hari Ini
             else {
                 const tglObj = item.tanggal_naskah ? item.tanggal_naskah.toDate() : new Date();
