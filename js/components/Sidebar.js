@@ -42,6 +42,10 @@ export default {
                         <i class="bi bi-123 me-2"></i> Penomoran SPT KGB
                     </router-link>
 
+                    <router-link to="/penomoran-inpassing" class="nav-link link-dark" active-class="active bg-primary text-white" @click="handleMobileClick">
+                        <i class="bi bi-123 me-2"></i> Inpassing KGB
+                    </router-link>
+
                     <router-link to="/laporan" class="nav-link link-dark" active-class="active bg-primary text-white" @click="handleMobileClick">
                         <i class="bi bi-printer me-2"></i> Laporan Rekap
                     </router-link>

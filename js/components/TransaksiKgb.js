@@ -58,7 +58,6 @@ const AutocompleteJabatan = {
     }
 };
 
-// [SMART FALLBACK] Autocomplete Unit Kerja
 const AutocompleteUnitKerja = {
     props: ['modelValue'],
     emits: ['update:modelValue'],
@@ -66,7 +65,6 @@ const AutocompleteUnitKerja = {
     setup(props, { emit }) {
         const showSuggestions = ref(false);
         const suggestions = ref([]);
-        
         const processSnap = (snap, keyword) => {
             const units = new Set();
             const keyLower = keyword.toLowerCase();
@@ -76,24 +74,14 @@ const AutocompleteUnitKerja = {
             });
             return Array.from(units).slice(0, 5);
         };
-
         const fetchSuggestions = debounce(async (keyword) => {
             if (!keyword || keyword.length < 3) { suggestions.value = []; return; }
             try {
                 const qGlobal = query(collection(db, "usulan_kgb"), orderBy("created_at", "desc"), limit(50)); 
                 const snap = await getDocs(qGlobal);
                 suggestions.value = processSnap(snap, keyword);
-            } catch (e) {
-                if (auth.currentUser) {
-                    try {
-                        const qOwn = query(collection(db, "usulan_kgb"), where("created_by", "==", auth.currentUser.uid), orderBy("created_at", "desc"), limit(50));
-                        const snapOwn = await getDocs(qOwn);
-                        suggestions.value = processSnap(snapOwn, keyword);
-                    } catch (err2) { }
-                }
-            }
+            } catch (e) { }
         }, 500);
-
         const handleInput = (e) => { emit('update:modelValue', e.target.value); fetchSuggestions(e.target.value); showSuggestions.value = true; };
         const selectItem = (item) => { emit('update:modelValue', item); showSuggestions.value = false; };
         const delayHide = () => setTimeout(() => showSuggestions.value = false, 200);
@@ -101,7 +89,6 @@ const AutocompleteUnitKerja = {
     }
 };
 
-// [NEW] Autocomplete Perangkat Daerah (Sama persis logikanya)
 const AutocompletePerangkatDaerah = {
     props: ['modelValue'],
     emits: ['update:modelValue'],
@@ -109,7 +96,6 @@ const AutocompletePerangkatDaerah = {
     setup(props, { emit }) {
         const showSuggestions = ref(false);
         const suggestions = ref([]);
-        
         const processSnap = (snap, keyword) => {
             const results = new Set();
             const keyLower = keyword.toLowerCase();
@@ -119,26 +105,14 @@ const AutocompletePerangkatDaerah = {
             });
             return Array.from(results).slice(0, 5);
         };
-
         const fetchSuggestions = debounce(async (keyword) => {
             if (!keyword || keyword.length < 3) { suggestions.value = []; return; }
             try {
-                // 1. Coba Global
                 const qGlobal = query(collection(db, "usulan_kgb"), orderBy("created_at", "desc"), limit(50)); 
                 const snap = await getDocs(qGlobal);
                 suggestions.value = processSnap(snap, keyword);
-            } catch (e) {
-                // 2. Fallback ke Data Sendiri
-                if (auth.currentUser) {
-                    try {
-                        const qOwn = query(collection(db, "usulan_kgb"), where("created_by", "==", auth.currentUser.uid), orderBy("created_at", "desc"), limit(50));
-                        const snapOwn = await getDocs(qOwn);
-                        suggestions.value = processSnap(snapOwn, keyword);
-                    } catch (err2) { }
-                }
-            }
+            } catch (e) { }
         }, 500);
-
         const handleInput = (e) => { emit('update:modelValue', e.target.value); fetchSuggestions(e.target.value); showSuggestions.value = true; };
         const selectItem = (item) => { emit('update:modelValue', item); showSuggestions.value = false; };
         const delayHide = () => setTimeout(() => showSuggestions.value = false, 200);
@@ -151,19 +125,23 @@ export default {
     components: { SearchSelect, AutocompleteJabatan, AutocompleteUnitKerja, AutocompletePerangkatDaerah },
     template: TplMain, 
     setup() {
+        // STATE LIST DATA
         const listData = ref([]);
         const tableLoading = ref(true);
         const tableSearch = ref('');
         
+        // PAGINATION
         const currentPage = ref(1);
         const itemsPerPage = ref(10); 
         const pageStack = ref([]); 
         const totalItems = ref(0);
         const isLastPage = ref(false); 
         
+        // FILTERS
         const filterStartDate = ref('');
         const filterEndDate = ref('');
 
+        // UI STATE
         const expandedRows = ref([]); 
         const toggleRow = (id) => {
             if (expandedRows.value.includes(id)) expandedRows.value = expandedRows.value.filter(rowId => rowId !== id);
@@ -177,6 +155,7 @@ export default {
         const currentPreviewItem = ref(null);
         const previewTab = ref('BASAH');
 
+        // FORM STATES
         const isEditMode = ref(false);
         const isSaving = ref(false);
         const isSearching = ref(false);
@@ -184,6 +163,7 @@ export default {
         const gajiMsg = ref('');
         const formId = ref(null);
         
+        // MASTER DATA
         const listGolongan = ref([]); 
         const listDasarHukum = ref([]);
         const listPejabat = ref([]); 
@@ -206,7 +186,6 @@ export default {
         });
 
         const filteredGolongan = computed(() => listGolongan.value.filter(g => g.tipe === form.tipe_asn));
-        
         const totalPages = computed(() => Math.ceil(totalItems.value / itemsPerPage.value) || 1);
         
         const visiblePages = computed(() => {
@@ -216,10 +195,7 @@ export default {
             let start = Math.max(1, current - 2);
             let end = Math.min(total, start + 4);
             if (end - start < 4) start = Math.max(1, end - 4);
-            
-            for (let i = start; i <= end; i++) {
-                pages.push(i);
-            }
+            for (let i = start; i <= end; i++) { pages.push(i); }
             return pages;
         });
 
@@ -240,6 +216,7 @@ export default {
             return data;
         };
 
+        // --- FETCH TABLE (FIXED LOGIC) ---
         const fetchTable = async (pageTarget) => {
             tableLoading.value = true;
             try {
@@ -252,131 +229,137 @@ export default {
                 if (filterStartDate.value) constraints.push(where("tmt_sekarang", ">=", filterStartDate.value));
                 if (filterEndDate.value) constraints.push(where("tmt_sekarang", "<=", filterEndDate.value));
 
+                // 1. Total Items (Refresh awal)
                 if (pageTarget === 1 || pageTarget === 'first') {
                     const snapshotCount = await getCountFromServer(query(collRef, ...constraints));
                     totalItems.value = snapshotCount.data().count;
-                    pageStack.value = []; 
+                    pageStack.value = [];
                     currentPage.value = 1;
                 }
 
+                // 2. Logic Search vs Pagination
                 if (tableSearch.value.trim()) {
-                    const qAll = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(50));
+                    // MODE SEARCH (Client Filter for 1000 items)
+                    const qAll = query(
+                        collRef, ...constraints, 
+                        orderBy("created_at", "desc"),
+                        orderBy("__name__", "desc"), // Stable sort
+                        limit(1000) 
+                    );
                     const snap = await getDocs(qAll);
                     const term = tableSearch.value.toLowerCase();
-                    listData.value = snap.docs.map(mapDoc).filter(d => (d.nama_snapshot||'').toLowerCase().includes(term) || (d.nip||'').includes(term));
+                    
+                    listData.value = snap.docs.map(mapDoc).filter(d => 
+                        (d.nama_snapshot||'').toLowerCase().includes(term) || 
+                        (d.nip||'').includes(term)
+                    );
                     isLastPage.value = true;
                 } else {
+                    // MODE PAGINATION (Stable Cursor)
                     if (typeof pageTarget === 'number') {
                         if (pageTarget === 1) {
-                            q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
+                            // Page 1
+                            q = query(
+                                collRef, ...constraints, 
+                                orderBy("created_at", "desc"), orderBy("__name__", "desc"), 
+                                limit(limitVal)
+                            );
                             currentPage.value = 1;
                             pageStack.value = [];
                         } else {
-                            if (pageTarget === currentPage.value + 1) {
+                            // Page > 1
+                            if (pageTarget > currentPage.value) { // Next
                                 const lastDoc = pageStack.value[pageStack.value.length - 1];
-                                q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(lastDoc), limit(limitVal));
-                                currentPage.value = pageTarget;
+                                if(lastDoc) {
+                                    q = query(
+                                        collRef, ...constraints, 
+                                        orderBy("created_at", "desc"), orderBy("__name__", "desc"), 
+                                        startAfter(lastDoc), limit(limitVal)
+                                    );
+                                    currentPage.value = pageTarget;
+                                } else { fetchTable(1); return; }
                             } 
-                            else if (pageTarget === currentPage.value - 1) {
+                            else if (pageTarget < currentPage.value) { // Prev
                                 const cursorIndex = pageTarget - 2;
                                 if (cursorIndex < 0) {
-                                    q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
+                                    q = query(collRef, ...constraints, orderBy("created_at", "desc"), orderBy("__name__", "desc"), limit(limitVal));
                                     pageStack.value = [];
                                 } else {
                                     const cursor = pageStack.value[cursorIndex];
-                                    q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(cursor), limit(limitVal));
+                                    q = query(
+                                        collRef, ...constraints, 
+                                        orderBy("created_at", "desc"), orderBy("__name__", "desc"), 
+                                        startAfter(cursor), limit(limitVal)
+                                    );
                                     pageStack.value = pageStack.value.slice(0, cursorIndex + 1);
                                 }
                                 currentPage.value = pageTarget;
-                            }
-                            else {
-                                q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
-                                currentPage.value = 1;
-                                pageStack.value = [];
-                            }
+                            } else { fetchData(1); return; } // Same page
                         }
                     } else {
-                        q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
-                        currentPage.value = 1;
-                        pageStack.value = [];
+                        // Default
+                        q = query(collRef, ...constraints, orderBy("created_at", "desc"), orderBy("__name__", "desc"), limit(limitVal));
+                        currentPage.value = 1; pageStack.value = [];
                     }
 
+                    // Execute
                     const snap = await getDocs(q);
                     listData.value = snap.docs.map(mapDoc);
                     isLastPage.value = snap.docs.length < limitVal;
 
+                    // Update Stack
                     if (snap.docs.length > 0) {
+                        const lastVisible = snap.docs[snap.docs.length - 1];
                         if (currentPage.value === 1) {
-                            pageStack.value = [snap.docs[snap.docs.length - 1]];
+                            pageStack.value = [lastVisible];
                         } else {
                             if (pageStack.value.length < currentPage.value) {
-                                pageStack.value.push(snap.docs[snap.docs.length - 1]);
+                                pageStack.value.push(lastVisible);
+                            } else {
+                                pageStack.value[currentPage.value - 1] = lastVisible;
                             }
                         }
                     }
                 }
-            } catch (e) { console.error(e); } 
-            finally { tableLoading.value = false; }
-        };
-        
-        const goToPage = (p) => {
-            if (p < 1 || p > totalPages.value || p === currentPage.value) return;
-            if (p === currentPage.value + 1 || p === currentPage.value - 1) {
-                fetchTable(p);
-            } else {
-                fetchTable(1);
+            } catch (e) { 
+                console.error("Fetch Error:", e); 
+                if(e.code === 'failed-precondition') showToast("Index Missing: Cek Console Browser", 'error');
+            } finally { 
+                tableLoading.value = false; 
             }
         };
-        
-        const nextPage = () => goToPage(currentPage.value + 1);
-        const prevPage = () => goToPage(currentPage.value - 1);
-        
-        watch(tableSearch, debounce(() => fetchTable(1), 800));
 
-        // --- LOGIKA UPDATE STATUS (SWITCH SELESAI/BELUM) ---
+        const goToPage = (p) => {
+            if (p < 1 || p > totalPages.value || p === currentPage.value) return;
+            fetchTable(p); // Direct fetch
+        };
+
+        watch(tableSearch, debounce(() => fetchTable(1), 800));
+        watch(itemsPerPage, () => fetchTable(1));
+
         const updateStatus = async (item, newStatus) => {
             if(!item.id) return showToast("ID Error", "error");
-            
-            // Optimistic UI Update (Agar switch terasa responsif langsung berubah)
             const oldStatus = item.status;
             item.status = newStatus; 
-
             try {
                 const updateData = { status: newStatus };
-                
-                // Jika ditandai SELESAI, catat tanggal penyelesaian
-                if (newStatus === 'SELESAI') {
-                    updateData.tgl_selesai = serverTimestamp();
-                } else {
-                    // Jika dikembalikan ke DRAFT, hapus tanggal selesai (opsional)
-                    updateData.tgl_selesai = null; 
-                }
+                if (newStatus === 'SELESAI') updateData.tgl_selesai = serverTimestamp();
+                else updateData.tgl_selesai = null; 
 
                 await updateDoc(doc(db, "usulan_kgb", item.id), updateData);
                 
-                // Pesan Feedback yang lebih jelas
-                if (newStatus === 'SELESAI') {
-                    showToast("Dokumen ditandai SELESAI.", "success");
-                } else {
-                    showToast("Dokumen dikembalikan ke PROSES.", "info");
-                }
+                if (newStatus === 'SELESAI') showToast("Dokumen ditandai SELESAI.", "success");
+                else showToast("Dokumen dikembalikan ke PROSES.", "info");
                 
-                // Refresh data untuk memastikan konsistensi server
                 fetchTable(currentPage.value); 
-
             } catch (e) { 
-                // Jika gagal, kembalikan status tampilan ke semula
                 item.status = oldStatus;
                 console.error(e);
-                showToast("Gagal update status: " + e.message, "error"); 
+                showToast("Gagal update status", "error"); 
             }
         };
 
-        // --- HELPER WARNA (Opsional, jika masih dipakai di Badge Mobile) ---
-        const statusColor = (status) => {
-            return status === 'SELESAI' ? 'bg-success' : 'bg-secondary';
-        };
-
+        // --- INIT REFS ---
         const initRefs = async () => {
             const qGol = query(collection(db, "master_golongan"), orderBy("kode"));
             const snapGol = await getDocs(qGol);
@@ -525,61 +508,30 @@ export default {
             } catch(e){ console.error(e); showToast(e.message,'error');} finally{isSaving.value=false;}
         };
 
-        // Pastikan fungsi-fungsi ini sudah di-import dari firebase.js
-        // import { collection, query, where, getDocs, deleteDoc, doc } from '../firebase.js';
-
         const hapusTransaksi = async(item) => { 
             if(!item || !item.id) return showToast("ID Error", 'error');
-
-            // --- LOGIKA BARU: JIKA DATA MEMILIKI NOMOR SK ---
             if (item.nomor_naskah) {
                 try {
-                    // 1. Beri info sedang mengecek
-                    // showToast("Mengecek validasi nomor...", 'info'); 
-
-                    // 2. Query ke database: Cari semua data yang punya nomor naskah SAMA persis
-                    const q = query(
-                        collection(db, "usulan_kgb"), 
-                        where("nomor_naskah", "==", item.nomor_naskah)
-                    );
-                    
-                    // 3. Ambil snapshot datanya
+                    const q = query(collection(db, "usulan_kgb"), where("nomor_naskah", "==", item.nomor_naskah));
                     const snap = await getDocs(q);
-
-                    // 4. Cek jumlah data yang ditemukan (snap.size)
                     if (snap.size > 1) {
-                        // KONDISI: DUPLIKASI (Ditemukan lebih dari 1 data dengan nomor ini)
-                        // Artinya: Aman dihapus salah satunya, karena nomor tidak akan hilang total.
-                        if(await showConfirm(
-                            "Hapus Data Duplikat?", 
-                            `Nomor SK "${item.nomor_naskah}" dipakai oleh ${snap.size} data. Hapus data ini?`
-                        )) { 
+                        if(await showConfirm("Hapus Data Duplikat?", `Nomor SK "${item.nomor_naskah}" dipakai oleh ${snap.size} data. Hapus data ini?`)) { 
                             await deleteDoc(doc(db, "usulan_kgb", item.id)); 
-                            fetchTable(1);
-                            showToast("Data duplikat berhasil dihapus.", 'success');
+                            fetchTable(1); showToast("Data duplikat berhasil dihapus.", 'success');
                         }
                     } else {
-                        // KONDISI: TIDAK DUPLIKASI (Hanya ketemu 1, yaitu dirinya sendiri)
-                        // Sesuai request: DILARANG HAPUS
-                        return showToast("Gagal! Data memiliki Nomor SK Tunggal (bukan duplikat). Dilarang menghapus!", 'error');
+                        return showToast("Gagal! Data memiliki Nomor SK Tunggal. Dilarang hapus!", 'error');
                     }
-
-                } catch (error) {
-                    console.error(error);
-                    showToast("Gagal mengecek duplikasi nomor.", 'error');
-                }
-                
-                return; // Stop eksekusi agar tidak lanjut ke logika bawah
+                } catch (error) { console.error(error); showToast("Gagal cek duplikasi.", 'error'); }
+                return; 
             }
-
-            // --- LOGIKA LAMA: JIKA TIDAK ADA NOMOR (DRAFT) ---
             if(await showConfirm("Hapus Draft?", "Data yang dihapus tidak dapat dikembalikan.")) { 
                 await deleteDoc(doc(db, "usulan_kgb", item.id)); 
-                fetchTable(1); 
-                showToast("Draft dihapus.", 'success');
+                fetchTable(1); showToast("Draft dihapus.", 'success');
             } 
         };
 
+        // --- PREVIEW & DOWNLOAD ---
         const generateDocBlob = async (item) => {
             if (!window.PizZip || !window.docxtemplater) throw new Error("Lib Error");
             const tplId = item.tipe_asn === 'PPPK' ? "PPPK" : "PNS"; 
@@ -610,30 +562,60 @@ export default {
                 if(ps.exists()){ const d = ps.data(); pjp = d.pangkat || pjp; pjj = d.jabatan || pjj; pjn = d.nama || ""; pjnip = d.nip || ""; } 
             }
             
-            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n" : "\n\n\n";
-            let tanggalSurat = previewTab.value === 'TTE' ? "${tanggal_naskah}" : formatTanggal(item.tanggal_naskah ? item.tanggal_naskah.toDate() : new Date());
-            let nomor_naskah = previewTab.value === 'TTE' ? (item.nomor_naskah || "${nomor_naskah}") : (item.nomor_naskah || "....................");
+            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n{{TTD_PENGIRIM}}\n\n\n" : "\n\n\n";
+            let tanggalSurat = item.tanggal_naskah ? formatTanggal(item.tanggal_naskah.toDate ? item.tanggal_naskah.toDate() : new Date(item.tanggal_naskah)) : "....................";
+            let nomor_naskah = previewTab.value === 'TTE' ? (item.nomor_naskah) : (item.nomor_naskah || "....................");
 
             const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
             const twoDigits = (val) => (val||0).toString().padStart(2, '0');
 
             const res = await fetch(url); const buf = await res.arrayBuffer();
             const zip = new window.PizZip(buf);
-            const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => p.value.startsWith('$') ? `{${p.value}}` : "" });
+            const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => "" });
 
+            // --- LOGIKA TMT (Prioritas: Inpassing -> Dasar TMT -> Hari Ini) ---
+            let tmtFinal = new Date(); // Default hari ini jika semua kosong
+
+            // 1. Cek TMT Inpassing (Inputan Baru)
+            if (item.tmt_inpassing) {
+                tmtFinal = item.tmt_inpassing.toDate ? item.tmt_inpassing.toDate() : new Date(item.tmt_inpassing);
+            } 
+            // 2. Jika kosong, Cek Dasar TMT (Data Lama)
+            else if (item.dasar_tmt) {
+                tmtFinal = item.dasar_tmt.toDate ? item.dasar_tmt.toDate() : new Date(item.dasar_tmt);
+            }
+
+            let dasarTanggalObj = new Date(); // Default hari ini
+
+            if (item.tanggal_inpassing_manual) {
+                // Cek inputan manual (Inpassing)
+                dasarTanggalObj = item.tanggal_inpassing_manual.toDate 
+                    ? item.tanggal_inpassing_manual.toDate() 
+                    : new Date(item.tanggal_inpassing_manual);
+            } 
+            else if (item.dasar_tanggal) {
+                // Cek data lama (Dasar Tanggal SK)
+                dasarTanggalObj = item.dasar_tanggal.toDate 
+                    ? item.dasar_tanggal.toDate() 
+                    : new Date(item.dasar_tanggal);
+            }
             docRender.render({
-                NAMA: item.nama || "", NIP: item.nip || "", PANGKAT: pangkatFinal, JABATAN: item.jabatan || "",
+                NAMA: item.nama||"", NIP: item.nip||"", PANGKAT: pangkatFinal, JABATAN: item.jabatan||"",
                 UNIT_KERJA: item.unit_kerja, UNIT_KERJA_INDUK: item.perangkat_daerah,
-                TGL_LAHIR: formatTanggal(item.tgl_lahir), GOLONGAN: item.golongan || "",
-                DASAR_NOMOR: item.dasar_nomor || "-", DASAR_TANGGAL: formatTanggal(item.dasar_tanggal), DASAR_PEJABAT: item.dasar_pejabat || "-",
-                DASAR_TMT: formatTanggal(item.dasar_tmt), DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
-                DASAR_MK_LAMA: `${twoDigits(item.dasar_mk_tahun)} Tahun ${twoDigits(item.dasar_mk_bulan)} Bulan`,
-                DASAR_HUKUM: textHukum, MK_BARU: `${twoDigits(item.mk_baru_tahun)} Tahun ${twoDigits(item.mk_baru_bulan)} Bulan`,
+                TGL_LAHIR: formatTanggal(item.tgl_lahir), GOLONGAN: item.golongan||"",
+                DASAR_NOMOR: item.nomor_inpassing || item.dasar_nomor ||"-", 
+                DASAR_TANGGAL: formatTanggal(dasarTanggalObj), 
+                DASAR_TMT: formatTanggal(tmtFinal), 
+                DASAR_PEJABAT: item.nomor_inpassing ? "BUPATI BANGKA" : item.dasar_pejabat||"-",
+                
+                DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
+                DASAR_MK_LAMA: `${(item.dasar_mk_tahun||0).toString().padStart(2,'0')} Tahun ${(item.dasar_mk_bulan||0).toString().padStart(2,'0')} Bulan`,
+                DASAR_HUKUM: textHukum, MK_BARU: `${(item.mk_baru_tahun||0).toString().padStart(2,'0')} Tahun ${(item.mk_baru_bulan||0).toString().padStart(2,'0')} Bulan`,
                 GAJI_BARU: formatRupiah(item.gaji_baru), TMT_SEKARANG: formatTanggal(item.tmt_sekarang), TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
-                MASA_PERJANJIAN_KERJA: item.masa_perjanjian || "-", PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian || "-",
-                KOP: kopT, ALAMAT_KOP: kopA, NOMOR_NASKAH: nomor_naskah, TANGGAL_NASKAH: tanggalSurat, 
+                MASA_PERJANJIAN_KERJA: item.masa_perjanjian||"-", PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian||"-",
+                KOP: kopT, ALAMAT_KOP: kopA, NOMOR_NASKAH: item.nomor_naskah||"....................", TANGGAL_NASKAH: tanggalSurat, 
                 SIFAT: "Biasa", TTD_PENGIRIM: ttdContent, JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp, 
-                NAMA_PENGIRIM: pjn || "${nama_pengirim}", NIP_PENGIRIM: pjnip || "${nip_pengirim}"
+                NAMA_PENGIRIM: pjn||"${nama_pengirim}", NIP_PENGIRIM: pjnip||"${nip_pengirim}"
             });
 
             return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
@@ -642,12 +624,8 @@ export default {
         const previewSK = async (item) => {
             if (!window.docx) return showToast("Library Preview Missing", 'error');
             showPreviewModal.value = true; previewLoading.value = true; currentPreviewItem.value = item; previewTab.value = 'BASAH'; 
-            await nextTick(); await renderCurrentPreview();
-        };
-
-        const changePreviewTab = async (tabName) => { previewTab.value = tabName; previewLoading.value = true; await nextTick(); await renderCurrentPreview(); };
-
-        const renderCurrentPreview = async () => {
+            await nextTick(); 
+            // Render logic
             try {
                 if(!currentPreviewItem.value) return;
                 const blob = await generateDocBlob(currentPreviewItem.value);
@@ -655,6 +633,16 @@ export default {
                 if(container) { container.innerHTML = ''; await window.docx.renderAsync(blob, container); }
             } catch (e) { showToast("Gagal Preview", 'error'); } 
             finally { previewLoading.value = false; }
+        };
+
+        const changePreviewTab = async (tabName) => { 
+            previewTab.value = tabName; previewLoading.value = true; 
+            await nextTick(); 
+            try {
+                const blob = await generateDocBlob(currentPreviewItem.value);
+                const container = document.getElementById('docx-preview-container');
+                if(container) { container.innerHTML = ''; await window.docx.renderAsync(blob, container); }
+            } catch(e){} finally{ previewLoading.value=false; }
         };
 
         const closePreview = () => { showPreviewModal.value = false; currentPreviewItem.value = null; };
@@ -670,6 +658,9 @@ export default {
             } catch(e) { showToast("Gagal: " + e.message, 'error'); }
         };
 
+        const nextPage = () => goToPage(currentPage.value + 1);
+        const prevPage = () => goToPage(currentPage.value - 1);
+
         onMounted(() => {
             const unsubscribe = onAuthStateChanged(auth, (user) => {
                 if (user) fetchTable(1); else listData.value = [];
@@ -684,8 +675,7 @@ export default {
             nextPage, prevPage, fetchTable, goToPage, openModal, closeModal, simpanTransaksi, hapusTransaksi, cetakSK, 
             handleNipInput, cariGajiBaru, cariGajiLama, handleGolonganChange, handleJabatanSelect, formatRupiah, formatTanggal,
             showPreviewModal, previewLoading, previewSK, closePreview, downloadFromPreview,
-            previewTab, changePreviewTab, statusColor, updateStatus,
-            setTmtPensiun 
+            previewTab, changePreviewTab, updateStatus, setTmtPensiun 
         };
     }
 };

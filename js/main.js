@@ -19,6 +19,7 @@ import MasterTemplate from './components/MasterTemplate.js';
 import MasterGolongan from './components/MasterGolongan.js';
 import MasterJabatan from './components/MasterJabatan.js';
 import Penomoran from './components/Penomoran.js';
+import PenomoranInpassing from './components/PenomoranInpassing.js';
 // --- KONFIGURASI ROUTER ---
 const routes = [
     // 1. Dashboard
@@ -27,7 +28,7 @@ const routes = [
     // 2. Transaksi & Penomoran
     { path: '/transaksi', component: TransaksiKgb },
     { path: '/penomoran', component: Penomoran },
-    
+    { path: '/penomoran-inpassing', component: PenomoranInpassing },
     // 3. Laporan
     { path: '/laporan', component: Laporan },
 

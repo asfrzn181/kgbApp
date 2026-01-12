@@ -10,7 +10,7 @@ import { store } from '../store.js';
 // IMPORT VIEW
 import { TplPenomoran, TplAutocompleteUsulan } from '../views/PenomoranView.js';
 
-// --- KOMPONEN AUTOCOMPLETE MANUAL ---
+// --- KOMPONEN AUTOCOMPLETE MANUAL (TETAP) ---
 const AutocompleteUsulan = {
     props: ['options', 'modelValue', 'disabled'],
     emits: ['update:modelValue', 'change'],
@@ -96,7 +96,8 @@ export default {
 
         const form = reactive({
             usulan_id: '', nama_pegawai: '', nip: '', jenis_jabatan: 'Fungsional',
-            golongan: '', tahun: new Date().getFullYear(), nomor_custom: '', no_urut: 0 
+            golongan: '', tahun: new Date().getFullYear(), nomor_custom: '', no_urut: 0,
+            kategori: 'KGB' // Default Kategori Reguler
         });
 
         const yearOptions = computed(() => {
@@ -124,6 +125,7 @@ export default {
             return data;
         };
 
+        // --- FETCH DATA LOG (FILTER NOT INPASSING) ---
         const fetchData = async (pageTarget) => {
             loading.value = true;
             try {
@@ -132,6 +134,16 @@ export default {
                 let q;
 
                 const constraints = [];
+                
+                // [PENTING] FILTER EXCLUDE INPASSING
+                // Cara paling aman di Firestore tanpa composite index ribet adalah:
+                // Filter di client side ATAU pastikan data reguler punya field 'kategori' != 'INPASSING'
+                // Di sini saya pakai 'where' jika field kategori ada, atau filter manual.
+                // Untuk amannya, kita asumsikan data lama field kategorinya null/undefined (bukan INPASSING)
+                // Tapi query "!=" butuh index.
+                // Jadi, strategi kita: Load data, lalu filter di JS (Client Side) untuk data yang tampil.
+                
+                // Filter Tanggal
                 if (filterStartDate.value) {
                     const start = new Date(filterStartDate.value);
                     constraints.push(where("created_at", ">=", start));
@@ -142,77 +154,138 @@ export default {
                     constraints.push(where("created_at", "<=", end));
                 }
 
-                if (pageTarget === 1 || pageTarget === 'first') {
-                    const snapshotCount = await getCountFromServer(query(collRef, ...constraints));
-                    totalItems.value = snapshotCount.data().count;
-                    pageStack.value = [];
-                    currentPage.value = 1;
-                }
-
+                // Hitung Total (Client Side Count agar akurat setelah filter inpassing)
+                // Note: getCountFromServer tidak bisa filter != INPASSING tanpa index.
+                // Kita abaikan total count presisi dulu, atau hitung manual jika data kecil.
+                
                 if (tableSearch.value.trim()) {
-                    const qAll = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(50));
+                    // --- MODE SEARCH ---
+                    const qAll = query(
+                        collRef, 
+                        ...constraints, 
+                        orderBy("created_at", "desc"), 
+                        orderBy("__name__", "desc"), 
+                        limit(1000) 
+                    );
                     const snap = await getDocs(qAll);
                     const term = tableSearch.value.toLowerCase();
-                    listData.value = snap.docs.map(mapDoc).filter(d => 
-                        (d.nomor_lengkap||'').toLowerCase().includes(term) || 
-                        (d.nama_pegawai||'').toLowerCase().includes(term)
-                    );
+                    
+                    listData.value = snap.docs.map(mapDoc)
+                        // [FILTER] HANYA TAMPILKAN YANG BUKAN INPASSING
+                        .filter(d => d.kategori !== 'INPASSING')
+                        .filter(d => 
+                            (d.nomor_lengkap||'').toLowerCase().includes(term) || 
+                            (d.nama_pegawai||'').toLowerCase().includes(term)
+                        );
+                        
+                    totalItems.value = listData.value.length;
                 } else {
-                    if (typeof pageTarget === 'number') {
-                        if (pageTarget === 1) {
-                            q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
-                            currentPage.value = 1;
-                            pageStack.value = [];
-                        } else {
-                            if (pageTarget === currentPage.value + 1) {
-                                const lastDoc = pageStack.value[pageStack.value.length - 1];
-                                q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(lastDoc), limit(limitVal));
-                                currentPage.value = pageTarget;
-                            } 
-                            else if (pageTarget === currentPage.value - 1) {
-                                const cursorIndex = pageTarget - 2;
-                                if (cursorIndex < 0) {
-                                    q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
-                                    pageStack.value = [];
-                                } else {
-                                    const cursor = pageStack.value[cursorIndex];
-                                    q = query(collRef, ...constraints, orderBy("created_at", "desc"), startAfter(cursor), limit(limitVal));
-                                    pageStack.value = pageStack.value.slice(0, cursorIndex + 1);
-                                }
-                                currentPage.value = pageTarget;
-                            } else {
-                                fetchData(1); 
-                                return;
-                            }
-                        }
-                    } else {
-                        q = query(collRef, ...constraints, orderBy("created_at", "desc"), limit(limitVal));
+                    // --- MODE PAGINATION (DENGAN CLIENT SIDE FILTER) ---
+                    // Karena kita butuh membuang data INPASSING, pagination murni Firestore akan sulit (offset berantakan).
+                    // Solusi: Ambil lebih banyak data (buffer), filter di client, lalu potong sesuai page.
+                    // Ini trade-off agar tidak perlu index kompleks.
+                    
+                    const bufferLimit = limitVal * 3; // Ambil 3x lipat untuk jaga-jaga ada inpassing terselip
+                    
+                    let qBase = query(
+                        collRef, 
+                        ...constraints, 
+                        orderBy("created_at", "desc"),
+                        orderBy("__name__", "desc"),
+                        limit(bufferLimit) 
+                    );
+
+                    // Logic pagination "StartAfter" agak tricky kalau ada filter client side.
+                    // Sederhananya: Kita ambil data, filter Inpassing, lalu tampilkan.
+                    // Jika user klik Next, kita load data SETELAH data terakhir yang VALID.
+                    
+                    if (pageTarget === 1) {
+                        q = qBase;
                         currentPage.value = 1;
                         pageStack.value = [];
+                    } else {
+                        if (pageTarget > currentPage.value) {
+                            const lastDoc = pageStack.value[pageStack.value.length - 1];
+                            if(lastDoc) {
+                                q = query(
+                                    collRef, ...constraints, 
+                                    orderBy("created_at", "desc"),
+                                    orderBy("__name__", "desc"), 
+                                    startAfter(lastDoc), limit(bufferLimit)
+                                );
+                                currentPage.value = pageTarget;
+                            } else { fetchData(1); return; }
+                        } 
+                        else if (pageTarget < currentPage.value) {
+                            const cursorIndex = pageTarget - 2;
+                            if (cursorIndex < 0) {
+                                q = qBase;
+                                pageStack.value = [];
+                            } else {
+                                const cursor = pageStack.value[cursorIndex];
+                                q = query(
+                                    collRef, ...constraints, 
+                                    orderBy("created_at", "desc"),
+                                    orderBy("__name__", "desc"), 
+                                    startAfter(cursor), limit(bufferLimit)
+                                );
+                                pageStack.value = pageStack.value.slice(0, cursorIndex + 1);
+                            }
+                            currentPage.value = pageTarget;
+                        } else {
+                            fetchData(1); return;
+                        }
                     }
 
                     const snap = await getDocs(q);
-                    listData.value = snap.docs.map(mapDoc);
+                    
+                    // Filter Inpassing di Client
+                    let validDocs = snap.docs.filter(d => d.data().kategori !== 'INPASSING');
+                    
+                    // Potong sesuai limit per halaman (karena tadi ambil buffer)
+                    const slicedDocs = validDocs.slice(0, limitVal);
+                    
+                    listData.value = slicedDocs.map(mapDoc);
+                    
+                    // Update Stack (Simpan doc terakhir dari yang TAMPIL)
+                    if (slicedDocs.length > 0) {
+                        // Perhatikan: Kita harus menyimpan DOC ASLI (bukan data) untuk cursor
+                        // Cari doc asli dari slicedDocs terakhir
+                        const lastVisibleData = slicedDocs[slicedDocs.length - 1];
+                        const lastVisibleDoc = snap.docs.find(d => d.id === lastVisibleData.id);
 
-                    if (snap.docs.length > 0) {
                         if (currentPage.value === 1) {
-                            pageStack.value = [snap.docs[snap.docs.length - 1]];
-                        } else if (pageStack.value.length < currentPage.value) {
-                            pageStack.value.push(snap.docs[snap.docs.length - 1]);
+                            pageStack.value = [lastVisibleDoc];
+                        } else {
+                            if (pageStack.value.length < currentPage.value) {
+                                pageStack.value.push(lastVisibleDoc);
+                            } else {
+                                pageStack.value[currentPage.value - 1] = lastVisibleDoc;
+                            }
                         }
                     }
+                    
+                    // Total items count (estimasi)
+                    if(pageTarget === 1) {
+                         const snapshotCount = await getCountFromServer(query(collRef, ...constraints));
+                         // Total kasar dikurangi estimasi inpassing (tidak akurat 100% tapi cukup utk UI)
+                         totalItems.value = snapshotCount.data().count; 
+                    }
                 }
-            } catch (e) { console.error(e); } 
-            finally { loading.value = false; }
+            } catch (e) { 
+                console.error("Fetch Error:", e); 
+            } finally { 
+                loading.value = false; 
+            }
         };
 
         const goToPage = (p) => {
             if (p < 1 || p > totalPages.value || p === currentPage.value) return;
-            if (p === currentPage.value + 1 || p === currentPage.value - 1) fetchData(p);
-            else fetchData(1);
+            fetchData(p);
         };
 
         watch(tableSearch, debounce(() => fetchData(1), 800));
+        watch(itemsPerPage, () => fetchData(1));
 
         const fetchUsulanList = async () => {
             try {
@@ -235,7 +308,7 @@ export default {
                 if(!isEditMode.value) {
                     form.golongan = selected.golongan;
                     const j = (selected.jenis_jabatan || '').toLowerCase();
-                    if (j.includes('struktural') || j.includes('pelaksana')) form.jenis_jabatan = 'Struktural';
+                    if (j.includes('struktural')) form.jenis_jabatan = 'Struktural';
                     else form.jenis_jabatan = 'Fungsional';
                 }
             }
@@ -267,13 +340,12 @@ export default {
         watch(() => form.jenis_jabatan, () => { if(form.nomor_custom) checkCustomNumber(form.nomor_custom); });
         watch(() => form.nomor_custom, (newVal) => checkCustomNumber(newVal));
 
-        // --- GAP DETECTOR LOGIC ---
+        // --- GAP DETECTOR ---
         const checkGaps = async () => {
             gapLoading.value = true;
             emptyNumbers.value = [];
             maxCounterVal.value = 0;
             try {
-                // 1. Ambil Max Counter saat ini
                 const counterId = `${gapForm.tahun}_${gapForm.jenis_jabatan.toUpperCase()}`;
                 const snapCount = await getDoc(doc(db, "counters_nomor", counterId));
                 
@@ -283,16 +355,23 @@ export default {
                 maxCounterVal.value = maxVal;
                 if (maxVal === 0) { gapLoading.value = false; return; }
 
-                // 2. Ambil semua nomor yang SUDAH TERPAKAI di range tsb
+                // Exclude Inpassing di Gap Detector juga
+                // Tapi karena Gap Detector hanya melihat no_urut (angka),
+                // Dan counter Inpassing terpisah (Unified), maka nomor reguler aman.
+                // Cukup query berdasarkan jenis jabatan & tahun reguler.
                 const q = query(collection(db, "nomor_surat"),
                     where("tahun", "==", gapForm.tahun),
                     where("jenis_jabatan", "==", gapForm.jenis_jabatan));
                 
                 const snapUsed = await getDocs(q);
                 const usedSet = new Set();
-                snapUsed.docs.forEach(d => usedSet.add(Number(d.data().no_urut)));
+                snapUsed.docs.forEach(d => {
+                    // Pastikan yang dihitung bukan Inpassing
+                    if(d.data().kategori !== 'INPASSING') {
+                        usedSet.add(Number(d.data().no_urut));
+                    }
+                });
 
-                // 3. Loop dari 1 s/d Max, cari yang tidak ada
                 const gaps = [];
                 for(let i=1; i<=maxVal; i++) {
                     if(!usedSet.has(i)) gaps.push(i);
@@ -305,15 +384,13 @@ export default {
 
         const useGapNumber = (no) => {
             showGapModal.value = false;
-            openModal(); // Buka form
-            // Set Data
+            openModal();
             form.tahun = gapForm.tahun;
             form.jenis_jabatan = gapForm.jenis_jabatan;
             form.no_urut = no;
             
-            // Generate
             const noUrutStr = String(no).padStart(4, '0');
-            const romawi = "IX"; // Default sementara
+            const romawi = "IX"; 
             form.nomor_custom = `B-800.1.11.13/${romawi}/${noUrutStr}/BKPSDMD/${form.tahun}`;
             
             showToast(`Menggunakan slot kosong #${no}`, 'info');
@@ -340,13 +417,11 @@ export default {
             } catch (e) { showToast("Gagal hitung: " + e.message, 'error'); }
         };
 
-        // --- SIMPAN FINAL (CONDITIONAL COUNTER) ---
         const simpanFinal = async () => {
             if (!form.nomor_custom) return showToast("Nomor belum diisi!", 'warning');
             if (customNumberStatus.value === 'taken') return showToast("Nomor terpakai!", 'error');
             isSaving.value = true;
             try {
-                // Step A: Ekstraksi Nomor
                 const parts = form.nomor_custom.split('/');
                 let inputUrut = 0;
                 if(parts.length > 2 && !isNaN(parseInt(parts[2]))) { 
@@ -355,7 +430,6 @@ export default {
                     inputUrut = form.no_urut || 0; 
                 }
 
-                // Step B: Double Check Server
                 if (!isEditMode.value || (isEditMode.value && inputUrut !== form.no_urut)) {
                     const qCek = query(collection(db, "nomor_surat"),
                         where("no_urut", "==", inputUrut),
@@ -364,19 +438,23 @@ export default {
                     );
                     const snapCek = await getDocs(qCek);
                     if (!snapCek.empty) {
-                        if (!isEditMode.value || (isEditMode.value && snapCek.docs[0].id !== editId.value)) {
-                            throw new Error(`Nomor Urut ${inputUrut} sudah digunakan!`);
+                        const existing = snapCek.docs[0].data();
+                        // Hanya error jika yang existing bukan inpassing (karena inpassing beda counter)
+                        if (existing.kategori !== 'INPASSING') {
+                            if (!isEditMode.value || (isEditMode.value && snapCek.docs[0].id !== editId.value)) {
+                                throw new Error(`Nomor Urut ${inputUrut} sudah digunakan!`);
+                            }
                         }
                     }
                 }
 
-                // Step C: Simpan
                 if (isEditMode.value) {
                     await runTransaction(db, async (transaction) => {
                         const logRef = doc(db, "nomor_surat", editId.value);
                         transaction.update(logRef, {
                             usulan_id: form.usulan_id, nama_pegawai: form.nama_pegawai, nip: form.nip,
-                            nomor_lengkap: form.nomor_custom, no_urut: inputUrut
+                            nomor_lengkap: form.nomor_custom, no_urut: inputUrut,
+                            kategori: 'KGB' // Ensure kategori set
                         });
                         if (oldUsulanId.value && oldUsulanId.value !== form.usulan_id) {
                             const oldRef = doc(db, "usulan_kgb", oldUsulanId.value);
@@ -387,14 +465,12 @@ export default {
                     });
                     showToast("Update berhasil!", 'success');
                 } else {
-                    // NEW ENTRY: Conditional Counter Update
                     const counterId = `${form.tahun}_${form.jenis_jabatan.toUpperCase()}`;
                     const counterRef = doc(db, "counters_nomor", counterId);
                     const snapCount = await getDoc(counterRef);
                     let dbLastCount = 0;
                     if (snapCount.exists()) dbLastCount = snapCount.data().count;
 
-                    // HANYA UPDATE COUNTER JIKA NOMOR BARU > COUNTER LAMA
                     if (inputUrut > dbLastCount) {
                         await setDoc(counterRef, { count: inputUrut }, { merge: true });
                     }
@@ -402,7 +478,8 @@ export default {
                     await setDoc(doc(collection(db, "nomor_surat")), {
                         usulan_id: form.usulan_id, nama_pegawai: form.nama_pegawai, nip: form.nip,
                         jenis_jabatan: form.jenis_jabatan, tahun: form.tahun, golongan: form.golongan,
-                        no_urut: inputUrut, nomor_lengkap: form.nomor_custom, created_at: serverTimestamp()
+                        no_urut: inputUrut, nomor_lengkap: form.nomor_custom, created_at: serverTimestamp(),
+                        kategori: 'KGB' // Default Reguler
                     });
                     await updateDoc(doc(db, "usulan_kgb", form.usulan_id), { nomor_naskah: form.nomor_custom, tanggal_naskah: serverTimestamp() });
                     showToast("Nomor disimpan!", 'success');
@@ -417,34 +494,20 @@ export default {
             customNumberStatus.value = null; customNumberMsg.value = '';
             await fetchUsulanList(); showModal.value = true;
         };
+
         const hapusNomor = async (item) => {
-            // Ubah pesan konfirmasi agar user sadar konsekuensinya
             if (await showConfirm('Batalkan Nomor?', 'Nomor ini akan menjadi KOSONG (Gap). Counter nomor TIDAK akan mundur.')) {
                 try {
                     await runTransaction(db, async (transaction) => {
-                        // 1. HAPUS LOGIC UPDATE COUNTER (Dibuang)
-                        // Kita tidak perlu membaca atau mengupdate collection 'counters_nomor'
-                        
-                        // 2. Hapus Dokumen Log Nomor
                         const logRef = doc(db, "nomor_surat", item.id);
                         transaction.delete(logRef);
-
-                        // 3. Reset Status di Data Usulan (Hapus referensi nomor di usulan_kgb)
-                        if (item.usulan_id) {
+                        if(item.usulan_id) {
                             const usulanRef = doc(db, "usulan_kgb", item.usulan_id);
-                            transaction.update(usulanRef, { 
-                                nomor_naskah: null, 
-                                tanggal_naskah: null 
-                            });
+                            transaction.update(usulanRef, { nomor_naskah: null, tanggal_naskah: null });
                         }
                     });
-
-                    fetchData(1); 
-                    showToast("Nomor dibatalkan. Slot nomor kini kosong.");
-                } catch (e) { 
-                    console.error(e); 
-                    showToast(e.message, 'error'); 
-                }
+                    fetchData(1); showToast("Nomor dibatalkan. Slot nomor kini kosong.");
+                } catch (e) { console.error(e); showToast(e.message, 'error'); }
             }
         };
 
@@ -483,17 +546,47 @@ export default {
                 if(ps.exists()){ const d = ps.data(); pjp=d.pangkat||pjp; pjj=d.jabatan||pjj; pjn=d.nama||""; pjnip=d.nip||""; } 
             }
             let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n" : "\n\n\n\n";
-            let tanggalSurat = previewTab.value === 'TTE' ? "${tanggal_naskah}" : formatTanggal(item.tanggal_naskah ? item.tanggal_naskah.toDate() : new Date());
+            let tanggalSurat = item.tanggal_naskah ? formatTanggal(item.tanggal_naskah.toDate ? item.tanggal_naskah.toDate() : new Date(item.tanggal_naskah)) : "....................";
             const mapH = gvd.dasar_hukum || []; const foundH = mapH.find(h => h.judul === item.dasar_hukum); const textHukum = foundH ? foundH.isi : (item.dasar_hukum || "-");
             const res = await fetch(url); const buf = await res.arrayBuffer();
             const zip = new window.PizZip(buf);
             const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => p.value.startsWith('$') ? `{${p.value}}` : "" });
+            // --- LOGIKA TMT (Prioritas: Inpassing -> Dasar TMT -> Hari Ini) ---
+            let tmtFinal = new Date(); // Default hari ini jika semua kosong
+
+            // 1. Cek TMT Inpassing (Inputan Baru)
+            if (item.tmt_inpassing) {
+                tmtFinal = item.tmt_inpassing.toDate ? item.tmt_inpassing.toDate() : new Date(item.tmt_inpassing);
+            } 
+            // 2. Jika kosong, Cek Dasar TMT (Data Lama)
+            else if (item.dasar_tmt) {
+                tmtFinal = item.dasar_tmt.toDate ? item.dasar_tmt.toDate() : new Date(item.dasar_tmt);
+            }
+
+            let dasarTanggalObj = new Date(); // Default hari ini
+
+            if (item.tanggal_inpassing_manual) {
+                // Cek inputan manual (Inpassing)
+                dasarTanggalObj = item.tanggal_inpassing_manual.toDate 
+                    ? item.tanggal_inpassing_manual.toDate() 
+                    : new Date(item.tanggal_inpassing_manual);
+            } 
+            else if (item.dasar_tanggal) {
+                // Cek data lama (Dasar Tanggal SK)
+                dasarTanggalObj = item.dasar_tanggal.toDate 
+                    ? item.dasar_tanggal.toDate() 
+                    : new Date(item.dasar_tanggal);
+            }
             docRender.render({
                 NAMA: item.nama||"", NIP: item.nip||"", PANGKAT: pangkatFinal, JABATAN: item.jabatan||"",
                 UNIT_KERJA: item.unit_kerja, UNIT_KERJA_INDUK: item.perangkat_daerah,
                 TGL_LAHIR: formatTanggal(item.tgl_lahir), GOLONGAN: item.golongan||"",
-                DASAR_NOMOR: item.dasar_nomor||"-", DASAR_TANGGAL: formatTanggal(item.dasar_tanggal), DASAR_PEJABAT: item.dasar_pejabat||"-",
-                DASAR_TMT: formatTanggal(item.dasar_tmt), DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
+                DASAR_NOMOR: item.nomor_inpassing || item.dasar_nomor ||"-", 
+                DASAR_TANGGAL: formatTanggal(dasarTanggalObj), 
+                DASAR_TMT: formatTanggal(tmtFinal), 
+                DASAR_PEJABAT: item.nomor_inpassing ? "BUPATI BANGKA" : item.dasar_pejabat||"-",
+                
+                DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
                 DASAR_MK_LAMA: `${(item.dasar_mk_tahun||0).toString().padStart(2,'0')} Tahun ${(item.dasar_mk_bulan||0).toString().padStart(2,'0')} Bulan`,
                 DASAR_HUKUM: textHukum, MK_BARU: `${(item.mk_baru_tahun||0).toString().padStart(2,'0')} Tahun ${(item.mk_baru_bulan||0).toString().padStart(2,'0')} Bulan`,
                 GAJI_BARU: formatRupiah(item.gaji_baru), TMT_SEKARANG: formatTanggal(item.tmt_sekarang), TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
