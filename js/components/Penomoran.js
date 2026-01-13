@@ -308,8 +308,9 @@ export default {
                 if(!isEditMode.value) {
                     form.golongan = selected.golongan;
                     const j = (selected.jenis_jabatan || '').toLowerCase();
-                    if (j.includes('struktural')) form.jenis_jabatan = 'Struktural';
-                    else form.jenis_jabatan = 'Fungsional';
+                    if (j.includes('struktural') || j.includes('pelaksana')) {
+                        form.jenis_jabatan = 'Struktural';
+                    } else form.jenis_jabatan = 'Fungsional';
                 }
             }
         };
