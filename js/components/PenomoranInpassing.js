@@ -611,7 +611,7 @@ export default {
             }
 
             // 5. Format Helper
-            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n" : "\n\n\n\n";
+            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n        ${ttd_pengirim}\n\n\n" : "\n\n\n\n";
             // Format Tanggal Surat
             let tanggalSurat = "";
 
