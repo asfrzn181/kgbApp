@@ -20,7 +20,7 @@ export default {
         const listUsers = ref([]);
         const previewData = ref([]);
 
-        // Chart Instances (Untuk destroy sebelum re-render)
+        // Chart Instances
         let chartTipeAsn = null;
         let chartJabatan = null;
         let chartGolongan = null;
@@ -39,9 +39,8 @@ export default {
 
         // --- RENDER CHART LOGIC ---
         const renderCharts = () => {
-            // Tunggu DOM update selesai (karena canvas ada di dalam v-if)
             nextTick(() => {
-                if (!window.Chart) return; // Pastikan library ada
+                if (!window.Chart) return; 
 
                 const data = previewData.value;
 
@@ -49,115 +48,74 @@ export default {
                 const countPNS = data.filter(d => d.tipe_asn === 'PNS').length;
                 const countPPPK = data.filter(d => d.tipe_asn === 'PPPK').length;
 
-                // 2. DATA JABATAN (Pelaksana gabung ke Struktural)
+                // 2. DATA JABATAN
                 let countStruktural = 0;
                 let countFungsional = 0;
                 data.forEach(d => {
                     const j = (d.jenis_jabatan || '').toLowerCase();
-                    if (j.includes('fungsional')) {
-                        countFungsional++;
-                    } else {
-                        // Struktural, Pelaksana, atau kosong masuk sini
-                        countStruktural++;
-                    }
+                    if (j.includes('fungsional')) countFungsional++;
+                    else countStruktural++;
                 });
 
-                // 3. DATA GOLONGAN (Hanya PNS)
+                // 3. DATA GOLONGAN
                 const golMap = {};
                 data.filter(d => d.tipe_asn === 'PNS').forEach(d => {
                     const g = d.golongan || 'Lainnya';
                     golMap[g] = (golMap[g] || 0) + 1;
                 });
-                // Sort Golongan
                 const golLabels = Object.keys(golMap).sort();
                 const golValues = golLabels.map(k => golMap[k]);
 
-                // 4. DATA UNIT KERJA (Top 10)
+                // 4. DATA UNIT KERJA
                 const unitMap = {};
                 data.forEach(d => {
                     const u = d.unit_kerja || 'Tidak Diketahui';
                     unitMap[u] = (unitMap[u] || 0) + 1;
                 });
-                // Sort by Value Descending
                 const sortedUnit = Object.entries(unitMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
                 const unitLabels = sortedUnit.map(i => i[0]);
                 const unitValues = sortedUnit.map(i => i[1]);
 
-                // --- DESTROY OLD CHARTS ---
+                // DESTROY OLD CHARTS
                 if (chartTipeAsn) chartTipeAsn.destroy();
                 if (chartJabatan) chartJabatan.destroy();
                 if (chartGolongan) chartGolongan.destroy();
                 if (chartUnit) chartUnit.destroy();
 
-                // --- CREATE NEW CHARTS ---
-                
-                // Chart 1: Pie ASN
+                // CREATE NEW CHARTS
                 const ctx1 = document.getElementById('chartTipeAsn');
                 if (ctx1) {
                     chartTipeAsn = new Chart(ctx1, {
                         type: 'doughnut',
-                        data: {
-                            labels: ['PNS', 'PPPK'],
-                            datasets: [{
-                                data: [countPNS, countPPPK],
-                                backgroundColor: ['#36a2eb', '#ffcd56']
-                            }]
-                        },
+                        data: { labels: ['PNS', 'PPPK'], datasets: [{ data: [countPNS, countPPPK], backgroundColor: ['#36a2eb', '#ffcd56'] }] },
                         options: { responsive: true, maintainAspectRatio: false }
                     });
                 }
 
-                // Chart 2: Pie Jabatan
                 const ctx2 = document.getElementById('chartJabatan');
                 if (ctx2) {
                     chartJabatan = new Chart(ctx2, {
                         type: 'pie',
-                        data: {
-                            labels: ['Struktural/Pelaksana', 'Fungsional'],
-                            datasets: [{
-                                data: [countStruktural, countFungsional],
-                                backgroundColor: ['#4bc0c0', '#ff6384']
-                            }]
-                        },
+                        data: { labels: ['Struktural/Pelaksana', 'Fungsional'], datasets: [{ data: [countStruktural, countFungsional], backgroundColor: ['#4bc0c0', '#ff6384'] }] },
                         options: { responsive: true, maintainAspectRatio: false }
                     });
                 }
 
-                // Chart 3: Bar Golongan
                 const ctx3 = document.getElementById('chartGolongan');
                 if (ctx3) {
                     chartGolongan = new Chart(ctx3, {
                         type: 'bar',
-                        data: {
-                            labels: golLabels,
-                            datasets: [{
-                                label: 'Jumlah PNS',
-                                data: golValues,
-                                backgroundColor: '#9966ff'
-                            }]
-                        },
+                        data: { labels: golLabels, datasets: [{ label: 'Jumlah PNS', data: golValues, backgroundColor: '#9966ff' }] },
                         options: { responsive: true, maintainAspectRatio: false }
                     });
                 }
 
-                // Chart 4: Bar Horizontal Unit Kerja
                 const ctx4 = document.getElementById('chartUnitKerja');
                 if (ctx4) {
                     chartUnit = new Chart(ctx4, {
                         type: 'bar',
-                        data: {
-                            labels: unitLabels,
-                            datasets: [{
-                                label: 'Jumlah Usulan',
-                                data: unitValues,
-                                backgroundColor: '#ff9f40'
-                            }]
-                        },
-                        options: { 
-                            indexAxis: 'y', // Horizontal Bar
-                            responsive: true, 
-                            maintainAspectRatio: false 
-                        }
+                        data: { labels: unitLabels, datasets: [{ label: 'Jumlah Usulan', data: unitValues, backgroundColor: '#ff9f40' }] },
+                        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
                     });
                 }
             });
@@ -212,7 +170,6 @@ export default {
                     };
                 });
 
-                // [PENTING] Render Chart setelah data didapat
                 renderCharts();
 
             } catch (e) {
@@ -224,6 +181,7 @@ export default {
             }
         };
 
+        // --- DOWNLOAD EXCEL (UPDATED WITH INPASSING) ---
         const downloadExcel = () => {
             if (previewData.value.length === 0) return;
             const XLSX = window.XLSX;
@@ -234,6 +192,13 @@ export default {
                 return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
             };
 
+            const safeDate = (val) => {
+                if(!val) return '-';
+                if(val.toDate) return formatTanggal(val.toDate());
+                return formatTanggal(new Date(val));
+            };
+
+            // 1. FORMAT DATA KGB NORMAL
             const excelRows = previewData.value.map(data => ({
                 NIP: "'" + data.nip,
                 NAMA: data.nama,
@@ -251,28 +216,59 @@ export default {
                 TIPE: data.tipe_asn || 'PNS'
             }));
 
+            // 2. FORMAT DATA INPASSING (Filter yg punya nomor_inpassing)
+            const inpassingData = previewData.value.filter(d => d.nomor_inpassing);
+            const inpassingRows = inpassingData.map(data => ({
+                NIP: "'" + data.nip,
+                NAMA: data.nama,
+                JABATAN: data.jenis_jabatan,
+                GOL_INPASSING: data.inpassing_golongan || data.golongan,
+                NOMOR_SK_INPASSING: data.nomor_inpassing,
+                
+                // Field khusus Inpassing
+                TMT_INPASSING: safeDate(data.tmt_inpassing),
+                TGL_SK_MANUAL: safeDate(data.tanggal_inpassing_manual),
+                GAJI_INPASSING: data.inpassing_gaji || 0,
+                MK_TAHUN: data.mk_inpassing_tahun || 0,
+                MK_BULAN: data.mk_inpassing_bulan || 0,
+                
+                "UNIT KERJA": toTitleCase(data.unit_kerja || '-'),
+                KETERANGAN: data.keterangan_inpassing || ''
+            }));
+
+            // 3. SEGREGASI DATA KGB
             const pnsGol3 = excelRows.filter(d => d.TIPE === 'PNS' && (String(d.GOLONGAN).startsWith('III') || String(d.GOLONGAN).startsWith('3')));
             const pnsGol4 = excelRows.filter(d => d.TIPE === 'PNS' && (String(d.GOLONGAN).startsWith('IV') || String(d.GOLONGAN).startsWith('4')));
             const pppp = excelRows.filter(d => d.TIPE === 'PPPK');
 
             const wb = XLSX.utils.book_new();
             
-            const appendSheet = (data, name) => {
-                const cleanData = data.map(({ TIPE, ...rest }) => rest);
+            const appendSheet = (data, name, isKGB = true) => {
+                let cleanData = data;
+                if(isKGB) {
+                     cleanData = data.map(({ TIPE, ...rest }) => rest);
+                }
+                
                 const ws = cleanData.length > 0 ? XLSX.utils.json_to_sheet(cleanData) : XLSX.utils.json_to_sheet([{Info: "Nihil"}]);
-                ws['!cols'] = [
-                    {wch:20}, {wch:30}, {wch:10}, {wch:25}, {wch:30}, {wch:25}, {wch:25}, 
-                    {wch:15}, {wch:15}, {wch:15}, {wch:10}, {wch:15}, {wch:25}
-                ];
+                
+                // Auto width dasar
+                if(cleanData.length > 0) {
+                    const keys = Object.keys(cleanData[0]);
+                    ws['!cols'] = keys.map(() => ({ wch: 20 }));
+                }
+
                 XLSX.utils.book_append_sheet(wb, ws, name);
             };
 
             appendSheet(pnsGol3, "PNS GOL III");
             appendSheet(pnsGol4, "PNS GOL IV");
             appendSheet(pppp, "PPPK");
+            
+            // [BARU] APPEND SHEET INPASSING
+            appendSheet(inpassingRows, "REKAP INPASSING", false);
 
             const labelFilter = filterType.value === 'TMT' ? 'TMT' : 'Input';
-            XLSX.writeFile(wb, `Rekap_KGB_${labelFilter}_${startDate.value}_sd_${endDate.value}.xlsx`);
+            XLSX.writeFile(wb, `Rekap_Data_${labelFilter}_${startDate.value}_sd_${endDate.value}.xlsx`);
             showToast("File Excel diunduh", 'success');
         };
 
