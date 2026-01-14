@@ -6,6 +6,21 @@ import { store } from '../store.js';
 // --- IMPORT VIEW HTML ---
 import { TplLaporan } from '../views/LaporanView.js';
 
+// --- FORMATTER HELPERS (Consistent with other modules) ---
+const LIST_SINGKATAN = ['UPTD', 'SMP', 'SD', 'RSUD', 'TK', 'PAUD', 'BLUD', 'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN', 'DPRD'];
+const LIST_KECIL = ['dan', 'di', 'ke', 'dari', 'yang', 'pada', 'untuk', 'atau', 'dengan', 'atas', 'oleh'];
+
+const formatTitleCase = (text) => {
+    if (!text) return '';
+    return text.replace(/\w+/g, (word, index) => {
+        const upper = word.toUpperCase();
+        const lower = word.toLowerCase();
+        if (LIST_SINGKATAN.includes(upper)) return upper;
+        if (index > 0 && LIST_KECIL.includes(lower)) return lower;
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    });
+};
+
 export default {
     template: TplLaporan, 
     setup() {
@@ -30,6 +45,8 @@ export default {
         const fetchUsers = async () => {
             if (store.isAdmin) {
                 try {
+                    // [TIPS] Kalau user sistem sedikit, query ini oke. 
+                    // Kalau banyak, bisa di-cache di store.js agar tidak fetch tiap buka menu laporan.
                     const q = query(collection(db, "users"));
                     const snap = await getDocs(q);
                     listUsers.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -66,10 +83,12 @@ export default {
                 const golLabels = Object.keys(golMap).sort();
                 const golValues = golLabels.map(k => golMap[k]);
 
-                // 4. DATA UNIT KERJA
+                // 4. DATA UNIT KERJA (Top 10)
                 const unitMap = {};
                 data.forEach(d => {
-                    const u = d.unit_kerja || 'Tidak Diketahui';
+                    // Gunakan formatTitleCase agar "Dinas A" dan "DINAS A" dianggap sama
+                    const rawU = d.unit_kerja || 'Tidak Diketahui';
+                    const u = formatTitleCase(rawU); 
                     unitMap[u] = (unitMap[u] || 0) + 1;
                 });
                 const sortedUnit = Object.entries(unitMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
@@ -155,6 +174,9 @@ export default {
                 const q = query(collRef, ...qConstraints);
                 const snap = await getDocs(q);
 
+                // [SAFETY WARNING]
+                if (snap.size > 500) showToast(`Memuat ${snap.size} data. Mohon tunggu proses render...`, 'info');
+
                 previewData.value = snap.docs.map(d => {
                     const data = d.data();
                     let createdAtStr = '-';
@@ -181,16 +203,11 @@ export default {
             }
         };
 
-        // --- DOWNLOAD EXCEL (UPDATED WITH INPASSING) ---
+        // --- DOWNLOAD EXCEL (UPDATED WITH SAFE FORMATTER) ---
         const downloadExcel = () => {
             if (previewData.value.length === 0) return;
             const XLSX = window.XLSX;
             if(!XLSX) return showToast("Library Excel error", 'error');
-
-            const toTitleCase = (str) => {
-                if (!str) return '';
-                return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-            };
 
             const safeDate = (val) => {
                 if(!val) return '-';
@@ -204,9 +221,9 @@ export default {
                 NAMA: data.nama,
                 GOLONGAN: data.golongan,
                 NOMOR_SK: data.nomor_naskah || '-',
-                JABATAN: data.jabatan_snapshot,
-                "UNIT KERJA": toTitleCase(data.unit_kerja || '-'),
-                "UNIT KERJA INDUK": toTitleCase(data.perangkat_daerah || '-'),
+                JABATAN: formatTitleCase(data.jabatan_snapshot), // SAFE FORMAT
+                "UNIT KERJA": formatTitleCase(data.unit_kerja || '-'), // SAFE FORMAT
+                "UNIT KERJA INDUK": formatTitleCase(data.perangkat_daerah || '-'), // SAFE FORMAT
                 TMT_BARU: formatTanggal(data.tmt_sekarang),
                 GAJI_LAMA: data.dasar_gaji_lama || 0,
                 GAJI_BARU: data.gaji_baru,
@@ -216,27 +233,26 @@ export default {
                 TIPE: data.tipe_asn || 'PNS'
             }));
 
-            // 2. FORMAT DATA INPASSING (Filter yg punya nomor_inpassing)
+            // 2. FORMAT DATA INPASSING
             const inpassingData = previewData.value.filter(d => d.nomor_inpassing);
             const inpassingRows = inpassingData.map(data => ({
                 NIP: "'" + data.nip,
                 NAMA: data.nama,
-                JABATAN: data.jenis_jabatan,
+                JABATAN: formatTitleCase(data.jenis_jabatan),
                 GOL_INPASSING: data.inpassing_golongan || data.golongan,
                 NOMOR_SK_INPASSING: data.nomor_inpassing,
                 
-                // Field khusus Inpassing
                 TMT_INPASSING: safeDate(data.tmt_inpassing),
                 TGL_SK_MANUAL: safeDate(data.tanggal_inpassing_manual),
                 GAJI_INPASSING: data.inpassing_gaji || 0,
                 MK_TAHUN: data.mk_inpassing_tahun || 0,
                 MK_BULAN: data.mk_inpassing_bulan || 0,
                 
-                "UNIT KERJA": toTitleCase(data.unit_kerja || '-'),
+                "UNIT KERJA": formatTitleCase(data.unit_kerja || '-'), // SAFE FORMAT
                 KETERANGAN: data.keterangan_inpassing || ''
             }));
 
-            // 3. SEGREGASI DATA KGB
+            // 3. SEGREGASI DATA
             const pnsGol3 = excelRows.filter(d => d.TIPE === 'PNS' && (String(d.GOLONGAN).startsWith('III') || String(d.GOLONGAN).startsWith('3')));
             const pnsGol4 = excelRows.filter(d => d.TIPE === 'PNS' && (String(d.GOLONGAN).startsWith('IV') || String(d.GOLONGAN).startsWith('4')));
             const pppp = excelRows.filter(d => d.TIPE === 'PPPK');
@@ -251,7 +267,6 @@ export default {
                 
                 const ws = cleanData.length > 0 ? XLSX.utils.json_to_sheet(cleanData) : XLSX.utils.json_to_sheet([{Info: "Nihil"}]);
                 
-                // Auto width dasar
                 if(cleanData.length > 0) {
                     const keys = Object.keys(cleanData[0]);
                     ws['!cols'] = keys.map(() => ({ wch: 20 }));
@@ -263,8 +278,6 @@ export default {
             appendSheet(pnsGol3, "PNS GOL III");
             appendSheet(pnsGol4, "PNS GOL IV");
             appendSheet(pppp, "PPPK");
-            
-            // [BARU] APPEND SHEET INPASSING
             appendSheet(inpassingRows, "REKAP INPASSING", false);
 
             const labelFilter = filterType.value === 'TMT' ? 'TMT' : 'Input';
