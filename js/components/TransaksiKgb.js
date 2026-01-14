@@ -13,8 +13,7 @@ import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplA
 // 1. KONFIGURASI FORMATTER (CHANGE CASE)
 // ==========================================
 const LIST_SINGKATAN = [
-    'UPTD', 'SMP', 'SD', 'RSUD', 'RS', 'TK', 'PAUD', 'BLUD', 
-    'PUSKESMAS', 'SETDA', 'BKPSDMD', 'DPRD', 'KECAMATAN', 'KELURAHAN',
+    'UPTD', 'SMP', 'SD', 'RSUD', 'TK', 'PAUD', 'BLUD', 
     'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN' 
 ];
 
@@ -662,7 +661,7 @@ export default {
                 if(ps.exists()){ const d = ps.data(); pjp = d.pangkat || pjp; pjj = d.jabatan || pjj; pjn = d.nama || ""; pjnip = d.nip || ""; } 
             }
             
-            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n{{TTD_PENGIRIM}}\n\n\n" : "\n\n\n";
+            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n" : "\n\n\n";
             let tanggalSurat = item.tanggal_naskah ? formatTanggal(item.tanggal_naskah.toDate ? item.tanggal_naskah.toDate() : new Date(item.tanggal_naskah)) : "....................";
             let nomor_naskah = previewTab.value === 'TTE' ? (item.nomor_naskah) : (item.nomor_naskah || "....................");
 
