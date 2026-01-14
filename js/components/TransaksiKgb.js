@@ -10,49 +10,29 @@ import { store } from '../store.js';
 import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplAutocompletePerangkatDaerah, TplMain } from '../views/TransaksiKgbView.js';
 
 // ==========================================
-// 1. KONFIGURASI FORMATTER (CHANGE CASE)
-// ==========================================
-// ==========================================
-// 1. KONFIGURASI FORMATTER (CHANGE CASE) - PERBAIKAN
+// 1. FORMATTER SAFE MODE (FIXED SPASI)
 // ==========================================
 const LIST_SINGKATAN = [
     'UPTD', 'SMP', 'SD', 'RSUD', 'TK', 'PAUD', 'BLUD', 
     'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN', "DPRD"
 ];
-
 const LIST_KECIL = [
     'dan', 'di', 'ke', 'dari', 'yang', 'pada', 'untuk', 'atau', 'dengan', 'atas', 'oleh'
 ];
 
 const formatTitleCase = (text) => {
     if (!text) return '';
-    
-    // 1. Deteksi spasi di akhir (agar user tetap bisa ngetik spasi)
-    const hasTrailingSpace = text.endsWith(' ');
-    
-    // 2. Split spasi DAN FILTER string kosong
-    // .filter(w => w) ini kuncinya. Dia membuang spasi ganda/kosong hasil split
-    const words = text.split(' ').filter(w => w);
-    
-    const formatted = words.map((word, index) => {
+    // Regex replace hanya mengganti kata, spasi tetap utuh
+    return text.replace(/\w+/g, (word, index) => {
         const upper = word.toUpperCase();
         const lower = word.toLowerCase();
-
-        // Cek Singkatan
         if (LIST_SINGKATAN.includes(upper)) return upper;
-
-        // Cek Kata Penghubung (Kecuali kata pertama)
         if (index > 0 && LIST_KECIL.includes(lower)) return lower;
-
-        // Default: Depan Besar, Belakang Kecil
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    }).join(' '); // Gabungkan kembali dengan satu spasi
-
-    // 3. Kembalikan spasi di akhir HANYA jika aslinya memang ada spasi
-    return hasTrailingSpace ? formatted + ' ' : formatted;
+    });
 };
 
-// --- SUB-COMPONENTS ---
+// --- SUB-COMPONENTS (Sama, logic formatTitleCase di dalamnya otomatis pakai yg baru) ---
 const SearchSelect = {
     props: ['options', 'modelValue', 'placeholder', 'labelKey', 'valueKey', 'disabled'],
     emits: ['update:modelValue', 'change'],
@@ -95,19 +75,16 @@ const AutocompleteJabatan = {
             } catch (e) {}
         }, 800);
         
-        // [MODIFIKASI] Apply Formatter
         const handleInput = (e) => {
             let val = e.target.value;
-            val = formatTitleCase(val); // Format Text
-            e.target.value = val; // Update UI
-            
+            val = formatTitleCase(val); // SAFE MODE
+            e.target.value = val; 
             emit('update:modelValue', val);
-            fetchSuggestions(val); // Fetch dengan keyword yg sudah rapi
+            fetchSuggestions(val); 
             showSuggestions.value = true;
         };
         
         const selectItem = (item) => { 
-            // Pastikan item yang dipilih juga diformat (jika perlu)
             const fmt = formatTitleCase(item.nama_jabatan);
             emit('update:modelValue', fmt); 
             emit('select', item); 
@@ -137,25 +114,23 @@ const AutocompleteUnitKerja = {
         const fetchSuggestions = debounce(async (keyword) => {
             if (!keyword || keyword.length < 3) { suggestions.value = []; return; }
             try {
+                // HEMAT: Sebaiknya punya master_unit_kerja sendiri, tapi query limit 50 ini "acceptable"
                 const qGlobal = query(collection(db, "usulan_kgb"), orderBy("created_at", "desc"), limit(50)); 
                 const snap = await getDocs(qGlobal);
                 suggestions.value = processSnap(snap, keyword);
             } catch (e) { }
         }, 500);
         
-        // [MODIFIKASI] Apply Formatter
         const handleInput = (e) => { 
             let val = e.target.value;
             val = formatTitleCase(val);
             e.target.value = val;
-            
             emit('update:modelValue', val); 
             fetchSuggestions(val); 
             showSuggestions.value = true; 
         };
         
         const selectItem = (item) => { 
-            // Format saat dipilih dari suggestion
             const fmt = formatTitleCase(item);
             emit('update:modelValue', fmt); 
             showSuggestions.value = false; 
@@ -190,12 +165,10 @@ const AutocompletePerangkatDaerah = {
             } catch (e) { }
         }, 500);
         
-        // [MODIFIKASI] Apply Formatter
         const handleInput = (e) => { 
             let val = e.target.value;
             val = formatTitleCase(val);
             e.target.value = val;
-
             emit('update:modelValue', val); 
             fetchSuggestions(val); 
             showSuggestions.value = true; 
@@ -216,23 +189,16 @@ export default {
     components: { SearchSelect, AutocompleteJabatan, AutocompleteUnitKerja, AutocompletePerangkatDaerah },
     template: TplMain, 
     setup() {
-        // STATE LIST DATA
         const listData = ref([]);
         const tableLoading = ref(true);
         const tableSearch = ref('');
-        
-        // PAGINATION
         const currentPage = ref(1);
         const itemsPerPage = ref(10); 
         const pageStack = ref([]); 
         const totalItems = ref(0);
         const isLastPage = ref(false); 
-        
-        // FILTERS
         const filterStartDate = ref('');
         const filterEndDate = ref('');
-
-        // UI STATE
         const expandedRows = ref([]); 
         const toggleRow = (id) => {
             if (expandedRows.value.includes(id)) expandedRows.value = expandedRows.value.filter(rowId => rowId !== id);
@@ -246,7 +212,6 @@ export default {
         const currentPreviewItem = ref(null);
         const previewTab = ref('BASAH');
 
-        // FORM STATES
         const isEditMode = ref(false);
         const isSaving = ref(false);
         const isSearching = ref(false);
@@ -254,11 +219,14 @@ export default {
         const gajiMsg = ref('');
         const formId = ref(null);
         
-        // MASTER DATA
+        // CACHE DATA (Untuk Hemat Read di Preview)
         const listGolongan = ref([]); 
         const listDasarHukum = ref([]);
         const listPejabat = ref([]); 
         const configPejabat = reactive({ setda: null, bkpsdmd: null });
+        const cacheGlobalVars = ref({}); // Cache Global Vars
+        const cacheTemplates = ref({}); // Cache Template URL
+
         const currentBup = ref(58);
         const isPensiun = ref(false);
         const pensiunMsg = ref('');
@@ -307,7 +275,7 @@ export default {
             return data;
         };
 
-        // --- FETCH TABLE (FIXED LOGIC) ---
+        // --- FETCH TABLE (OPTIMIZED SEARCH & PAGINATION) ---
         const fetchTable = async (pageTarget) => {
             tableLoading.value = true;
             try {
@@ -315,163 +283,182 @@ export default {
                 const limitVal = parseInt(itemsPerPage.value) || 10;
                 let q; 
                 
-                const constraints = [];
-                if (!store.isAdmin && auth.currentUser) constraints.push(where("created_by", "==", auth.currentUser.uid));
-                if (filterStartDate.value) constraints.push(where("tmt_sekarang", ">=", filterStartDate.value));
-                if (filterEndDate.value) constraints.push(where("tmt_sekarang", "<=", filterEndDate.value));
+                // 1. Constraint Dasar (Filter User Biasa / Tanggal TMT)
+                const baseConstraints = [];
+                if (!store.isAdmin && auth.currentUser) baseConstraints.push(where("created_by", "==", auth.currentUser.uid));
+                
+                // Note: Filter TMT hanya bisa dipakai jika TIDAK sedang searching nama/nip
+                // karena Firestore punya batasan sorting field.
+                const isFilteringDate = filterStartDate.value || filterEndDate.value;
 
-                // 1. Total Items (Refresh awal)
-                if (pageTarget === 1 || pageTarget === 'first') {
-                    const snapshotCount = await getCountFromServer(query(collRef, ...constraints));
-                    totalItems.value = snapshotCount.data().count;
-                    pageStack.value = [];
-                    currentPage.value = 1;
-                }
-
-                // 2. Logic Search vs Pagination
+                // --- CABANG LOGIKA: SEARCH vs NORMAL ---
+                
                 if (tableSearch.value.trim()) {
-                    // MODE SEARCH (Client Filter for 1000 items)
-                    const qAll = query(
-                        collRef, ...constraints, 
-                        orderBy("created_at", "desc"),
-                        orderBy("__name__", "desc"), // Stable sort
-                        limit(1000) 
-                    );
-                    const snap = await getDocs(qAll);
-                    const term = tableSearch.value.toLowerCase();
+                    const term = tableSearch.value.trim();
+                    const isNumber = /^\d+$/.test(term); 
+
+                    let searchConstraints = [...baseConstraints];
+
+                    if (isNumber) {
+                        // A. Cari NIP (Angka)
+                        searchConstraints.push(orderBy("nip")); 
+                        searchConstraints.push(where("nip", ">=", term));
+                        searchConstraints.push(where("nip", "<=", term + "\uf8ff"));
+                    } else {
+                        // B. Cari Nama (Huruf)
+                        // [PERBAIKAN] Gunakan UPPERCASE agar cocok dengan data ASN umumnya
+                        // Jika data Anda campuran (ada besar/kecil), solusi terbaik adalah 'nama_lower' (lihat bawah)
+                        const termNama = term.toUpperCase(); 
+                        
+                        searchConstraints.push(orderBy("nama"));
+                        searchConstraints.push(where("nama", ">=", termNama));
+                        searchConstraints.push(where("nama", "<=", termNama + "\uf8ff"));
+                    }
+
+                    // Limit 50 hasil
+                    q = query(collRef, ...searchConstraints, limit(50));
                     
-                    listData.value = snap.docs.map(mapDoc).filter(d => 
-                        (d.nama_snapshot||'').toLowerCase().includes(term) || 
-                        (d.nip||'').includes(term)
-                    );
+                    const snap = await getDocs(q);
+                    listData.value = snap.docs.map(mapDoc);
                     isLastPage.value = true;
+                    
                 } else {
-                    // MODE PAGINATION (Stable Cursor)
+                    // === MODE 2: PAGINATION NORMAL (Data Terbaru) ===
+                    
+                    if (isFilteringDate) {
+                        if (filterStartDate.value) baseConstraints.push(where("tmt_sekarang", ">=", filterStartDate.value));
+                        if (filterEndDate.value) baseConstraints.push(where("tmt_sekarang", "<=", filterEndDate.value));
+                    }
+
+                    // Hitung Total (Hanya sekali di awal)
+                    if (pageTarget === 1 || pageTarget === 'first') {
+                        const snapshotCount = await getCountFromServer(query(collRef, ...baseConstraints));
+                        totalItems.value = snapshotCount.data().count;
+                        pageStack.value = [];
+                        currentPage.value = 1;
+                    }
+
+                    // Query Dasar (Sort by Created At)
+                    // PENTING: Jika ada filter where(...), orderBy pertama harus field tsb.
+                    // Jika filter TMT aktif -> Order by TMT. Jika tidak -> Order by CreatedAt
+                    const sortField = isFilteringDate ? "tmt_sekarang" : "created_at";
+                    
+                    let qConstraints = [
+                        ...baseConstraints,
+                        orderBy(sortField, "desc"),
+                        orderBy("__name__", "desc") // Stable sort secondary
+                    ];
+
                     if (typeof pageTarget === 'number') {
                         if (pageTarget === 1) {
-                            // Page 1
-                            q = query(
-                                collRef, ...constraints, 
-                                orderBy("created_at", "desc"), orderBy("__name__", "desc"), 
-                                limit(limitVal)
-                            );
-                            currentPage.value = 1;
-                            pageStack.value = [];
+                            q = query(collRef, ...qConstraints, limit(limitVal));
+                            currentPage.value = 1; pageStack.value = [];
                         } else {
-                            // Page > 1
+                            // Next / Prev Logic
                             if (pageTarget > currentPage.value) { // Next
                                 const lastDoc = pageStack.value[pageStack.value.length - 1];
                                 if(lastDoc) {
-                                    q = query(
-                                        collRef, ...constraints, 
-                                        orderBy("created_at", "desc"), orderBy("__name__", "desc"), 
-                                        startAfter(lastDoc), limit(limitVal)
-                                    );
+                                    q = query(collRef, ...qConstraints, startAfter(lastDoc), limit(limitVal));
                                     currentPage.value = pageTarget;
                                 } else { fetchTable(1); return; }
                             } 
                             else if (pageTarget < currentPage.value) { // Prev
                                 const cursorIndex = pageTarget - 2;
                                 if (cursorIndex < 0) {
-                                    q = query(collRef, ...constraints, orderBy("created_at", "desc"), orderBy("__name__", "desc"), limit(limitVal));
+                                    q = query(collRef, ...qConstraints, limit(limitVal));
                                     pageStack.value = [];
                                 } else {
                                     const cursor = pageStack.value[cursorIndex];
-                                    q = query(
-                                        collRef, ...constraints, 
-                                        orderBy("created_at", "desc"), orderBy("__name__", "desc"), 
-                                        startAfter(cursor), limit(limitVal)
-                                    );
+                                    q = query(collRef, ...qConstraints, startAfter(cursor), limit(limitVal));
                                     pageStack.value = pageStack.value.slice(0, cursorIndex + 1);
                                 }
                                 currentPage.value = pageTarget;
-                            } else { fetchTable(1); return; } // Same page
+                            } else { fetchTable(1); return; }
                         }
                     } else {
-                        // Default
-                        q = query(collRef, ...constraints, orderBy("created_at", "desc"), orderBy("__name__", "desc"), limit(limitVal));
+                        // Default fallback
+                        q = query(collRef, ...qConstraints, limit(limitVal));
                         currentPage.value = 1; pageStack.value = [];
                     }
 
-                    // Execute
                     const snap = await getDocs(q);
                     listData.value = snap.docs.map(mapDoc);
                     isLastPage.value = snap.docs.length < limitVal;
 
-                    // Update Stack
                     if (snap.docs.length > 0) {
                         const lastVisible = snap.docs[snap.docs.length - 1];
-                        if (currentPage.value === 1) {
-                            pageStack.value = [lastVisible];
-                        } else {
-                            if (pageStack.value.length < currentPage.value) {
-                                pageStack.value.push(lastVisible);
-                            } else {
-                                pageStack.value[currentPage.value - 1] = lastVisible;
-                            }
+                        if (currentPage.value === 1) { pageStack.value = [lastVisible]; } 
+                        else {
+                            if (pageStack.value.length < currentPage.value) pageStack.value.push(lastVisible);
+                            else pageStack.value[currentPage.value - 1] = lastVisible;
                         }
                     }
                 }
             } catch (e) { 
                 console.error("Fetch Error:", e); 
-                if(e.code === 'failed-precondition') showToast("Index Missing: Cek Console Browser", 'error');
+                // Deteksi Error Index Firestore
+                if(e.code === 'failed-precondition' || e.message.includes('index')) {
+                    const link = e.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+                    if(link) {
+                        console.warn("Index Required. Click link:", link[0]);
+                        showToast("Sistem sedang mengoptimalkan database (Index). Coba lagi dalam 2 menit.", 'info');
+                        window.open(link[0], '_blank'); // Buka link otomatis biar admin klik create index
+                    } else {
+                        showToast("Perlu Index Database (Cek Console)", 'warning');
+                    }
+                }
             } finally { 
                 tableLoading.value = false; 
             }
         };
 
-        const goToPage = (p) => {
-            if (p < 1 || p > totalPages.value || p === currentPage.value) return;
-            fetchTable(p); // Direct fetch
-        };
-
+        const goToPage = (p) => { if (p < 1 || p > totalPages.value || p === currentPage.value) return; fetchTable(p); };
         watch(tableSearch, debounce(() => fetchTable(1), 800));
         watch(itemsPerPage, () => fetchTable(1));
 
         const updateStatus = async (item, newStatus) => {
             if(!item.id) return showToast("ID Error", "error");
-            const oldStatus = item.status;
-            item.status = newStatus; 
+            const oldStatus = item.status; item.status = newStatus; 
             try {
-                const updateData = { status: newStatus };
-                if (newStatus === 'SELESAI') updateData.tgl_selesai = serverTimestamp();
-                else updateData.tgl_selesai = null; 
-
+                const updateData = { status: newStatus, tgl_selesai: newStatus === 'SELESAI' ? serverTimestamp() : null };
                 await updateDoc(doc(db, "usulan_kgb", item.id), updateData);
-                
-                if (newStatus === 'SELESAI') showToast("Dokumen ditandai SELESAI.", "success");
-                else showToast("Dokumen dikembalikan ke PROSES.", "info");
-                
+                showToast(newStatus === 'SELESAI' ? "Selesai" : "Proses", "success");
                 fetchTable(currentPage.value); 
-            } catch (e) { 
-                item.status = oldStatus;
-                console.error(e);
-                showToast("Gagal update status", "error"); 
-            }
+            } catch (e) { item.status = oldStatus; showToast("Gagal update", "error"); }
         };
 
-        // --- INIT REFS ---
+        // --- INIT REFS (HEMAT & CACHE) ---
         const initRefs = async () => {
-            const qGol = query(collection(db, "master_golongan"), orderBy("kode"));
-            const snapGol = await getDocs(qGol);
-            const setGol = new Set();
-            listGolongan.value = [];
-            snapGol.forEach(d => {
-                const data = d.data();
-                if(!setGol.has(data.kode + data.tipe)) {
-                    setGol.add(data.kode + data.tipe);
-                    listGolongan.value.push({ kode: data.kode, pangkat: data.pangkat, tipe: data.tipe, label_full: `${data.kode} - ${data.pangkat}` });
+            // Cek Cache Data Master
+            if (listGolongan.value.length === 0) {
+                const qGol = query(collection(db, "master_golongan"), orderBy("kode"));
+                const snapGol = await getDocs(qGol);
+                listGolongan.value = [];
+                const setGol = new Set();
+                snapGol.forEach(d => {
+                    const data = d.data();
+                    if(!setGol.has(data.kode + data.tipe)) {
+                        setGol.add(data.kode + data.tipe);
+                        listGolongan.value.push({ kode: data.kode, pangkat: data.pangkat, tipe: data.tipe, label_full: `${data.kode} - ${data.pangkat}` });
+                    }
+                });
+            }
+            if (listPejabat.value.length === 0) {
+                const qPj = query(collection(db, "master_pejabat"), orderBy("nama"));
+                const snapPj = await getDocs(qPj);
+                listPejabat.value = snapPj.docs.map(d => d.data());
+            }
+            
+            // Cek Cache Global Vars
+            if (!cacheGlobalVars.value.dasar_hukum) {
+                const docVars = await getDoc(doc(db, "config_template", "GLOBAL_VARS"));
+                if(docVars.exists()) {
+                    const data = docVars.data();
+                    cacheGlobalVars.value = data; // SIMPAN DI CACHE
+                    if(data.dasar_hukum) listDasarHukum.value = data.dasar_hukum;
+                    if(data.kop_setda) configPejabat.setda = data.kop_setda.pejabat_nip;
+                    if(data.kop_bkpsdmd) configPejabat.bkpsdmd = data.kop_bkpsdmd.pejabat_nip;
                 }
-            });
-            const qPj = query(collection(db, "master_pejabat"), orderBy("nama"));
-            const snapPj = await getDocs(qPj);
-            listPejabat.value = snapPj.docs.map(d => d.data());
-            const docVars = await getDoc(doc(db, "config_template", "GLOBAL_VARS"));
-            if(docVars.exists()) {
-                const data = docVars.data();
-                if(data.dasar_hukum) listDasarHukum.value = data.dasar_hukum;
-                if(data.kop_setda) configPejabat.setda = data.kop_setda.pejabat_nip;
-                if(data.kop_bkpsdmd) configPejabat.bkpsdmd = data.kop_bkpsdmd.pejabat_nip;
             }
         };
 
@@ -482,8 +469,7 @@ export default {
         watch(() => [form.dasar_golongan, form.dasar_mk_tahun], () => debounce(cariGajiLama, 500)());
 
         const extractTglLahir = (nip) => {
-            const clean = nip.replace(/\s/g, '');
-            if (clean.length < 8) return '';
+            const clean = nip.replace(/\s/g, ''); if (clean.length < 8) return '';
             const y = clean.substring(0, 4); const m = clean.substring(4, 6); const d = clean.substring(6, 8);
             if (!isNaN(y) && !isNaN(m) && !isNaN(d)) return `${y}-${m}-${d}`;
             return '';
@@ -498,23 +484,14 @@ export default {
                 if(snap.exists()){
                     const d=snap.data(); 
                     let finalTgl = d.tgl_lahir; if (!finalTgl || finalTgl === '' || finalTgl === 'Invalid Date') finalTgl = dateFromNip;
-                    
-                    // [MODIFIKASI DISINI]
-                    // Terapkan formatTitleCase saat populate data dari Database
                     Object.assign(form, {
-                        nama: d.nama, 
-                        tempat_lahir: d.tempat_lahir||'', 
-                        tgl_lahir: finalTgl, 
-                        
-                        // Apply Formatter:
+                        nama: d.nama, tempat_lahir: d.tempat_lahir||'', tgl_lahir: finalTgl, 
                         perangkat_daerah: formatTitleCase(d.perangkat_daerah || ''), 
                         unit_kerja: formatTitleCase(d.unit_kerja || ''), 
                         jabatan: formatTitleCase(d.jabatan || ''), 
-                        
                         tipe_asn: d.tipe_asn || 'PNS',
                         jenis_jabatan: d.jenis_jabatan || 'Pelaksana'
                     });
-
                     if(d.golongan_kode) { form.golongan = d.golongan_kode; handleGolonganChange(d.golongan_kode); }
                     if (d.pangkat) form.pangkat = d.pangkat;
                     if(form.jabatan){
@@ -535,15 +512,12 @@ export default {
                 currentAge.value = age;
             } else currentAge.value = 0;
             if (!form.tgl_lahir || !form.tmt_sekarang) return;
-            
             const bd = new Date(form.tgl_lahir); const tmt = new Date(form.tmt_sekarang); const bup = currentBup.value || 58;
             const pd = new Date(bd); pd.setFullYear(bd.getFullYear() + bup); pd.setDate(1); pd.setMonth(pd.getMonth() + 1);
-            
             if (!form.is_pensiun_manual) {
                 const next = new Date(tmt); next.setFullYear(next.getFullYear() + 2);
                 form.tmt_selanjutnya = next.toISOString().split('T')[0];
             }
-
             if (form.is_pensiun_manual) { isPensiun.value = true; pensiunMsg.value = "Status: Pensiun"; } 
             else if (new Date(form.tmt_selanjutnya) >= pd) { isPensiun.value = true; pensiunMsg.value = `Masuk BUP`; } 
             else { isPensiun.value = false; pensiunMsg.value = `BUP: ${formatTanggal(pd.toISOString())}`; }
@@ -563,7 +537,7 @@ export default {
         };
 
         const openModal = (item=null) => {
-            initRefs();
+            initRefs(); // Load Data (Cached)
             if(item){ 
                 if(!item.id) { showToast("ID Error", 'error'); return; }
                 isEditMode.value=true; formId.value=item.id; Object.assign(form,item); 
@@ -587,7 +561,6 @@ export default {
                 if (safeForm.jenis_jabatan === undefined) safeForm.jenis_jabatan = 'Pelaksana';
                 if (safeForm.golongan === undefined) safeForm.golongan = '';
 
-                // Apply Title Case to critical fields before saving (just in case)
                 safeForm.jabatan = formatTitleCase(safeForm.jabatan);
                 safeForm.unit_kerja = formatTitleCase(safeForm.unit_kerja);
                 safeForm.perangkat_daerah = formatTitleCase(safeForm.perangkat_daerah);
@@ -601,6 +574,7 @@ export default {
                     await addDoc(collection(db,"usulan_kgb"), payload); 
                 }
                 
+                // [HEMAT] Update master hanya update Timestamp, kecuali mau update detail lain
                 await setDoc(doc(db,"master_pegawai",form.nip), {
                     nip:form.nip, nama:form.nama, tempat_lahir:form.tempat_lahir, tgl_lahir:form.tgl_lahir,
                     perangkat_daerah:form.perangkat_daerah, unit_kerja:form.unit_kerja, jabatan:form.jabatan,
@@ -618,43 +592,46 @@ export default {
         const hapusTransaksi = async(item) => { 
             if(!item || !item.id) return showToast("ID Error", 'error');
             if (item.nomor_naskah) {
-                try {
-                    const q = query(collection(db, "usulan_kgb"), where("nomor_naskah", "==", item.nomor_naskah));
-                    const snap = await getDocs(q);
-                    if (snap.size > 1) {
-                        if(await showConfirm("Hapus Data Duplikat?", `Nomor SK "${item.nomor_naskah}" dipakai oleh ${snap.size} data. Hapus data ini?`)) { 
-                            await deleteDoc(doc(db, "usulan_kgb", item.id)); 
-                            fetchTable(1); showToast("Data duplikat berhasil dihapus.", 'success');
-                        }
-                    } else {
-                        return showToast("Gagal! Data memiliki Nomor SK Tunggal. Dilarang hapus!", 'error');
+                const q = query(collection(db, "usulan_kgb"), where("nomor_naskah", "==", item.nomor_naskah));
+                const snap = await getDocs(q);
+                if (snap.size > 1) {
+                    if(await showConfirm("Hapus?", `Ada ${snap.size} data duplikat. Hapus?`)) { 
+                        await deleteDoc(doc(db, "usulan_kgb", item.id)); fetchTable(1); showToast("Terhapus.", 'success');
                     }
-                } catch (error) { console.error(error); showToast("Gagal cek duplikasi.", 'error'); }
-                return; 
+                } else showToast("Gagal! Nomor SK Tunggal.", 'error');
+                return;
             }
-            if(await showConfirm("Hapus Draft?", "Data yang dihapus tidak dapat dikembalikan.")) { 
-                await deleteDoc(doc(db, "usulan_kgb", item.id)); 
-                fetchTable(1); showToast("Draft dihapus.", 'success');
+            if(await showConfirm("Hapus Draft?", "Data hilang permanen.")) { 
+                await deleteDoc(doc(db, "usulan_kgb", item.id)); fetchTable(1); showToast("Draft dihapus.", 'success');
             } 
         };
 
-        // --- PREVIEW & DOWNLOAD ---
+        // --- PREVIEW & DOWNLOAD (HEMAT VERSION) ---
         const generateDocBlob = async (item) => {
             if (!window.PizZip || !window.docxtemplater) throw new Error("Lib Error");
             const tplId = item.tipe_asn === 'PPPK' ? "PPPK" : "PNS"; 
-            const ts = await getDoc(doc(db, "config_template", tplId)); 
-            if(!ts.exists()) throw new Error("Template Missing");
-            const url = ts.data().url || `./templates/${ts.data().nama_file}`;
-            const gv = await getDoc(doc(db, "config_template", "GLOBAL_VARS")); 
-            const gvd = gv.exists() ? gv.data() : {};
+            
+            // [HEMAT] GUNAKAN CACHE TEMPLATE (Jika belum ada baru fetch)
+            if (!cacheTemplates.value[tplId]) {
+                const ts = await getDoc(doc(db, "config_template", tplId)); 
+                if(!ts.exists()) throw new Error("Template Missing");
+                cacheTemplates.value[tplId] = ts.data().url || `./templates/${ts.data().nama_file}`;
+            }
+            const url = cacheTemplates.value[tplId];
+
+            // [HEMAT] GUNAKAN CACHE GLOBAL VARS (Dari initRefs)
+            let gvd = cacheGlobalVars.value;
+            if(!gvd.dasar_hukum) { // Fallback jika belum ter-cache
+                const gv = await getDoc(doc(db, "config_template", "GLOBAL_VARS")); 
+                gvd = gv.exists() ? gv.data() : {};
+                cacheGlobalVars.value = gvd;
+            }
 
             let pangkatFinal = item.pangkat || ""; 
             if (item.golongan) {
-                try {
-                    const qPkt = query(collection(db, "master_golongan"), where("kode", "==", item.golongan));
-                    const snapPkt = await getDocs(qPkt);
-                    if (!snapPkt.empty && snapPkt.docs[0].data().pangkat) pangkatFinal = snapPkt.docs[0].data().pangkat;
-                } catch (e) {}
+                // [HEMAT] Cari di listGolongan yg sudah di-cache di RAM
+                const foundGol = listGolongan.value.find(g => g.kode === item.golongan);
+                if(foundGol) pangkatFinal = foundGol.pangkat;
             }
             
             const isSetda = item.tipe_asn === 'PNS' && ((item.golongan||'').startsWith('IV') || (item.golongan||'').startsWith('4'));
@@ -665,66 +642,43 @@ export default {
             let pjp = item.pejabat_baru_pangkat || ""; let pjj = item.pejabat_baru_nama || ""; let pjn = ""; let pjnip = ""; 
 
             if (targetNip) { 
-                const ps = await getDoc(doc(db, "master_pejabat", targetNip)); 
-                if(ps.exists()){ const d = ps.data(); pjp = d.pangkat || pjp; pjj = d.jabatan || pjj; pjn = d.nama || ""; pjnip = d.nip || ""; } 
+                // [HEMAT] Cari di listPejabat yg sudah di-cache di RAM
+                const foundPj = listPejabat.value.find(p => p.nip === targetNip);
+                if(foundPj) { pjp = foundPj.pangkat; pjj = foundPj.jabatan; pjn = foundPj.nama; pjnip = foundPj.nip; }
+                else {
+                    // Fallback fetch jika tidak ada di list cache (jarang terjadi)
+                    const ps = await getDoc(doc(db, "master_pejabat", targetNip)); 
+                    if(ps.exists()){ const d = ps.data(); pjp = d.pangkat || pjp; pjj = d.jabatan || pjj; pjn = d.nama || ""; pjnip = d.nip || ""; } 
+                }
             }
             
-            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n" : "\n\n\n";
+            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n{{TTD_PENGIRIM}}\n\n\n" : "\n\n\n";
             let tanggalSurat = item.tanggal_naskah ? formatTanggal(item.tanggal_naskah.toDate ? item.tanggal_naskah.toDate() : new Date(item.tanggal_naskah)) : "....................";
-            let nomor_naskah = previewTab.value === 'TTE' ? (item.nomor_naskah) : (item.nomor_naskah || "....................");
-
-            // --- LOGIKA DASAR HUKUM ---
+            
             const mapH = gvd.dasar_hukum || []; 
-            
-            // Logika: Jika Nomor Inpassing ada, paksa cari judul "INPASSING"
-            // Jika belum ada nomor, gunakan dasar_hukum bawaan data (atau "-" jika kosong)
             const searchKey = item.nomor_inpassing ? "INPASSING" : item.dasar_hukum;
-
             const foundH = mapH.find(h => h.judul === searchKey);
-            
-            // Ambil isinya (Jika ketemu pakai isinya, jika tidak strip)
             const textHukum = foundH ? foundH.isi : "-";
-            const twoDigits = (val) => (val||0).toString().padStart(2, '0');
 
             const res = await fetch(url); const buf = await res.arrayBuffer();
             const zip = new window.PizZip(buf);
             const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => "" });
 
-            // --- LOGIKA TMT (Prioritas: Inpassing -> Dasar TMT -> Hari Ini) ---
-            let tmtFinal = new Date(); // Default hari ini jika semua kosong
+            let tmtFinal = new Date(); 
+            if (item.tmt_inpassing) tmtFinal = item.tmt_inpassing.toDate ? item.tmt_inpassing.toDate() : new Date(item.tmt_inpassing);
+            else if (item.dasar_tmt) tmtFinal = item.dasar_tmt.toDate ? item.dasar_tmt.toDate() : new Date(item.dasar_tmt);
 
-            // 1. Cek TMT Inpassing (Inputan Baru)
-            if (item.tmt_inpassing) {
-                tmtFinal = item.tmt_inpassing.toDate ? item.tmt_inpassing.toDate() : new Date(item.tmt_inpassing);
-            } 
-            // 2. Jika kosong, Cek Dasar TMT (Data Lama)
-            else if (item.dasar_tmt) {
-                tmtFinal = item.dasar_tmt.toDate ? item.dasar_tmt.toDate() : new Date(item.dasar_tmt);
-            }
+            let dasarTanggalObj = new Date();
+            if (item.tanggal_inpassing_manual) dasarTanggalObj = item.tanggal_inpassing_manual.toDate ? item.tanggal_inpassing_manual.toDate() : new Date(item.tanggal_inpassing_manual);
+            else if (item.dasar_tanggal) dasarTanggalObj = item.dasar_tanggal.toDate ? item.dasar_tanggal.toDate() : new Date(item.dasar_tanggal);
 
-            let dasarTanggalObj = new Date(); // Default hari ini
-
-            if (item.tanggal_inpassing_manual) {
-                // Cek inputan manual (Inpassing)
-                dasarTanggalObj = item.tanggal_inpassing_manual.toDate 
-                    ? item.tanggal_inpassing_manual.toDate() 
-                    : new Date(item.tanggal_inpassing_manual);
-            } 
-            else if (item.dasar_tanggal) {
-                // Cek data lama (Dasar Tanggal SK)
-                dasarTanggalObj = item.dasar_tanggal.toDate 
-                    ? item.dasar_tanggal.toDate() 
-                    : new Date(item.dasar_tanggal);
-            }
             docRender.render({
                 NAMA: item.nama||"", NIP: item.nip||"", PANGKAT: pangkatFinal, JABATAN: item.jabatan||"",
                 UNIT_KERJA: item.unit_kerja, UNIT_KERJA_INDUK: item.perangkat_daerah,
                 TGL_LAHIR: formatTanggal(item.tgl_lahir), GOLONGAN: item.golongan||"",
                 DASAR_NOMOR: item.nomor_inpassing || item.dasar_nomor ||"-", 
-                DASAR_TANGGAL: formatTanggal(dasarTanggalObj), 
-                DASAR_TMT: formatTanggal(tmtFinal), 
+                DASAR_TANGGAL: formatTanggal(dasarTanggalObj), DASAR_TMT: formatTanggal(tmtFinal), 
                 DASAR_PEJABAT: item.nomor_inpassing ? "BUPATI BANGKA" : item.dasar_pejabat||"-",
-                
                 DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
                 DASAR_MK_LAMA: `${(item.dasar_mk_tahun||0).toString().padStart(2,'0')} Tahun ${(item.dasar_mk_bulan||0).toString().padStart(2,'0')} Bulan`,
                 DASAR_HUKUM: textHukum, MK_BARU: `${(item.mk_baru_tahun||0).toString().padStart(2,'0')} Tahun ${(item.mk_baru_bulan||0).toString().padStart(2,'0')} Bulan`,
@@ -734,7 +688,6 @@ export default {
                 SIFAT: "Biasa", TTD_PENGIRIM: ttdContent, JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp, 
                 NAMA_PENGIRIM: pjn||"${nama_pengirim}", NIP_PENGIRIM: pjnip||"${nip_pengirim}"
             });
-
             return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
         };
 
@@ -742,7 +695,6 @@ export default {
             if (!window.docx) return showToast("Library Preview Missing", 'error');
             showPreviewModal.value = true; previewLoading.value = true; currentPreviewItem.value = item; previewTab.value = 'BASAH'; 
             await nextTick(); 
-            // Render logic
             try {
                 if(!currentPreviewItem.value) return;
                 const blob = await generateDocBlob(currentPreviewItem.value);
@@ -753,8 +705,7 @@ export default {
         };
 
         const changePreviewTab = async (tabName) => { 
-            previewTab.value = tabName; previewLoading.value = true; 
-            await nextTick(); 
+            previewTab.value = tabName; previewLoading.value = true; await nextTick(); 
             try {
                 const blob = await generateDocBlob(currentPreviewItem.value);
                 const container = document.getElementById('docx-preview-container');
@@ -779,9 +730,7 @@ export default {
         const prevPage = () => goToPage(currentPage.value - 1);
 
         onMounted(() => {
-            const unsubscribe = onAuthStateChanged(auth, (user) => {
-                if (user) fetchTable(1); else listData.value = [];
-            });
+            onAuthStateChanged(auth, (user) => { if (user) fetchTable(1); else listData.value = []; });
         });
         
         return { 
