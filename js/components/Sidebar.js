@@ -1,5 +1,6 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { store } from '../store.js';
+import { showConfirm } from '../utils.js'; // Pastikan import showConfirm
 
 export default {
     template: `
@@ -37,13 +38,12 @@ export default {
                         <i class="bi bi-pencil-square me-2"></i> Input KGB
                     </router-link>
 
-
                     <router-link to="/penomoran" class="nav-link link-dark" active-class="active bg-primary text-white" @click="handleMobileClick">
                         <i class="bi bi-123 me-2"></i> Penomoran SPT KGB
                     </router-link>
 
                     <router-link to="/penomoran-inpassing" class="nav-link link-dark" active-class="active bg-primary text-white" @click="handleMobileClick">
-                        <i class="bi bi-123 me-2"></i> Inpassing KGB
+                        <i class="bi bi-stars me-2"></i> Inpassing KGB
                     </router-link>
 
                     <router-link to="/laporan" class="nav-link link-dark" active-class="active bg-primary text-white" @click="handleMobileClick">
@@ -88,11 +88,14 @@ export default {
                         </router-link>
                     </li>
                 </div>
-
             </ul>
             
             <hr class="text-secondary opacity-25 mt-2">
             
+            <button @click="hardReset" class="btn btn-outline-success btn-sm w-100 mb-3 d-flex align-items-center justify-content-center" title="Klik jika aplikasi error atau ada update baru">
+                <i class="bi bi-arrow-clockwise me-2"></i> Update / Refresh
+            </button>
+
             <div class="dropdown pb-2">
                 <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle p-2 rounded hover-bg-light" id="dropdownUser2" data-bs-toggle="dropdown" aria-expanded="false">
                     <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 me-2 d-flex justify-content-center align-items-center" style="width: 32px; height: 32px;">
@@ -148,6 +151,41 @@ export default {
             }
         };
 
+        // --- FITUR HARD RESET (PENYELAMAT CACHE GITHUB PAGES) ---
+        const hardReset = async () => {
+            const confirmed = await showConfirm(
+                'Update Aplikasi?', 
+                'Ini akan menghapus cache browser dan memuat ulang kode terbaru dari server. Gunakan ini jika ada fitur baru yang belum muncul.',
+                'Ya, Update Sekarang'
+            );
+
+            if (confirmed) {
+                store.setLoading(true); // Tampilkan Loading Spinner "MAS PRI"
+
+                // 1. Hapus Service Worker (Penting untuk PWA)
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                        await registration.unregister();
+                        console.log('SW Unregistered');
+                    }
+                }
+
+                // 2. Hapus Cache Storage (Cache API)
+                if ('caches' in window) {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map(key => caches.delete(key)));
+                    console.log('Cache Storage Cleared');
+                }
+
+                // 3. Force Reload dengan Timestamp (Cache Busting)
+                // Ini memaksa browser menganggap index.html adalah halaman baru
+                const url = new URL(window.location.href);
+                url.searchParams.set('force_update', Date.now());
+                window.location.href = url.toString();
+            }
+        };
+
         onMounted(() => {
             window.addEventListener('resize', handleResize);
         });
@@ -156,6 +194,10 @@ export default {
             window.removeEventListener('resize', handleResize);
         });
 
-        return { store, isOpen, isDesktop, containerStyle, toggleMenu, handleMobileClick };
+        return { 
+            store, 
+            isOpen, isDesktop, containerStyle, 
+            toggleMenu, handleMobileClick, hardReset 
+        };
     }
 };
