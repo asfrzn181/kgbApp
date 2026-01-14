@@ -9,7 +9,7 @@ import { showToast, showConfirm } from '../utils.js';
 import { TplMasterGolongan } from '../views/MasterGolonganView.js';
 
 export default {
-    template: TplMasterGolongan, // Menggunakan HTML dari View
+    template: TplMasterGolongan, 
     setup() {
         const listData = ref([]);
         const loading = ref(true);
@@ -43,10 +43,14 @@ export default {
         const fetchData = async () => {
             loading.value = true;
             try {
+                // Master Golongan biasanya sedikit (< 100), jadi tarik semua masih aman.
                 const q = query(collection(db, "master_golongan"), orderBy("kode"));
                 const snap = await getDocs(q);
                 listData.value = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            } catch (e) { console.error(e); } 
+            } catch (e) { 
+                console.error(e); 
+                showToast("Gagal memuat data", 'error');
+            } 
             finally { loading.value = false; }
         };
 
@@ -70,6 +74,7 @@ export default {
 
                     // HEADER EXCEL: TIPE, KELOMPOK, KODE, PANGKAT
                     const CHUNK = 300;
+                    let count = 0;
                     for (let i = 0; i < json.length; i += CHUNK) {
                         const batch = writeBatch(db);
                         json.slice(i, i + CHUNK).forEach(row => {
@@ -80,19 +85,23 @@ export default {
 
                             if (tipe && kode) {
                                 // ID Unik: PNS_IIIA
-                                const docId = `${tipe}_${String(kode).replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}`;
+                                const cleanKode = String(kode).trim();
+                                const cleanTipe = String(tipe).toUpperCase().trim();
+                                const docId = `${cleanTipe}_${cleanKode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}`;
+                                
                                 batch.set(doc(db, "master_golongan", docId), {
-                                    tipe: String(tipe).toUpperCase(),
-                                    group: String(group),
-                                    kode: String(kode),
-                                    pangkat: String(pangkat),
+                                    tipe: cleanTipe,
+                                    group: String(group || '').trim(),
+                                    kode: cleanKode,
+                                    pangkat: String(pangkat || '').trim(),
                                     updated_at: serverTimestamp()
                                 }, { merge: true });
+                                count++;
                             }
                         });
                         await batch.commit();
                     }
-                    showToast(`Import ${json.length} data sukses!`);
+                    showToast(`Import ${count} data sukses!`);
                     fetchData();
                 } catch (err) {
                     showToast("Gagal: " + err.message, 'error');
@@ -106,23 +115,30 @@ export default {
 
         // --- 2. RESET DEFAULT (STANDAR BKN) ---
         const resetDefault = async () => {
-            if (!await showConfirm('Reset Data?', 'Database Golongan akan diisi ulang dengan standar BKN.')) return;
+            if (!await showConfirm('Reset Data?', 'Database Golongan akan diisi ulang dengan standar BKN. Data lama akan tertimpa/ditambah.')) return;
             isSaving.value = true;
             try {
                 const batch = writeBatch(db);
+                let count = 0;
+                
                 for (const [tipe, groups] of Object.entries(RAW_DATA)) {
                     for (const [groupName, codes] of Object.entries(groups)) {
                         for (const [kode, pangkatName] of Object.entries(codes)) {
                             const docId = `${tipe}_${kode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}`;
                             batch.set(doc(db, "master_golongan", docId), {
-                                tipe: tipe, group: groupName, kode: kode, pangkat: pangkatName,
+                                tipe: tipe, 
+                                group: groupName, 
+                                kode: kode, 
+                                pangkat: pangkatName,
                                 updated_at: serverTimestamp()
                             });
+                            count++;
                         }
                     }
                 }
+                
                 await batch.commit();
-                showToast(`Data berhasil di-reset!`);
+                showToast(`Data berhasil di-reset (${count} item)!`);
                 fetchData();
             } catch (e) { showToast(e.message, 'error'); } 
             finally { isSaving.value = false; }
@@ -130,19 +146,32 @@ export default {
 
         // --- 3. CRUD MANUAL ---
         const simpanData = async () => {
+            if(!form.kode || !form.pangkat) return showToast("Kode & Pangkat wajib diisi", 'warning');
             isSaving.value = true;
             try {
-                const docId = `${form.tipe}_${form.kode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}`;
-                await setDoc(doc(db, "master_golongan", docId), { ...form, updated_at: serverTimestamp() });
+                const cleanKode = form.kode.trim();
+                const cleanTipe = form.tipe.toUpperCase().trim();
+                const docId = `${cleanTipe}_${cleanKode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}`;
+                
+                await setDoc(doc(db, "master_golongan", docId), { 
+                    ...form, 
+                    tipe: cleanTipe,
+                    kode: cleanKode,
+                    updated_at: serverTimestamp() 
+                });
+                
                 showToast("Tersimpan!"); closeModal(); fetchData();
             } catch (e) { showToast(e.message, 'error'); } 
             finally { isSaving.value = false; }
         };
 
         const hapusData = async (item) => {
-            if (await showConfirm('Hapus?', `Hapus ${item.kode}?`)) {
-                await deleteDoc(doc(db, "master_golongan", item.id));
-                fetchData();
+            if (await showConfirm('Hapus?', `Hapus ${item.kode} - ${item.pangkat}?`)) {
+                try {
+                    await deleteDoc(doc(db, "master_golongan", item.id));
+                    showToast("Terhapus");
+                    fetchData();
+                } catch(e) { showToast(e.message, 'error'); }
             }
         };
 

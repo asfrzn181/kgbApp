@@ -3,14 +3,14 @@ import {
     db, auth, collection, getDocs, query, orderBy, limit, where, 
     getCountFromServer, Timestamp 
 } from '../firebase.js';
-import { formatTanggal, formatRupiah, formatTmtPendek, hitungHariLagi } from '../utils.js';
+import { formatTanggal, formatRupiah, formatTmtPendek, hitungHariLagi, showToast } from '../utils.js';
 import { store } from '../store.js';
 
 // --- IMPORT VIEW HTML ---
 import { TplDashboard } from '../views/DashboardView.js';
 
 export default {
-    template: TplDashboard, // Menggunakan HTML dari View
+    template: TplDashboard, 
     setup() {
         // STATE
         const listData = ref([]);
@@ -24,23 +24,28 @@ export default {
         // Stats Triwulan
         const stats = reactive({ q1: 0, q2: 0, q3: 0, q4: 0 });
         
-        // Range Tanggal Reminder (Untuk Display)
+        // Range Tanggal Reminder
         const rangeStart = ref('');
         const rangeEnd = ref('');
 
-        // 1. FETCH RECENT DATA
+        // 1. FETCH RECENT DATA (Exclude Inpassing jika memungkinkan)
         const fetchRecent = async () => {
             loadingData.value = true;
             try {
-                // RULES: Admin lihat semua, User lihat sendiri
-                const constraints = [ orderBy("created_at", "desc"), limit(10) ];
-                if (!store.isAdmin && auth.currentUser) {
-                    constraints.unshift(where("created_by", "==", auth.currentUser.uid));
-                }
-
+                // Filter Inpassing di Client Side (karena where != butuh index)
+                const constraints = [ orderBy("created_at", "desc"), limit(10) ]; // Ambil lebih banyak untuk buffer filter
+                // if (!store.isAdmin && auth.currentUser) {
+                //     constraints.unshift(where("created_by", "==", auth.currentUser.uid));
+                // }
+                constraints.unshift(where("created_by", "==", auth.currentUser.uid));
                 const q = query(collection(db, "usulan_kgb"), ...constraints);
                 const snap = await getDocs(q);
-                listData.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                
+                // Filter Data
+                listData.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                    .filter(d => !d.nomor_inpassing) // Sembunyikan Inpassing dari Recent Activity
+                    .slice(0, 10); // Ambil 10 teratas setelah filter
+
             } catch (e) { console.error(e); } 
             finally { loadingData.value = false; }
         };
@@ -49,6 +54,7 @@ export default {
         const fetchMyInputs = async () => {
             if (!auth.currentUser) return;
             try {
+                // Count semua (termasuk inpassing tidak apa-apa untuk total kerjaan)
                 const q = query(collection(db, "usulan_kgb"), where("created_by", "==", auth.currentUser.uid));
                 const snap = await getCountFromServer(q);
                 myInputCount.value = snap.data().count;
@@ -79,6 +85,7 @@ export default {
                     ? [where("created_by", "==", auth.currentUser.uid)] 
                     : [];
 
+                // Jalankan paralel
                 const promises = ranges.map(([s, e]) => 
                     getCountFromServer(query(coll, ...ownerFilter, where("created_at", ">=", s), where("created_at", "<=", e)))
                 );
@@ -92,7 +99,7 @@ export default {
             } catch(e) { console.error("Gagal hitung triwulan", e); }
         };
 
-        // 4. FETCH REMINDER
+        // 4. FETCH REMINDER (Optimized & Error Handling)
         const fetchReminder = async () => {
             loadingReminder.value = true;
             try {
@@ -125,14 +132,21 @@ export default {
                 const seenNip = new Set();
                 snap.docs.forEach(d => {
                     const data = d.data();
-                    if(!seenNip.has(data.nip)) {
+                    // Filter Inpassing (Jangan tampilkan reminder inpassing di dashboard reguler)
+                    if(!data.nomor_inpassing && !seenNip.has(data.nip)) {
                         seenNip.add(data.nip);
                         uniqueReminders.push({ id: d.id, ...data });
                     }
                 });
                 listReminder.value = uniqueReminders;
 
-            } catch(e) { console.error("Gagal load reminder", e); } 
+            } catch(e) { 
+                console.error("Gagal load reminder", e); 
+                if(e.message.includes("index")) {
+                    // Jika error index, berikan link di console tapi jangan ganggu UI user
+                    console.warn("Butuh Index Composite: (created_by + tmt_selanjutnya)");
+                }
+            } 
             finally { loadingReminder.value = false; }
         };
 

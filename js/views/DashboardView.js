@@ -7,14 +7,6 @@ export const TplDashboard = `
             <h3 class="fw-bold text-primary mb-1">Dashboard</h3>
             <p class="text-muted small mb-0">Selamat datang, <strong>{{ store.user?.email }}</strong>.</p>
         </div>
-        <div class="d-flex flex-wrap gap-2">
-            <router-link to="/master/pegawai" class="btn btn-light border text-primary shadow-sm flex-fill text-nowrap" v-if="store.isAdmin">
-                <i class="bi bi-database me-1"></i> Data Master
-            </router-link>
-            <router-link to="/transaksi" class="btn btn-primary shadow-sm flex-fill text-nowrap">
-                <i class="bi bi-plus-lg me-1"></i> Input Usulan
-            </router-link>
-        </div>
     </div>
 
     <div class="card border-0 shadow-sm mb-4">

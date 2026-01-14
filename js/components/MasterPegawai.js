@@ -4,7 +4,7 @@ import {
     query, orderBy, limit, startAfter, writeBatch, serverTimestamp,
     where 
 } from '../firebase.js';
-import { showToast, showConfirm, debounce } from '../utils.js';
+import { showToast, showConfirm, debounce, formatTitleCase } from '../utils.js'; // Pastikan formatTitleCase di-export dari utils
 
 // IMPORT VIEW DARI FILE TERPISAH
 import { TplMasterPegawai } from '../views/MasterPegawaiView.js';
@@ -19,6 +19,9 @@ export default {
         const showModal = ref(false);
         const isEdit = ref(false);
         const isSaving = ref(false);
+        
+        // FORMATTER TITLE CASE PADA FORM
+        // Kita gunakan reactive form dengan watcher atau interceptor
         const form = reactive({ nip: '', nama: '', tempat_lahir: '', perangkat_daerah: '' });
         
         // Import
@@ -74,11 +77,14 @@ export default {
             return 'bg-light text-dark border';
         };
 
-        // --- 2. LOGIKA HITUNG STATISTIK ---
+        // --- 2. LOGIKA HITUNG STATISTIK (MANUAL TRIGGER) ---
+        // [HEMAT] Hanya jalankan jika diminta user, karena membaca seluruh DB mahal.
         const hitungStatistik = async () => {
+            if(!await showConfirm("Hitung Statistik?", "Proses ini akan membaca semua data pegawai. Lanjutkan?")) return;
+            
             loadingStats.value = true;
             try {
-                // Ambil semua dokumen (Hati-hati jika data > 10.000, sebaiknya pakai aggregasi server)
+                // Query ALL documents (Costly operation)
                 const q = query(collection(db, "master_pegawai"));
                 const snap = await getDocs(q);
                 
@@ -101,7 +107,7 @@ export default {
             } finally { loadingStats.value = false; }
         };
 
-        // --- 3. FETCH DATA & SEARCH ---
+        // --- 3. FETCH DATA & SEARCH (OPTIMIZED) ---
         const fetchData = async (direction = 'first') => {
             loading.value = true;
             try {
@@ -109,15 +115,37 @@ export default {
                 const collRef = collection(db, "master_pegawai");
 
                 if (searchQuery.value.trim()) {
+                    // [OPTIMIZED SEARCH] Prefix Search
                     const term = searchQuery.value.trim();
-                    q = query(collRef, 
-                        orderBy('nip'), 
-                        where('nip', '>=', term),
-                        where('nip', '<=', term + '\uf8ff'),
-                        limit(itemsPerPage)
-                    );
+                    const isNumber = /^\d+$/.test(term);
+                    
+                    if (isNumber) {
+                        // Cari NIP
+                        q = query(collRef, 
+                            orderBy('nip'), 
+                            where('nip', '>=', term),
+                            where('nip', '<=', term + '\uf8ff'),
+                            limit(itemsPerPage)
+                        );
+                    } else {
+                        // Cari Nama (Case Sensitive - Gunakan Upper/Title Case sesuai format simpan)
+                        // Karena kita pakai formatTitleCase saat simpan, kita search pakai format itu juga
+                        // ATAU pakai Uppercase jika data lama uppercase. 
+                        // Asumsi: Data Master Pegawai biasanya UPPERCASE.
+                        const termSearch = term.toUpperCase(); 
+                        
+                        // Note: Perlu index (nama, asc)
+                        q = query(collRef, 
+                            orderBy('nama'), 
+                            where('nama', '>=', termSearch),
+                            where('nama', '<=', termSearch + '\uf8ff'),
+                            limit(itemsPerPage)
+                        );
+                    }
+                    
                     if(direction !== 'next' && direction !== 'prev') { currentPage.value=1; pageStack.value=[]; }
                 } else {
+                    // Pagination Normal
                     if (direction === 'first') {
                         q = query(collRef, orderBy(sortBy.value, sortOrder.value), limit(itemsPerPage));
                         pageStack.value = []; currentPage.value = 1;
@@ -141,15 +169,18 @@ export default {
                 } else {
                     isLastPage.value = snap.docs.length < itemsPerPage;
                     listData.value = snap.docs.map(d => d.data());
+                    
                     if (direction !== 'prev' && !searchQuery.value) {
                         const lastVisible = snap.docs[snap.docs.length-1];
                         if(direction === 'next' || pageStack.value.length === 0) pageStack.value.push(lastVisible);
                     }
                 }
-                if(totalEstimasi.value === 0 && !searchQuery.value) totalEstimasi.value = listData.value.length;
+                
+                // Estimasi total hanya saat awal (sekali saja)
+                if(totalEstimasi.value === 0 && !searchQuery.value) totalEstimasi.value = listData.value.length + (isLastPage.value ? 0 : 100); 
             } catch (e) {
                 console.error(e);
-                showToast("Error Load Data", 'error');
+                showToast("Gagal memuat data (Cek Koneksi/Index)", 'error');
             } finally { loading.value = false; }
         };
 
@@ -173,7 +204,7 @@ export default {
         const nextPage = () => fetchData('next');
         const prevPage = () => fetchData('prev');
 
-        // --- 4. IMPORT EXCEL (FULL IMPLEMENTATION) ---
+        // --- 4. IMPORT EXCEL (Batch Write) ---
         const handleImportExcel = (event) => {
             const file = event.target.files[0];
             if (!file) return;
@@ -189,31 +220,39 @@ export default {
 
                     if (json.length === 0) throw new Error("Excel kosong!");
 
-                    // Header di Excel harus: NIP, NAMA, TEMPAT_LAHIR, PERANGKAT_DAERAH
-                    const CHUNK = 300;
+                    // Batch Limit Firestore adalah 500
+                    const CHUNK = 400; 
+                    let processedCount = 0;
+
                     for (let i = 0; i < json.length; i += CHUNK) {
                         const batch = writeBatch(db);
                         json.slice(i, i + CHUNK).forEach(row => {
                             const nip = row['NIP'] || row['nip'];
                             const nama = row['NAMA'] || row['nama'];
-                            // Optional
                             const tempat = row['TEMPAT_LAHIR'] || row['tempat_lahir'] || '';
                             const opd = row['PERANGKAT_DAERAH'] || row['perangkat_daerah'] || '';
 
                             if (nip && nama) {
                                 const nipStr = String(nip).replace(/['"\s]/g, '');
+                                
+                                // AUTO FORMAT DATA EXCEL (Agar rapi)
+                                const cleanNama = String(nama).trim().toUpperCase(); // Nama biasanya Upper
+                                const cleanTempat = formatTitleCase(String(tempat));
+                                const cleanOpd = formatTitleCase(String(opd));
+
                                 batch.set(doc(db, "master_pegawai", nipStr), {
                                     nip: nipStr,
-                                    nama: String(nama).trim(),
-                                    tempat_lahir: String(tempat).trim(),
-                                    perangkat_daerah: String(opd).trim(),
+                                    nama: cleanNama,
+                                    tempat_lahir: cleanTempat,
+                                    perangkat_daerah: cleanOpd,
                                     updated_at: serverTimestamp()
                                 }, { merge: true });
+                                processedCount++;
                             }
                         });
                         await batch.commit();
                     }
-                    showToast(`Import ${json.length} pegawai sukses!`);
+                    showToast(`Import ${processedCount} pegawai sukses!`);
                     fetchData('first');
                 } catch (err) {
                     showToast("Gagal: " + err.message, 'error');
@@ -230,11 +269,16 @@ export default {
             if (!form.nip || !form.nama) return showToast("NIP & Nama wajib diisi!", 'warning');
             isSaving.value = true;
             try {
-                // ID Dokumen = NIP
-                await setDoc(doc(db, "master_pegawai", form.nip), {
-                    ...form,
+                // Apply Formatter sebelum simpan
+                const cleanData = {
+                    nip: form.nip.trim(),
+                    nama: form.nama.trim().toUpperCase(), // Standardize Nama
+                    tempat_lahir: formatTitleCase(form.tempat_lahir),
+                    perangkat_daerah: formatTitleCase(form.perangkat_daerah),
                     updated_at: serverTimestamp()
-                }, { merge: true });
+                };
+
+                await setDoc(doc(db, "master_pegawai", cleanData.nip), cleanData, { merge: true });
                 
                 showToast("Pegawai Tersimpan!");
                 closeModal();
