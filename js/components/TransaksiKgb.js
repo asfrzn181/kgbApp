@@ -285,7 +285,7 @@ export default {
                 
                 // 1. Constraint Dasar (Filter User Biasa / Tanggal TMT)
                 const baseConstraints = [];
-                if (!store.isAdmin && auth.currentUser) baseConstraints.push(where("created_by", "==", auth.currentUser.uid));
+                baseConstraints.push(where("created_by", "==", auth.currentUser.uid));
                 
                 // Note: Filter TMT hanya bisa dipakai jika TIDAK sedang searching nama/nip
                 // karena Firestore punya batasan sorting field.
