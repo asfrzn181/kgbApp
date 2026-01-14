@@ -9,6 +9,42 @@ import { store } from '../store.js';
 // --- IMPORT VIEW ---
 import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplAutocompletePerangkatDaerah, TplMain } from '../views/TransaksiKgbView.js';
 
+// ==========================================
+// 1. KONFIGURASI FORMATTER (CHANGE CASE)
+// ==========================================
+const LIST_SINGKATAN = [
+    'UPTD', 'SMP', 'SD', 'RSUD', 'RS', 'TK', 'PAUD', 'BLUD', 
+    'PUSKESMAS', 'SETDA', 'BKPSDMD', 'DPRD', 'KECAMATAN', 'KELURAHAN',
+    'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN' 
+];
+
+const LIST_KECIL = [
+    'dan', 'di', 'ke', 'dari', 'yang', 'pada', 'untuk', 'atau', 'dengan', 'atas', 'oleh'
+];
+
+const formatTitleCase = (text) => {
+    if (!text) return '';
+    const hasTrailingSpace = text.endsWith(' ');
+    const words = text.split(' ');
+    
+    const formatted = words.map((word, index) => {
+        if (!word) return ''; 
+        const upper = word.toUpperCase();
+        const lower = word.toLowerCase();
+
+        // 1. Cek Singkatan (Wajib Besar)
+        if (LIST_SINGKATAN.includes(upper)) return upper;
+
+        // 2. Cek Kata Penghubung (Kecuali kata pertama)
+        if (index > 0 && LIST_KECIL.includes(lower)) return lower;
+
+        // 3. Default: Depan Besar, Belakang Kecil
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join(' ');
+
+    return hasTrailingSpace ? formatted + ' ' : formatted;
+};
+
 // --- SUB-COMPONENTS ---
 const SearchSelect = {
     props: ['options', 'modelValue', 'placeholder', 'labelKey', 'valueKey', 'disabled'],
@@ -51,8 +87,25 @@ const AutocompleteJabatan = {
                 suggestions.value = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             } catch (e) {}
         }, 800);
-        const handleInput = (e) => { emit('update:modelValue', e.target.value); fetchSuggestions(e.target.value); showSuggestions.value = true; };
-        const selectItem = (item) => { emit('update:modelValue', item.nama_jabatan); emit('select', item); showSuggestions.value = false; };
+        
+        // [MODIFIKASI] Apply Formatter
+        const handleInput = (e) => {
+            let val = e.target.value;
+            val = formatTitleCase(val); // Format Text
+            e.target.value = val; // Update UI
+            
+            emit('update:modelValue', val);
+            fetchSuggestions(val); // Fetch dengan keyword yg sudah rapi
+            showSuggestions.value = true;
+        };
+        
+        const selectItem = (item) => { 
+            // Pastikan item yang dipilih juga diformat (jika perlu)
+            const fmt = formatTitleCase(item.nama_jabatan);
+            emit('update:modelValue', fmt); 
+            emit('select', item); 
+            showSuggestions.value = false; 
+        };
         const delayHide = () => setTimeout(() => showSuggestions.value = false, 200);
         return { showSuggestions, suggestions, handleInput, selectItem, delayHide };
     }
@@ -82,8 +135,24 @@ const AutocompleteUnitKerja = {
                 suggestions.value = processSnap(snap, keyword);
             } catch (e) { }
         }, 500);
-        const handleInput = (e) => { emit('update:modelValue', e.target.value); fetchSuggestions(e.target.value); showSuggestions.value = true; };
-        const selectItem = (item) => { emit('update:modelValue', item); showSuggestions.value = false; };
+        
+        // [MODIFIKASI] Apply Formatter
+        const handleInput = (e) => { 
+            let val = e.target.value;
+            val = formatTitleCase(val);
+            e.target.value = val;
+            
+            emit('update:modelValue', val); 
+            fetchSuggestions(val); 
+            showSuggestions.value = true; 
+        };
+        
+        const selectItem = (item) => { 
+            // Format saat dipilih dari suggestion
+            const fmt = formatTitleCase(item);
+            emit('update:modelValue', fmt); 
+            showSuggestions.value = false; 
+        };
         const delayHide = () => setTimeout(() => showSuggestions.value = false, 200);
         return { showSuggestions, suggestions, handleInput, selectItem, delayHide };
     }
@@ -113,8 +182,23 @@ const AutocompletePerangkatDaerah = {
                 suggestions.value = processSnap(snap, keyword);
             } catch (e) { }
         }, 500);
-        const handleInput = (e) => { emit('update:modelValue', e.target.value); fetchSuggestions(e.target.value); showSuggestions.value = true; };
-        const selectItem = (item) => { emit('update:modelValue', item); showSuggestions.value = false; };
+        
+        // [MODIFIKASI] Apply Formatter
+        const handleInput = (e) => { 
+            let val = e.target.value;
+            val = formatTitleCase(val);
+            e.target.value = val;
+
+            emit('update:modelValue', val); 
+            fetchSuggestions(val); 
+            showSuggestions.value = true; 
+        };
+        
+        const selectItem = (item) => { 
+            const fmt = formatTitleCase(item);
+            emit('update:modelValue', fmt); 
+            showSuggestions.value = false; 
+        };
         const delayHide = () => setTimeout(() => showSuggestions.value = false, 200);
         return { showSuggestions, suggestions, handleInput, selectItem, delayHide };
     }
@@ -294,7 +378,7 @@ export default {
                                     pageStack.value = pageStack.value.slice(0, cursorIndex + 1);
                                 }
                                 currentPage.value = pageTarget;
-                            } else { fetchData(1); return; } // Same page
+                            } else { fetchTable(1); return; } // Same page
                         }
                     } else {
                         // Default
@@ -407,12 +491,23 @@ export default {
                 if(snap.exists()){
                     const d=snap.data(); 
                     let finalTgl = d.tgl_lahir; if (!finalTgl || finalTgl === '' || finalTgl === 'Invalid Date') finalTgl = dateFromNip;
+                    
+                    // [MODIFIKASI DISINI]
+                    // Terapkan formatTitleCase saat populate data dari Database
                     Object.assign(form, {
-                        nama:d.nama, tempat_lahir:d.tempat_lahir||'', tgl_lahir: finalTgl, 
-                        perangkat_daerah:d.perangkat_daerah||'', unit_kerja:d.unit_kerja||'', 
-                        jabatan:d.jabatan||'', tipe_asn:d.tipe_asn||'PNS',
+                        nama: d.nama, 
+                        tempat_lahir: d.tempat_lahir||'', 
+                        tgl_lahir: finalTgl, 
+                        
+                        // Apply Formatter:
+                        perangkat_daerah: formatTitleCase(d.perangkat_daerah || ''), 
+                        unit_kerja: formatTitleCase(d.unit_kerja || ''), 
+                        jabatan: formatTitleCase(d.jabatan || ''), 
+                        
+                        tipe_asn: d.tipe_asn || 'PNS',
                         jenis_jabatan: d.jenis_jabatan || 'Pelaksana'
                     });
+
                     if(d.golongan_kode) { form.golongan = d.golongan_kode; handleGolonganChange(d.golongan_kode); }
                     if (d.pangkat) form.pangkat = d.pangkat;
                     if(form.jabatan){
@@ -484,6 +579,11 @@ export default {
                 const safeForm = { ...form }; delete safeForm.eselon; 
                 if (safeForm.jenis_jabatan === undefined) safeForm.jenis_jabatan = 'Pelaksana';
                 if (safeForm.golongan === undefined) safeForm.golongan = '';
+
+                // Apply Title Case to critical fields before saving (just in case)
+                safeForm.jabatan = formatTitleCase(safeForm.jabatan);
+                safeForm.unit_kerja = formatTitleCase(safeForm.unit_kerja);
+                safeForm.perangkat_daerah = formatTitleCase(safeForm.perangkat_daerah);
 
                 const payload = { ...safeForm, ...pjSnap, nama_snapshot: form.nama, jabatan_snapshot: form.jabatan, creator_email: auth.currentUser.email, updated_at: serverTimestamp() };
                 

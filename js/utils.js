@@ -90,3 +90,45 @@ export function hitungHariLagi(targetDateStr) {
     const diffTime = target - today;
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 }
+
+// --- KONFIGURASI FORMATTER ---
+const LIST_SINGKATAN = [
+    'UPTD', 'SMP', 'SD', 'RSUD', 'RS', 'TK', 'PAUD', 'BLUD', 
+    'PUSKESMAS', 'SETDA', 'BKPSDMD', 'DPRD', 'KECAMATAN', 'KELURAHAN'
+];
+
+const LIST_KECIL = [
+    'dan', 'di', 'ke', 'dari', 'yang', 'pada', 'untuk', 'atau', 'dengan'
+];
+
+// --- FUNGSI UTAMA ---
+export const formatTitleCase = (text) => {
+    if (!text) return '';
+    
+    // Deteksi spasi di akhir agar tidak mengganggu saat mengetik
+    const hasTrailingSpace = text.endsWith(' ');
+    
+    const words = text.split(' ');
+    
+    const formatted = words.map((word, index) => {
+        if (!word) return ''; // Skip spasi ganda
+        
+        const upper = word.toUpperCase();
+        const lower = word.toLowerCase();
+
+        // 1. Cek Singkatan (UPTD, SD, dll) - Prioritas Utama
+        if (LIST_SINGKATAN.includes(upper)) {
+            return upper;
+        }
+
+        // 2. Cek Kata Sambung (dan, di, dll) - Kecuali kata pertama
+        if (index > 0 && LIST_KECIL.includes(lower)) {
+            return lower;
+        }
+
+        // 3. Default: Capitalize Each Word (Huruf pertama besar, sisa kecil)
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join(' ');
+
+    return hasTrailingSpace ? formatted + ' ' : formatted;
+};
