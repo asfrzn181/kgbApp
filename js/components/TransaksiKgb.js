@@ -17,7 +17,7 @@ import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplA
 // ==========================================
 const LIST_SINGKATAN = [
     'UPTD', 'SMP', 'SD', 'RSUD', 'TK', 'PAUD', 'BLUD', 
-    'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN' 
+    'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN', "DPRD"
 ];
 
 const LIST_KECIL = [
