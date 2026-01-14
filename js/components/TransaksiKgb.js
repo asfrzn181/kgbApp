@@ -12,6 +12,9 @@ import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplA
 // ==========================================
 // 1. KONFIGURASI FORMATTER (CHANGE CASE)
 // ==========================================
+// ==========================================
+// 1. KONFIGURASI FORMATTER (CHANGE CASE) - PERBAIKAN
+// ==========================================
 const LIST_SINGKATAN = [
     'UPTD', 'SMP', 'SD', 'RSUD', 'TK', 'PAUD', 'BLUD', 
     'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN' 
@@ -23,24 +26,29 @@ const LIST_KECIL = [
 
 const formatTitleCase = (text) => {
     if (!text) return '';
+    
+    // 1. Deteksi spasi di akhir (agar user tetap bisa ngetik spasi)
     const hasTrailingSpace = text.endsWith(' ');
-    const words = text.split(' ');
+    
+    // 2. Split spasi DAN FILTER string kosong
+    // .filter(w => w) ini kuncinya. Dia membuang spasi ganda/kosong hasil split
+    const words = text.split(' ').filter(w => w);
     
     const formatted = words.map((word, index) => {
-        if (!word) return ''; 
         const upper = word.toUpperCase();
         const lower = word.toLowerCase();
 
-        // 1. Cek Singkatan (Wajib Besar)
+        // Cek Singkatan
         if (LIST_SINGKATAN.includes(upper)) return upper;
 
-        // 2. Cek Kata Penghubung (Kecuali kata pertama)
+        // Cek Kata Penghubung (Kecuali kata pertama)
         if (index > 0 && LIST_KECIL.includes(lower)) return lower;
 
-        // 3. Default: Depan Besar, Belakang Kecil
+        // Default: Depan Besar, Belakang Kecil
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    }).join(' ');
+    }).join(' '); // Gabungkan kembali dengan satu spasi
 
+    // 3. Kembalikan spasi di akhir HANYA jika aslinya memang ada spasi
     return hasTrailingSpace ? formatted + ' ' : formatted;
 };
 
