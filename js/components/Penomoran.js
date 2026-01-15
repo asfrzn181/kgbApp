@@ -82,7 +82,7 @@ export default {
         const showPreviewModal = ref(false);
         const previewLoading = ref(false);
         const currentPreviewItem = ref(null);
-        const previewTab = ref('BASAH');
+        const previewTab = ref('TTE');
 
         const customNumberStatus = ref(null);
         const customNumberMsg = ref('');
@@ -473,7 +473,7 @@ export default {
                 if(ps.exists()){ const d = ps.data(); pjp=d.pangkat||pjp; pjj=d.jabatan||pjj; pjn=d.nama||""; pjnip=d.nip||""; } 
             }
             
-            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n" : "\n\n\n\n";
+            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n\n" : "\n\n\n\n";
             let tanggalSurat = item.tanggal_naskah ? formatTanggal(item.tanggal_naskah.toDate ? item.tanggal_naskah.toDate() : new Date(item.tanggal_naskah)) : "....................";
             const mapH = gvd.dasar_hukum || []; 
             const searchKey = item.nomor_inpassing ? "INPASSING" : item.dasar_hukum;

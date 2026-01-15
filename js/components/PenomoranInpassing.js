@@ -82,7 +82,7 @@ export default {
         const showPreviewModal = ref(false);
         const previewLoading = ref(false);
         const currentPreviewItem = ref(null);
-        const previewTab = ref('BASAH');
+        const previewTab = ref('TTE');
 
         // CHECK NUMBER
         const customNumberStatus = ref(null);
@@ -488,7 +488,7 @@ export default {
                 if(ps.exists()){ const d = ps.data(); pjp=d.pangkat||pjp; pjj=d.jabatan||pjj; pjn=d.nama||""; pjnip=d.nip||""; } 
             }
 
-            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n" : "\n\n\n\n";
+            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n\n" : "\n\n\n\n";
             let tanggalSurat = "";
             if (item.tanggal_inpassing_manual) {
                 const tglObj = item.tanggal_inpassing_manual.toDate ? item.tanggal_inpassing_manual.toDate() : new Date(item.tanggal_inpassing_manual);
