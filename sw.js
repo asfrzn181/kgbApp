@@ -2,7 +2,7 @@
 
 // 1. GANTI VERSI INI SETIAP KALI ANDA DEPLOY UPDATE KODE!
 // Contoh: v2.1, v2.2, v2.3 ...
-const CACHE_NAME = 'maspri-v2.1-cache';
+const CACHE_NAME = 'maspri-v2.2-cache';
 
 // Daftar file statis yang mau disimpan agar aplikasi kencang
 const urlsToCache = [
