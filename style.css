@@ -1,0 +1,210 @@
+/* style.css - Theme: Black, White, Red */
+
+:root {
+    /* --- PALET WARNA MERAH --- */
+    --primary-color: #d90429; /* Merah menyala */
+    --primary-hover: #ef233c; /* Merah sedikit lebih terang untuk hover */
+    --primary-dark:  #8d0801; /* Merah gelap untuk gradient */
+    
+    /* --- NETRAL --- */
+    --bg-color: #f4f6f8;      /* Abu sangat muda (hampir putih) */
+    --text-main: #212529;     /* Hitam soft (standar Bootstrap) */
+    --text-muted: #6c757d;    /* Abu-abu teks */
+    
+    /* --- KOMPONEN --- */
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    --radius-md: 8px;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+}
+
+/* --- NAVBAR & MENU (YANG DIPERBAIKI) --- */
+
+.navbar {
+    background: white !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    border-top: 4px solid var(--primary-color); /* Garis merah di atas */
+}
+
+.navbar-brand {
+    color: var(--primary-color) !important;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    text-transform: uppercase;
+}
+
+/* Menu Item Biasa */
+.navbar-light .navbar-nav .nav-link {
+    color: var(--text-main);
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+/* Menu Item saat Hover -> Merah */
+.navbar-light .navbar-nav .nav-link:hover {
+    color: var(--primary-hover);
+}
+
+/* Menu Item AKTIF -> Merah Tebal */
+.navbar-light .navbar-nav .nav-link.active,
+.navbar-light .navbar-nav .show > .nav-link,
+.router-link-active { 
+    color: var(--primary-color) !important;
+    font-weight: 700 !important;
+}
+
+/* Dropdown Item Aktif (Saat dipilih di select) -> Background Merah */
+.dropdown-item.active, 
+.dropdown-item:active {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+}
+
+/* Dropdown Item Hover -> Background Merah Muda */
+.dropdown-item:hover {
+    background-color: #fff0f3; /* Merah sangat muda */
+    color: var(--primary-color);
+}
+
+/* --- COMPONENTS --- */
+
+/* Card */
+.card {
+    border: 1px solid rgba(0,0,0,0.05);
+    border-radius: var(--radius-md);
+    box-shadow: var(--card-shadow);
+    background-color: white;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(217, 4, 41, 0.15); 
+    border-color: rgba(217, 4, 41, 0.2);
+}
+
+/* Tabel */
+.table thead th {
+    background-color: #212529; /* Hitam */
+    color: #ffffff;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: none;
+    padding: 1rem;
+}
+
+.table tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+    color: var(--text-main);
+    border-bottom: 1px solid #e9ecef;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #fff5f5; /* Merah muda saat hover row */
+}
+
+/* Tombol */
+.btn {
+    border-radius: 6px;
+    padding: 0.6rem 1.2rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 12px rgba(217, 4, 41, 0.3);
+}
+
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+    background-color: #b00220 !important; /* Merah gelap */
+    border-color: #b00220 !important;
+    box-shadow: none;
+}
+
+.btn-outline-primary {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Input Form */
+.form-control {
+    border-radius: 6px;
+    padding: 0.7rem 1rem;
+    border: 1px solid #ced4da;
+    background-color: #ffffff;
+    color: var(--text-main);
+}
+
+.form-control:focus {
+    background-color: #fff;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(217, 4, 41, 0.15); 
+}
+
+/* Modal */
+.modal-content {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    border-bottom: 1px solid #e9ecef;
+    background-color: #fff !important;
+    border-radius: 12px 12px 0 0;
+    padding: 1.5rem;
+}
+
+.modal-title {
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+/* --- UTILITY --- */
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #212529 100%) !important;
+    color: white;
+}
+
+.text-primary {
+    color: var(--primary-color) !important;
+}
+
+.text-primary-soft {
+    color: var(--primary-hover);
+}
+
+.badge.bg-primary {
+    background-color: var(--primary-color) !important;
+}
+
+/* Pagination Active State */
+.page-item.active .page-link {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+.page-link {
+    color: var(--primary-color);
+}
