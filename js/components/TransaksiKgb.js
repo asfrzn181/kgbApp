@@ -14,7 +14,7 @@ import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplA
 // ==========================================
 const LIST_SINGKATAN = [
     'UPTD', 'SMP', 'SD', 'RSUD', 'TK', 'PAUD', 'BLUD', 
-    'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN', "DPRD", "PPKN", "IPA", "IPS"
+    'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN', "DPRD", "PPKN", "IPA", "IPS", "TIK"
 ];
 const LIST_KECIL = [
     'dan', 'di', 'ke', 'dari', 'yang', 'pada', 'untuk', 'atau', 'dengan', 'atas', 'oleh'
