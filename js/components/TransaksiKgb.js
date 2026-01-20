@@ -188,7 +188,7 @@ const AutocompletePerangkatDaerah = {
 export default {
     components: { SearchSelect, AutocompleteJabatan, AutocompleteUnitKerja, AutocompletePerangkatDaerah },
     template: TplMain, 
-    setup() {
+    setup(props, { emit }) {
         const listData = ref([]);
         const tableLoading = ref(true);
         const tableSearch = ref('');
@@ -266,6 +266,21 @@ export default {
                 if (selectedMaster.nomor && !form.dasar_nomor) form.dasar_nomor = selectedMaster.nomor;
             }
         });
+
+        watch(() => props.options, (newOptions) => {
+            if (props.modelValue && newOptions.length > 0) {
+                // Cari label yang cocok dengan value yang sudah ada
+                const found = newOptions.find(opt => 
+                    // Sesuaikan logic ini dengan structure data Anda (value-key / id)
+                    (opt[props.valueKey] || opt) === props.modelValue
+                );
+                
+                if (found) {
+                    // Update tampilan label
+                    selectedLabel.value = found[props.labelKey] || found;
+                }
+            }
+        }, { deep: true, immediate: true });
 
         const mapDoc = (d) => {
             const data = d.data();
@@ -729,6 +744,7 @@ export default {
         const nextPage = () => goToPage(currentPage.value + 1);
         const prevPage = () => goToPage(currentPage.value - 1);
 
+        
         onMounted(() => {
             onAuthStateChanged(auth, (user) => { if (user) fetchTable(1); else listData.value = []; });
         });
