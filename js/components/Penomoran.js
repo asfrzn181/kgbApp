@@ -517,7 +517,7 @@ export default {
             showPreviewModal.value = true; previewLoading.value = true; currentPreviewItem.value = logItem; previewTab.value = 'BASAH'; 
             await nextTick(); await renderCurrentPreview();
         };
-        const changePreviewTab = async (tabName) => { previewTab.value = tabName; previLoading.value = true; await nextTick(); await renderCurrentPreview(); };
+        const changePreviewTab = async (tabName) => { previewTab.value = tabName; previewLoading.value = true; await nextTick(); await renderCurrentPreview(); };
         const renderCurrentPreview = async () => {
             try {
                 if(!currentPreviewItem.value) return;

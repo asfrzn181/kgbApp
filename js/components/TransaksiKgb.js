@@ -298,21 +298,24 @@ export default {
                 const limitVal = parseInt(itemsPerPage.value) || 10;
                 let q; 
                 
-                // 1. Constraint Dasar (Filter User Biasa / Tanggal TMT)
+                // 1. Constraint Dasar (Filter User Biasa & Created By)
                 const baseConstraints = [];
-                baseConstraints.push(where("created_by", "==", auth.currentUser.uid));
+                // [PENTING] Jangan lupakan parameter created_by
+                if (auth.currentUser) {
+                    baseConstraints.push(where("created_by", "==", auth.currentUser.uid));
+                }
                 
-                // Note: Filter TMT hanya bisa dipakai jika TIDAK sedang searching nama/nip
-                // karena Firestore punya batasan sorting field.
+                // Cek apakah user sedang memfilter tanggal
                 const isFilteringDate = filterStartDate.value || filterEndDate.value;
 
                 // --- CABANG LOGIKA: SEARCH vs NORMAL ---
                 
                 if (tableSearch.value.trim()) {
+                    // === LOGIKA PENCARIAN (SEARCH) ===
                     const term = tableSearch.value.trim();
                     const isNumber = /^\d+$/.test(term); 
 
-                    let searchConstraints = [...baseConstraints];
+                    let searchConstraints = [...baseConstraints]; // Copy base constraints
 
                     if (isNumber) {
                         // A. Cari NIP (Angka)
@@ -320,11 +323,8 @@ export default {
                         searchConstraints.push(where("nip", ">=", term));
                         searchConstraints.push(where("nip", "<=", term + "\uf8ff"));
                     } else {
-                        // B. Cari Nama (Huruf)
-                        // [PERBAIKAN] Gunakan UPPERCASE agar cocok dengan data ASN umumnya
-                        // Jika data Anda campuran (ada besar/kecil), solusi terbaik adalah 'nama_lower' (lihat bawah)
+                        // B. Cari Nama (Huruf) - Uppercase
                         const termNama = term.toUpperCase(); 
-                        
                         searchConstraints.push(orderBy("nama"));
                         searchConstraints.push(where("nama", ">=", termNama));
                         searchConstraints.push(where("nama", "<=", termNama + "\uf8ff"));
@@ -335,14 +335,23 @@ export default {
                     
                     const snap = await getDocs(q);
                     listData.value = snap.docs.map(mapDoc);
-                    isLastPage.value = true;
+                    isLastPage.value = true; // Search tidak pakai pagination halaman
                     
                 } else {
-                    // === MODE 2: PAGINATION NORMAL (Data Terbaru) ===
+                    // === MODE 2: PAGINATION NORMAL + DATE RANGE created_at ===
                     
                     if (isFilteringDate) {
-                        if (filterStartDate.value) baseConstraints.push(where("tmt_sekarang", ">=", filterStartDate.value));
-                        if (filterEndDate.value) baseConstraints.push(where("tmt_sekarang", "<=", filterEndDate.value));
+                        // [UBAH DISINI] Filter berdasarkan created_at
+                        if (filterStartDate.value) {
+                            const startDate = new Date(filterStartDate.value);
+                            startDate.setHours(0, 0, 0, 0); // Set awal hari (00:00)
+                            baseConstraints.push(where("created_at", ">=", startDate));
+                        }
+                        if (filterEndDate.value) {
+                            const endDate = new Date(filterEndDate.value);
+                            endDate.setHours(23, 59, 59, 999); // Set akhir hari (23:59)
+                            baseConstraints.push(where("created_at", "<=", endDate));
+                        }
                     }
 
                     // Hitung Total (Hanya sekali di awal)
@@ -354,9 +363,8 @@ export default {
                     }
 
                     // Query Dasar (Sort by Created At)
-                    // PENTING: Jika ada filter where(...), orderBy pertama harus field tsb.
-                    // Jika filter TMT aktif -> Order by TMT. Jika tidak -> Order by CreatedAt
-                    const sortField = isFilteringDate ? "tmt_sekarang" : "created_at";
+                    // [PENTING] Karena kita filter range 'created_at', maka sort pertamanya WAJIB 'created_at'
+                    const sortField = "created_at"; 
                     
                     let qConstraints = [
                         ...baseConstraints,
@@ -416,8 +424,8 @@ export default {
                     const link = e.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
                     if(link) {
                         console.warn("Index Required. Click link:", link[0]);
-                        showToast("Sistem sedang mengoptimalkan database (Index). Coba lagi dalam 2 menit.", 'info');
-                        window.open(link[0], '_blank'); // Buka link otomatis biar admin klik create index
+                        showToast("Perlu Index Database Baru. Cek Console (F12) untuk Link.", 'info');
+                        window.open(link[0], '_blank'); 
                     } else {
                         showToast("Perlu Index Database (Cek Console)", 'warning');
                     }
