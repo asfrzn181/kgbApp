@@ -531,10 +531,25 @@ export default {
         const cetakSK = async (logItem) => {
             try {
                 showToast("Menyiapkan download...", 'info');
-                const blob = await generateDocBlob(logItem.usulan_id);
+                
+                // Pastikan generateDocBlob sesuai dengan versi yang Bapak pakai
+                // (Jika pakai versi fix preview saya sebelumnya, tambahkan parameter ke-2: logItem)
+                const blob = await generateDocBlob(logItem.usulan_id, logItem);
+                
                 const prefix = previewTab.value === 'TTE' ? 'DRAFT_TTE_' : 'SK_';
-                window.saveAs(blob, `${prefix}KGB_${logItem.nama_pegawai.replace(/\W/g,'')}.docx`);
-            } catch(e) { showToast("Gagal: " + e.message, 'error'); }
+                
+                // 1. Bersihkan Nama Pegawai (Ambil dari logItem)
+                const safeName = (logItem.nama_pegawai || logItem.nama || 'TanpaNama').replace(/[^a-zA-Z0-9]/g, '_');
+                
+                // 2. Bersihkan Nama Unit Kerja
+                const safeUnit = (logItem.unit_kerja || 'TanpaUnit').replace(/[^a-zA-Z0-9]/g, '_');
+
+                // 3. Gabungkan jadi Nama File
+                window.saveAs(blob, `${prefix}KGB_${safeName}_${safeUnit}.docx`);
+
+            } catch(e) { 
+                showToast("Gagal: " + e.message, 'error'); 
+            }
         };
 
         const openModal = async () => {

@@ -439,15 +439,45 @@ export default {
         watch(tableSearch, debounce(() => fetchTable(1), 800));
         watch(itemsPerPage, () => fetchTable(1));
 
-        const updateStatus = async (item, newStatus) => {
+const updateStatus = async (item, newStatus) => {
             if(!item.id) return showToast("ID Error", "error");
-            const oldStatus = item.status; item.status = newStatus; 
+            
+            // 1. Simpan state lama untuk backup (Rollback)
+            const oldStatus = item.status; 
+            const oldTgl = item.tgl_selesai;
+
+            // 2. UPDATE UI SECARA LOKAL (Optimistic Update)
+            // Ini membuat perubahan terlihat INSTAN di mata user
+            item.status = newStatus;
+
+            // Trik: Set tanggal manual di lokal menggunakan new Date()
+            // agar kolom tanggal langsung terisi tanpa refresh
+            if (newStatus === 'SELESAI') {
+                // Kita mock object biar mirip format Firebase Timestamp { toDate: ... }
+                item.tgl_selesai = { toDate: () => new Date() }; 
+            } else {
+                item.tgl_selesai = null;
+            }
+            
             try {
-                const updateData = { status: newStatus, tgl_selesai: newStatus === 'SELESAI' ? serverTimestamp() : null };
+                // 3. Update ke Server (Background)
+                const updateData = { 
+                    status: newStatus, 
+                    tgl_selesai: newStatus === 'SELESAI' ? serverTimestamp() : null 
+                };
+                
                 await updateDoc(doc(db, "usulan_kgb", item.id), updateData);
                 showToast(newStatus === 'SELESAI' ? "Selesai" : "Proses", "success");
-                fetchTable(currentPage.value); 
-            } catch (e) { item.status = oldStatus; showToast("Gagal update", "error"); }
+                
+                // [HAPUS BARIS INI]
+                // fetchTable(currentPage.value); <--- Tidak perlu load ulang, hemat kuota!
+                
+            } catch (e) { 
+                // 4. Jika Server Gagal, Kembalikan ke Semula
+                item.status = oldStatus;
+                item.tgl_selesai = oldTgl;
+                showToast("Gagal update", "error"); 
+            }
         };
 
         // --- INIT REFS (HEMAT & CACHE) ---
@@ -738,15 +768,26 @@ export default {
 
         const closePreview = () => { showPreviewModal.value = false; currentPreviewItem.value = null; };
         const downloadFromPreview = async () => { if(currentPreviewItem.value) cetakSK(currentPreviewItem.value); };
-
         const cetakSK = async (item) => {
             try {
                 showToast("Menyiapkan...", 'info');
                 const blob = await generateDocBlob(item);
+                
                 const prefix = previewTab.value === 'TTE' ? 'DRAFT_TTE_' : 'SK_';
-                const safeName = (item.nama || 'doc').replace(/[^a-zA-Z0-9]/g,'_');
-                window.saveAs(blob, `${prefix}KGB_${safeName}.docx`);
-            } catch(e) { showToast("Gagal: " + e.message, 'error'); }
+                
+                // 1. Bersihkan Nama Pegawai (Hanya huruf & angka, spasi jadi _)
+                const safeName = (item.nama || 'TanpaNama').replace(/[^a-zA-Z0-9]/g, '_');
+                
+                // 2. Bersihkan Nama Unit Kerja (Baru)
+                // Jika unit kerja panjang, kita ambil depannya saja atau biarkan full tapi dibersihkan
+                const safeUnit = (item.unit_kerja || 'TanpaUnit').replace(/[^a-zA-Z0-9]/g, '_');
+
+                // 3. Gabungkan: SK_KGB_NamaPegawai_NamaUnit.docx
+                window.saveAs(blob, `${prefix}KGB_${safeName}_${safeUnit}.docx`);
+
+            } catch(e) { 
+                showToast("Gagal: " + e.message, 'error'); 
+            }
         };
 
         const nextPage = () => goToPage(currentPage.value + 1);
