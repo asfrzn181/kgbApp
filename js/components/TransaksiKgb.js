@@ -12,7 +12,7 @@ import { srikandiBookmarklet } from '../bookmartScript.js';
 // ==========================================
 const LIST_SINGKATAN = [
     'UPTD', 'SMP', 'SD', 'RSUD', 'TK', 'PAUD', 'BLUD', 
-    'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN', "DPRD", "PPKN", "IPA", "IPS", "TIK"
+    'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN', "DPRD", "PPKN", "IPA", "IPS", "TIK","SDM","SDMD","BKPSDMD","TPA","PPI"
 ];
 const LIST_KECIL = [
     'dan', 'di', 'ke', 'dari', 'yang', 'pada', 'untuk', 'atau', 'dengan', 'atas', 'oleh'
@@ -32,7 +32,7 @@ const formatTitleCase = (text) => {
 
 // HAPUS import firebase storage, kita tidak butuh lagi.
 
-
+const masterLoading = ref(false);
 
 // --- SUB-COMPONENTS (Sama, logic formatTitleCase di dalamnya otomatis pakai yg baru) ---
 const SearchSelect = {
@@ -42,22 +42,44 @@ const SearchSelect = {
     setup(props, { emit }) {
         const isOpen = ref(false);
         const search = ref('');
+        
         const getKey = (opt) => props.valueKey ? opt[props.valueKey] : opt;
         const getLabel = (opt) => props.labelKey ? opt[props.labelKey] : opt;
+        
+        // ⭐ FIX: Gunakan computed agar auto-update
         const safeOptions = computed(() => {
             const opts = props.options || []; 
             if (!search.value) return opts;
-            return opts.filter(opt => String(getLabel(opt)).toLowerCase().includes(search.value.toLowerCase()));
+            return opts.filter(opt => 
+                String(getLabel(opt)).toLowerCase().includes(search.value.toLowerCase())
+            );
         });
+        
+        // ⭐ FIX: selectedLabel jadi computed yang reactive
         const selectedLabel = computed(() => {
             const opts = props.options || [];
+            if (!opts.length) return null; // Guard untuk options kosong
+            
             const found = opts.find(opt => getKey(opt) === props.modelValue);
             return found ? getLabel(found) : null;
         });
+        
         const selectOpt = (opt) => {
-            emit('update:modelValue', getKey(opt)); emit('change', opt); isOpen.value = false; search.value = '';
+            emit('update:modelValue', getKey(opt)); 
+            emit('change', opt); 
+            isOpen.value = false; 
+            search.value = '';
         };
-        return { isOpen, search, safeOptions, selectedLabel, selectOpt, getKey, getLabel };
+        
+        return { 
+            isOpen, 
+            search, 
+            safeOptions, 
+            selectedLabel, // ⭐ Sudah reactive via computed
+            selectOpt, 
+            getKey, 
+            getLabel 
+        };
     }
 };
 
@@ -260,14 +282,16 @@ export default {
             return pages;
         });
 
-        watch(() => form.dasar_hukum, (newVal) => {
-            if (!newVal || listDasarHukum.value.length === 0) return;
-            const selectedMaster = listDasarHukum.value.find(item => item.judul === newVal);
-            if (selectedMaster) {
-                if (selectedMaster.pejabat) form.dasar_pejabat = selectedMaster.pejabat;
-                if (selectedMaster.nomor && !form.dasar_nomor) form.dasar_nomor = selectedMaster.nomor;
-            }
-        });
+        // watch(() => form.dasar_hukum, (newVal) => {
+        //     if (!newVal || listDasarHukum.value.length === 0) return;
+        //     const selectedMaster = listDasarHukum.value.find(item => item.judul === newVal);
+        //     if (selectedMaster) {
+        //         if (selectedMaster.pejabat) form.dasar_pejabat = selectedMaster.pejabat;
+        //         if (selectedMaster.nomor && !form.dasar_nomor) form.dasar_nomor = selectedMaster.nomor;
+        //     }
+        // });
+
+        
 
         watch(() => props.options, (newOptions) => {
             if (props.modelValue && newOptions.length > 0) {
@@ -484,6 +508,7 @@ const updateStatus = async (item, newStatus) => {
 
         // --- INIT REFS (HEMAT & CACHE) ---
         const initRefs = async () => {
+            
             // Cek Cache Data Master
             if (listGolongan.value.length === 0) {
                 const qGol = query(collection(db, "master_golongan"), orderBy("kode"));
@@ -592,7 +617,6 @@ const updateStatus = async (item, newStatus) => {
         };
 
         const openModal = (item=null) => {
-            initRefs(); // Load Data (Cached)
             if(item){ 
                 if(!item.id) { showToast("ID Error", 'error'); return; }
                 isEditMode.value=true; formId.value=item.id; Object.assign(form,item); 
@@ -749,7 +773,7 @@ const updateStatus = async (item, newStatus) => {
 
         const previewSK = async (item) => {
             if (!window.docx) return showToast("Library Preview Missing", 'error');
-            showPreviewModal.value = true; previewLoading.value = true; currentPreviewItem.value = item; previewTab.value = 'BASAH'; 
+            showPreviewModal.value = true; previewLoading.value = true; currentPreviewItem.value = item; previewTab.value = 'TTE'; 
             await nextTick(); 
             try {
                 if(!currentPreviewItem.value) return;
@@ -846,18 +870,18 @@ const updateStatus = async (item, newStatus) => {
         // Fungsi untuk Copy ke Clipboard
         const copyCode = async () => {
             try {
-                if (!srikandiBookmartlet) {
+                if (!srikandiBookmarklet) {
                     alert("Script kosong! Cek import file.");
                     return;
                 }
 
                 // Coba cara modern (Clipboard API)
                 if (navigator.clipboard && window.isSecureContext) {
-                    await navigator.clipboard.writeText(srikandiBookmartlet);
+                    await navigator.clipboard.writeText(srikandiBookmarklet);
                 } else {
                     // Fallback untuk browser lama / Non-HTTPS
                     const textArea = document.createElement("textarea");
-                    textArea.value = srikandiBookmartlet;
+                    textArea.value = srikandiBookmarklet;
                     textArea.style.position = "fixed";
                     textArea.style.left = "-9999px";
                     document.body.appendChild(textArea);
@@ -903,7 +927,14 @@ const updateStatus = async (item, newStatus) => {
 
         
         onMounted(() => {
-            onAuthStateChanged(auth, (user) => { if (user) fetchTable(1); else listData.value = []; });
+            onAuthStateChanged(auth, (user) => { 
+                if (user) {
+                    initRefs(); // ⭐ Panggil di sini
+                    fetchTable(1); 
+                } else {
+                    listData.value = []; 
+                }
+            });
         });
         
         return { 
@@ -914,7 +945,7 @@ const updateStatus = async (item, newStatus) => {
             nextPage, prevPage, fetchTable, goToPage, openModal, closeModal, simpanTransaksi, hapusTransaksi, cetakSK, 
             handleNipInput, cariGajiBaru, cariGajiLama, handleGolonganChange, handleJabatanSelect, formatRupiah, formatTanggal,
             showPreviewModal, previewLoading, previewSK, closePreview, downloadFromPreview,
-            previewTab, changePreviewTab, updateStatus, setTmtPensiun,openSrikandi
+            previewTab, changePreviewTab, updateStatus, setTmtPensiun,openSrikandi, copyCode
         };
     }
 };

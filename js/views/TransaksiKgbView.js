@@ -86,13 +86,19 @@ export const TplMain = `
                 <h3 class="fw-bold text-primary mb-1">Data Usulan KGB</h3>
                 <p class="text-muted small mb-0">Manajemen usulan kenaikan gaji berkala.</p>
             </div>
-            <button @click="openModal()" class="btn btn-primary shadow-sm text-nowrap w-100 w-md-auto">
-                <i class="bi bi-plus-lg me-2"></i> Input Baru
-            </button>
-
-                        <button @click="copyCode()" class="btn btn-primary shadow-sm text-nowrap w-100 w-md-auto">
-                <i class="bi bi-plus-lg me-2"></i> copy
-            </button>
+            
+            <!-- ⭐ Button Group dengan Proporsi Berbeda -->
+            <div class="d-flex gap-2 w-100 w-md-auto">
+                <!-- Button Input Baru: Lebih Besar -->
+                <button @click="openModal()" class="btn btn-primary shadow-sm text-nowrap px-4 py-2 fw-semibold" style="flex: 2;">
+                    <i class="bi bi-plus-lg me-2"></i> Input Baru
+                </button>
+                
+                <!-- Button Copy: Lebih Kecil -->
+                <button @click="copyCode()" class="btn btn-outline-secondary shadow-sm text-nowrap px-3 py-2 btn-sm" style="flex: 1;" title="Copy Bookmarklet Code">
+                    <i class="bi bi-clipboard me-2"></i> Copy Code
+                </button>
+            </div>
         </div>
 
         <div class="card shadow-sm border-0">
@@ -333,7 +339,7 @@ export const TplMain = `
                         
                         <div class="card shadow-sm border-0 border-start border-4 border-success mb-3"><div class="card-header bg-success bg-opacity-10 py-3"><h6 class="fw-bold text-success mb-0">3. Penetapan Gaji Baru</h6></div><div class="card-body"><div class="row g-3"><div class="col-12 col-md-4"><label class="form-label small fw-bold">Golongan Baru</label><SearchSelect :options="filteredGolongan" v-model="form.golongan" label-key="label_full" value-key="kode" placeholder="Pilih..." @change="handleGolonganChange" /></div><div class="col-6 col-md-2"><label class="form-label small fw-bold">MK Thn</label><input v-model.number="form.mk_baru_tahun" type="number" class="form-control fw-bold"></div><div class="col-6 col-md-2"><label class="form-label small fw-bold">MK Bln</label><input v-model.number="form.mk_baru_bulan" type="number" class="form-control"></div><div class="col-12 col-md-4"><label class="form-label small fw-bold text-success">Gaji Pokok Baru</label><div class="input-group"><input :value="formatRupiah(form.gaji_baru)" class="form-control bg-success text-white fw-bold" readonly><button type="button" @click="cariGajiBaru" class="btn btn-outline-success"><i class="bi bi-arrow-clockwise"></i></button></div></div><div class="col-12"><hr></div><div v-if="form.tipe_asn === 'PPPK'" class="col-12 bg-warning bg-opacity-10 p-3 rounded border border-warning mb-3"><div class="row g-3"><div class="col-12 col-md-6"><label class="form-label small fw-bold">Masa Perjanjian</label><input v-model="form.masa_perjanjian" class="form-control"></div><div class="col-12 col-md-6"><label class="form-label small fw-bold">Perpanjangan</label><input v-model="form.perpanjangan_perjanjian" class="form-control"></div></div></div><div class="col-12 col-md-3"><label class="form-label small fw-bold">TMT Sekarang</label><input v-model="form.tmt_sekarang" type="date" class="form-control" required></div><div class="col-12 col-md-4"><label class="form-label small text-muted">TMT YAD</label><div class="input-group"><input v-model="form.tmt_selanjutnya" type="date" class="form-control bg-white"><button type="button" @click="setTmtPensiun" class="btn btn-danger text-white btn-sm fw-bold"><i class="bi bi-stop-circle me-1"></i> STOP</button></div><div class="small text-danger fw-bold mt-1" v-if="pensiunMsg">{{ pensiunMsg }}</div></div><div class="col-12 col-md-5"><label class="form-label small fw-bold text-primary">Pejabat TTD</label><SearchSelect :options="listPejabat" v-model="form.pejabat_baru_nip" label-key="jabatan" value-key="nip" /></div></div></div></div>
                         
-                        <div class="card shadow-sm border-0 border-start border-4 border-danger"><div class="card-body py-2"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" v-model="form.is_pensiun_manual" id="manualPensiunCheck"><label class="form-check-label small fw-bold text-danger" for="manualPensiunCheck">Set Status: Berhenti Berkala (Pensiun/Meninggal)</label></div></div></div>
+                        <div class="card shadow-sm border-0 border-start border-4 border-danger"><div class="card-body py-2"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" v-model="form.is_pensiun_manual" id="manualPensiunCheck"><label class="form-check-label small fw-bold text-danger" for="manualPensiunCheck">Set Status: Berhenti Berkala (Pensiun/Meninggal/Berakhirnya masa KGB)</label></div></div></div>
                     </form>
                 </div>
                 <div class="modal-footer bg-white">
