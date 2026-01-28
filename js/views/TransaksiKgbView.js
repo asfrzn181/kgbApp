@@ -170,13 +170,23 @@ export const TplMain = `
                                             </div>
                                         </td>
 
-                                        <td class="text-end pe-4">
-                                            <div class="btn-group btn-group-sm">
-                                                <button @click="previewSK(item)" class="btn btn-light border text-primary" title="Preview"><i class="bi bi-eye"></i></button>
-                                                <button @click="openModal(item)" class="btn btn-light border text-secondary" title="Edit"><i class="bi bi-pencil"></i></button>
-                                                <button  @click="hapusTransaksi(item)" class="btn btn-light border text-danger" title="Hapus"><i class="bi bi-trash"></i></button>
-                                            </div>
-                                        </td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button @click="previewSK(item)" class="btn btn-light border text-primary" title="Preview">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            
+                                            <button @click="openModal(item)" class="btn btn-light border text-secondary" title="Edit">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+
+                                            <button @click="openSrikandi(item)" class="btn btn-light border text-success" title="Kirim ke Srikandi">
+                                                <i class="bi bi-send-fill"></i>
+                                            </button>
+
+                                            <button @click="hapusTransaksi(item)" class="btn btn-light border text-danger" title="Hapus">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
                                     </tr>
                                     
                                     <tr v-if="isExpanded(item.id)" class="bg-light border-bottom fade-in">
@@ -242,9 +252,21 @@ export const TplMain = `
                                     </div>
 
                                     <div class="btn-group btn-group-sm">
-                                        <button @click="previewSK(item)" class="btn btn-outline-primary"><i class="bi bi-eye"></i></button>
-                                        <button @click="openModal(item)" class="btn btn-outline-secondary"><i class="bi bi-pencil"></i></button>
-                                        <button  @click="hapusTransaksi(item)" class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                        <button @click="previewSK(item)" class="btn btn-light border text-primary" title="Preview">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        
+                                        <button @click="openModal(item)" class="btn btn-light border text-secondary" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+
+                                        <button @click="openSrikandi(item)" class="btn btn-light border text-success" title="Kirim ke Srikandi">
+                                            <i class="bi bi-send-fill"></i>
+                                        </button>
+
+                                        <button @click="hapusTransaksi(item)" class="btn btn-light border text-danger" title="Hapus">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
                                     </div>
                                 </div>
                             </div>

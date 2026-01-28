@@ -4,9 +4,7 @@ import {
     query, orderBy, limit, startAfter, where, serverTimestamp, onAuthStateChanged 
 } from '../firebase.js';
 import { showToast, showConfirm, debounce, formatRupiah, formatTanggal } from '../utils.js';
-import { store } from '../store.js';
 
-// --- IMPORT VIEW ---
 import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplAutocompletePerangkatDaerah, TplMain } from '../views/TransaksiKgbView.js';
 
 // ==========================================
@@ -31,6 +29,10 @@ const formatTitleCase = (text) => {
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     });
 };
+
+// HAPUS import firebase storage, kita tidak butuh lagi.
+
+
 
 // --- SUB-COMPONENTS (Sama, logic formatTitleCase di dalamnya otomatis pakai yg baru) ---
 const SearchSelect = {
@@ -662,6 +664,7 @@ const updateStatus = async (item, newStatus) => {
         // --- PREVIEW & DOWNLOAD (HEMAT VERSION) ---
         const generateDocBlob = async (item) => {
             if (!window.PizZip || !window.docxtemplater) throw new Error("Lib Error");
+            console.table(item);
             const tplId = item.tipe_asn === 'PPPK' ? "PPPK" : "PNS"; 
             
             // [HEMAT] GUNAKAN CACHE TEMPLATE (Jika belum ada baru fetch)
@@ -765,6 +768,80 @@ const updateStatus = async (item, newStatus) => {
                 if(container) { container.innerHTML = ''; await window.docx.renderAsync(blob, container); }
             } catch(e){} finally{ previewLoading.value=false; }
         };
+        const openSrikandi = async (item) => {
+            console.table(item);
+            try {
+                showToast("Menyiapkan data...", "info");
+
+                // 1. GENERATE FILE
+                const docBlob = await generateDocBlob(item);
+                const reader = new FileReader();
+                reader.readAsDataURL(docBlob);
+                
+                reader.onloadend = () => {
+                    const base64data = reader.result;
+
+                    // 2. LOGIKA DATA
+                    const gol = (item.golongan || '').trim().toUpperCase();
+                    const isGol4 = gol.startsWith('IV') || gol.startsWith('4');
+
+                    // A. Penandatangan (Logic Golongan)
+                    // Jika IV -> Asisten, Jika tidak -> Kaban
+                    let penandatangan = isGol4 ? "ASISTEN ADMINISTRASI" : "KEPALA BADAN KEPEGAWAIAN";
+
+                    // B. Verifikator (URUTAN: Mutasi -> Sekretaris -> [Kaban])
+                    // GUNAKAN NAMA JABATAN YANG BAKU DI SRIKANDI
+                    let listVerifikator = [
+                        "BIDANG MUTASI",   
+                        "SEKRETARIS"        
+                    ];
+
+                    // Jika Gol IV, tambah Kepala Badan sebagai verifikator ke-3
+                    if (isGol4) {
+                        listVerifikator.push("KEPALA BADAN KEPEGAWAIAN");
+                    }
+                    
+                    // Gabung jadi satu string: "Mutasi|Sekretaris|Kaban"
+                    const verifikatorString = listVerifikator.join('|');
+
+                    // C. Tujuan / Dikirimkan Melalui (HANYA SATU)
+                    const tujuanString = "Badan Kepegawaian dan Pengembangan Sumber Daya Manusia";
+
+                    // 3. KIRIM
+                    const params = new URLSearchParams({
+                        action: 'autofill_magic',
+                        
+                        fill_hal: `Kenaikan Gaji Berkala a.n ${item.nama}`,
+                        fill_ringkasan: `Usulan KGB Tahun ${new Date().getFullYear()} a.n ${item.nama}, ${item.pangkat}, ${item.golongan}.`,
+                        fill_nomor: item.nomor_naskah || "NOMOR KOSONG",
+                        
+                        fill_penandatangan: penandatangan,
+                        fill_verifikator: verifikatorString, // String gabungan
+                        fill_tujuan: tujuanString,           // String tunggal
+                        
+                        transfer_mode: 'direct_post_message', 
+                        file_name: `SK_KGB_${item.nama.replace(/[^a-zA-Z0-9]/g,'_')}.docx`
+                    });
+
+                    const srikandiUrl = `https://srikandi.arsip.go.id/pembuatan-naskah-keluar/registrasi-naskah-keluar?${params.toString()}`;
+                    const popup = window.open(srikandiUrl, '_blank'); 
+
+                    // 4. LISTENER
+                    const messageHandler = (event) => {
+                        if (event.data === "SRIKANDI_READY_TO_RECEIVE") {
+                            popup.postMessage({
+                                type: 'FILE_TRANSFER',
+                                fileData: base64data,
+                                fileName: `SK_KGB_${item.nama.replace(/[^a-zA-Z0-9]/g,'_')}.docx`
+                            }, '*');
+                            window.removeEventListener('message', messageHandler);
+                        }
+                    };
+                    window.addEventListener('message', messageHandler);
+                };
+
+            } catch (e) { console.error(e); }
+        };
 
         const closePreview = () => { showPreviewModal.value = false; currentPreviewItem.value = null; };
         const downloadFromPreview = async () => { if(currentPreviewItem.value) cetakSK(currentPreviewItem.value); };
@@ -806,7 +883,7 @@ const updateStatus = async (item, newStatus) => {
             nextPage, prevPage, fetchTable, goToPage, openModal, closeModal, simpanTransaksi, hapusTransaksi, cetakSK, 
             handleNipInput, cariGajiBaru, cariGajiLama, handleGolonganChange, handleJabatanSelect, formatRupiah, formatTanggal,
             showPreviewModal, previewLoading, previewSK, closePreview, downloadFromPreview,
-            previewTab, changePreviewTab, updateStatus, setTmtPensiun 
+            previewTab, changePreviewTab, updateStatus, setTmtPensiun,openSrikandi
         };
     }
 };
