@@ -243,7 +243,7 @@ export default {
 
         const fetchUsulanList = async () => {
             try {
-                let constraints = [orderBy("created_at", "desc"), limit(150)]; // [HEMAT] Batasi 100 usulan terbaru saja
+                let constraints = [orderBy("created_at", "asc"), limit(100)]; // [HEMAT] Batasi 100 usulan terbaru saja
                 // if (!store.isAdmin && auth.currentUser) {
                 //     constraints.push(where("created_by", "==", auth.currentUser.uid));
                 // }

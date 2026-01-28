@@ -89,6 +89,10 @@ export const TplMain = `
             <button @click="openModal()" class="btn btn-primary shadow-sm text-nowrap w-100 w-md-auto">
                 <i class="bi bi-plus-lg me-2"></i> Input Baru
             </button>
+
+                        <button @click="copyCode()" class="btn btn-primary shadow-sm text-nowrap w-100 w-md-auto">
+                <i class="bi bi-plus-lg me-2"></i> copy
+            </button>
         </div>
 
         <div class="card shadow-sm border-0">

@@ -6,7 +6,7 @@ import {
 import { showToast, showConfirm, debounce, formatRupiah, formatTanggal } from '../utils.js';
 
 import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplAutocompletePerangkatDaerah, TplMain } from '../views/TransaksiKgbView.js';
-
+import { srikandiBookmarklet } from '../bookmartScript.js';
 // ==========================================
 // 1. FORMATTER SAFE MODE (FIXED SPASI)
 // ==========================================
@@ -769,7 +769,7 @@ const updateStatus = async (item, newStatus) => {
             } catch(e){} finally{ previewLoading.value=false; }
         };
         const openSrikandi = async (item) => {
-            console.table(item);
+            previewTab.value = 'TTE'; 
             try {
                 showToast("Menyiapkan data...", "info");
 
@@ -841,6 +841,37 @@ const updateStatus = async (item, newStatus) => {
                 };
 
             } catch (e) { console.error(e); }
+        };
+
+        // Fungsi untuk Copy ke Clipboard
+        const copyCode = async () => {
+            try {
+                if (!srikandiBookmartlet) {
+                    alert("Script kosong! Cek import file.");
+                    return;
+                }
+
+                // Coba cara modern (Clipboard API)
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(srikandiBookmartlet);
+                } else {
+                    // Fallback untuk browser lama / Non-HTTPS
+                    const textArea = document.createElement("textarea");
+                    textArea.value = srikandiBookmartlet;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-9999px";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                }
+
+                alert("SUKSES COPY!\n\nSilakan Paste di Edit Bookmark.");
+            } catch (err) {
+                console.error("Error copy:", err);
+                alert("Gagal copy: " + err);
+            }
         };
 
         const closePreview = () => { showPreviewModal.value = false; currentPreviewItem.value = null; };
