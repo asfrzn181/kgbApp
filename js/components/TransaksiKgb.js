@@ -6,7 +6,7 @@ import {
 import { showToast, showConfirm, debounce, formatRupiah, formatTanggal } from '../utils.js';
 
 import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplAutocompletePerangkatDaerah, TplMain } from '../views/TransaksiKgbView.js';
-import { srikandiBookmarklet } from '../bookmartScript.js';
+import { srikandiBookmarklet, downloadSrikandiBookmartlet } from '../bookmartScript.js';
 // ==========================================
 // 1. FORMATTER SAFE MODE (FIXED SPASI)
 // ==========================================
@@ -242,7 +242,8 @@ export default {
         const searchMsg = ref('');
         const gajiMsg = ref('');
         const formId = ref(null);
-        
+        const selectedNaskah = ref([]);
+
         // CACHE DATA (Untuk Hemat Read di Preview)
         const listGolongan = ref([]); 
         const listDasarHukum = ref([]);
@@ -282,6 +283,16 @@ export default {
             return pages;
         });
 
+        const isAllPageSelected = computed(() => {
+            // Ambil item valid di halaman ini
+            const pageItems = listData.value.filter(i => i.status === 'SELESAI' && i.nomor_naskah);
+            
+            if (pageItems.length === 0) return false;
+
+            // Cek apakah semua item tersebut ada di selectedNaskah
+            return pageItems.every(item => selectedNaskah.value.includes(item.nomor_naskah));
+        });
+
         // watch(() => form.dasar_hukum, (newVal) => {
         //     if (!newVal || listDasarHukum.value.length === 0) return;
         //     const selectedMaster = listDasarHukum.value.find(item => item.judul === newVal);
@@ -318,6 +329,7 @@ export default {
 
         // --- FETCH TABLE (OPTIMIZED SEARCH & PAGINATION) ---
         const fetchTable = async (pageTarget) => {
+
             tableLoading.value = true;
             try {
                 const collRef = collection(db, "usulan_kgb"); 
@@ -867,6 +879,88 @@ const updateStatus = async (item, newStatus) => {
             } catch (e) { console.error(e); }
         };
 
+        const toggleSelection = (nomorNaskah) => {
+            if (selectedNaskah.value.includes(nomorNaskah)) {
+                // Uncheck (Hapus dari array)
+                selectedNaskah.value = selectedNaskah.value.filter(n => n !== nomorNaskah);
+            } else {
+                // Check (Masukan ke array)
+                selectedNaskah.value.push(nomorNaskah);
+            }
+        };
+
+        // 2. Pilih Semua (Select All)
+        // Ganti fungsi toggleSelectAll dengan ini:
+        const toggleSelectAll = (e) => {
+            const isChecked = e.target.checked;
+            
+            // Ambil hanya item yang valid di HALAMAN INI SAJA
+            const currentPageIds = listData.value
+                .filter(i => i.status === 'SELESAI' && i.nomor_naskah)
+                .map(i => i.nomor_naskah);
+
+            if (isChecked) {
+                // LOGIKA GABUNG (MERGE): Data Lama + Data Halaman Ini
+                // Set digunakan untuk mencegah duplikat otomatis
+                const combined = new Set([...selectedNaskah.value, ...currentPageIds]);
+                selectedNaskah.value = Array.from(combined);
+            } else {
+                // LOGIKA HAPUS PARSIAL: Hapus item halaman ini saja, sisanya biarkan
+                selectedNaskah.value = selectedNaskah.value.filter(
+                    id => !currentPageIds.includes(id)
+                );
+            }
+        };
+
+        // 3. Eksekusi Robot (Buka Srikandi & Kirim Data)
+        const openBotDownloader = () => {
+            // Validasi
+            if (selectedNaskah.value.length === 0) {
+                showToast("Harap centang minimal satu data yang sudah Selesai!", "warning");
+                return;
+            }
+
+            // A. Siapkan Paket Data
+            const dataPaket = {
+                type: 'DATA_NASKAH_KGB', // Password agar data tidak tertukar
+                list: JSON.parse(JSON.stringify(selectedNaskah.value)) // Copy murni agar aman
+            };
+
+            // B. Buka Srikandi di Tab Baru (Target Window)
+            // 'srikandiBotTarget' adalah nama window agar browser tidak spam tab baru
+            const srikandiWindow = window.open(
+                'https://srikandi.arsip.go.id/pembuatan-naskah-keluar/naskah-keluar', 
+                'srikandiBotTarget' 
+            );
+
+            if (!srikandiWindow) {
+                showToast("Pop-up diblokir browser! Izinkan pop-up.", "error");
+                return;
+            }
+
+            showToast("Menghubungkan ke Robot...", "info");
+
+            // C. Pasang Telinga (Listener)
+            // Kita menunggu Bookmarklet di Srikandi berteriak "SRIKANDI_BOT_READY"
+            const messageHandler = (event) => {
+                // Terima pesan dari Bookmarklet
+                if (event.data === "SRIKANDI_BOT_READY") {
+                    console.log("🤖 Robot tersambung! Mengirim paket data...");
+                    
+                    // KIRIM DATA VIA JALUR BELAKANG (POST MESSAGE)
+                    srikandiWindow.postMessage(dataPaket, "*");
+                    
+                    showToast(`Tersambung! Mengirim ${selectedNaskah.value.length} data...`, "success");
+                    
+                    // Lepas listener agar hemat memori setelah selesai kirim
+                    window.removeEventListener("message", messageHandler);
+                }
+            };
+
+            // Aktifkan pendengaran
+            window.addEventListener("message", messageHandler);
+        };
+
         // Fungsi untuk Copy ke Clipboard
         const copyCode = async () => {
             try {
@@ -882,6 +976,36 @@ const updateStatus = async (item, newStatus) => {
                     // Fallback untuk browser lama / Non-HTTPS
                     const textArea = document.createElement("textarea");
                     textArea.value = srikandiBookmarklet;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-9999px";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                }
+
+                alert("SUKSES COPY!\n\nSilakan Paste di Edit Bookmark.");
+            } catch (err) {
+                console.error("Error copy:", err);
+                alert("Gagal copy: " + err);
+            }
+        };
+
+        const copyCodeDownloadSrikandi = async () => {
+            try {
+                if (!downloadSrikandiBookmartlet) {
+                    alert("Script kosong! Cek import file.");
+                    return;
+                }
+
+                // Coba cara modern (Clipboard API)
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(downloadSrikandiBookmartlet);
+                } else {
+                    // Fallback untuk browser lama / Non-HTTPS
+                    const textArea = document.createElement("textarea");
+                    textArea.value = downloadSrikandiBookmartlet;
                     textArea.style.position = "fixed";
                     textArea.style.left = "-9999px";
                     document.body.appendChild(textArea);
@@ -945,7 +1069,9 @@ const updateStatus = async (item, newStatus) => {
             nextPage, prevPage, fetchTable, goToPage, openModal, closeModal, simpanTransaksi, hapusTransaksi, cetakSK, 
             handleNipInput, cariGajiBaru, cariGajiLama, handleGolonganChange, handleJabatanSelect, formatRupiah, formatTanggal,
             showPreviewModal, previewLoading, previewSK, closePreview, downloadFromPreview,
-            previewTab, changePreviewTab, updateStatus, setTmtPensiun,openSrikandi, copyCode
+            previewTab, changePreviewTab, updateStatus, setTmtPensiun,openSrikandi, copyCode, selectedNaskah,  toggleSelection,    
+            toggleSelectAll,    
+            openBotDownloader, copyCodeDownloadSrikandi, isAllPageSelected
         };
     }
 };

@@ -87,16 +87,23 @@ export const TplMain = `
                 <p class="text-muted small mb-0">Manajemen usulan kenaikan gaji berkala.</p>
             </div>
             
-            <!-- ⭐ Button Group dengan Proporsi Berbeda -->
-            <div class="d-flex gap-2 w-100 w-md-auto">
-                <!-- Button Input Baru: Lebih Besar -->
-                <button @click="openModal()" class="btn btn-primary shadow-sm text-nowrap px-4 py-2 fw-semibold" style="flex: 2;">
-                    <i class="bi bi-plus-lg me-2"></i> Input Baru
+            <div class="d-flex gap-2 w-100 w-md-auto flex-wrap">
+                <button @click="copyCode()" class="btn btn-dark shadow-sm text-nowrap px-3 py-2 btn-sm" title="Form Srikandi">
+                    <i class="bi bi-code-slash me-2"></i> Copy Form Srikandi
                 </button>
-                
-                <!-- Button Copy: Lebih Kecil -->
-                <button @click="copyCode()" class="btn btn-outline-secondary shadow-sm text-nowrap px-3 py-2 btn-sm" style="flex: 1;" title="Copy Bookmarklet Code">
-                    <i class="bi bi-clipboard me-2"></i> Copy Code
+
+                <button @click="copyCodeDownloadSrikandi()" class="btn btn-dark shadow-sm text-nowrap px-3 py-2 btn-sm" title="Copy Code Form Srikandi Otomatis">
+                    <i class="bi bi-code-slash me-2"></i> Copy Download Kolektif Srikandi
+                </button>
+
+                <button @click="openBotDownloader" class="btn btn-success shadow-sm text-nowrap px-3 py-2 btn-sm" 
+                    :disabled="selectedNaskah.length === 0" 
+                    title="Download via Srikandi">
+                    <i class="bi bi-robot me-2"></i> Download ({{ selectedNaskah.length }})
+                </button>
+
+                <button @click="openModal()" class="btn btn-primary shadow-sm text-nowrap px-4 py-2 fw-semibold" style="flex: 1;">
+                    <i class="bi bi-plus-lg me-2"></i> Input Baru
                 </button>
             </div>
         </div>
@@ -146,6 +153,13 @@ export const TplMain = `
                         <table class="table table-hover align-middle mb-0 text-nowrap" style="min-width: 1000px;">
                             <thead class="bg-light">
                                 <tr>
+                                    <th class="text-center bg-light" style="width: 40px;">
+                                                <input class="form-check-input cursor-pointer" 
+                                                    type="checkbox" 
+                                                    :checked="isAllPageSelected" 
+                                                    @change="toggleSelectAll">
+                                            </th>
+
                                     <th style="width: 40px;"></th>
                                     <th class="ps-2 py-3 small fw-bold">Pegawai</th>
                                     <th class="py-3 small fw-bold">Gaji Baru</th>
@@ -157,6 +171,16 @@ export const TplMain = `
                             <tbody>
                                 <template v-for="item in listData" :key="item.id">
                                     <tr :class="{'bg-light': isExpanded(item.id)}">
+                                        
+                                        <td class="text-center">
+                                            <input v-if="item.status === 'SELESAI' && item.nomor_naskah" 
+                                                   type="checkbox" 
+                                                   class="form-check-input cursor-pointer"
+                                                   :checked="selectedNaskah.includes(item.nomor_naskah)"
+                                                   @change="toggleSelection(item.nomor_naskah)">
+                                            <i v-else class="bi bi-dash text-muted opacity-25"></i>
+                                        </td>
+
                                         <td class="text-center">
                                             <button class="btn btn-sm btn-link text-decoration-none p-0" @click="toggleRow(item.id)">
                                                 <i class="bi" :class="isExpanded(item.id) ? 'bi-dash-circle-fill text-danger' : 'bi-plus-circle-fill text-primary'"></i>
@@ -180,27 +204,29 @@ export const TplMain = `
                                             </div>
                                         </td>
 
-                                        <div class="btn-group btn-group-sm">
-                                            <button @click="previewSK(item)" class="btn btn-light border text-primary" title="Preview">
-                                                <i class="bi bi-eye"></i>
-                                            </button>
-                                            
-                                            <button @click="openModal(item)" class="btn btn-light border text-secondary" title="Edit">
-                                                <i class="bi bi-pencil"></i>
-                                            </button>
+                                        <td class="text-end pe-4">
+                                            <div class="btn-group btn-group-sm">
+                                                <button @click="previewSK(item)" class="btn btn-light border text-primary" title="Preview">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                                
+                                                <button @click="openModal(item)" class="btn btn-light border text-secondary" title="Edit">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
 
-                                            <button @click="openSrikandi(item)" class="btn btn-light border text-success" title="Kirim ke Srikandi">
-                                                <i class="bi bi-send-fill"></i>
-                                            </button>
+                                                <button @click="openSrikandi(item)" class="btn btn-light border text-success" title="Kirim ke Srikandi">
+                                                    <i class="bi bi-send-fill"></i>
+                                                </button>
 
-                                            <button @click="hapusTransaksi(item)" class="btn btn-light border text-danger" title="Hapus">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
+                                                <button @click="hapusTransaksi(item)" class="btn btn-light border text-danger" title="Hapus">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
                                     </tr>
                                     
                                     <tr v-if="isExpanded(item.id)" class="bg-light border-bottom fade-in">
-                                        <td colspan="6" class="p-3 ps-5">
+                                        <td colspan="7" class="p-3 ps-5">
                                             <div class="row g-3 small">
                                                 <div class="col-md-4">
                                                     <h6 class="fw-bold text-muted mb-2 text-uppercase" style="font-size: 0.7rem;">Detail Jabatan</h6>
@@ -236,9 +262,16 @@ export const TplMain = `
                         <div v-for="item in listData" :key="'mob-'+item.id" class="card border-0 shadow-sm">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div>
-                                        <h6 class="fw-bold mb-0 text-primary">{{ item.nama_snapshot }}</h6>
-                                        <small class="text-muted font-monospace">{{ item.nip }}</small>
+                                    <div class="d-flex gap-2">
+                                        <input v-if="item.status === 'SELESAI' && item.nomor_naskah" 
+                                               type="checkbox" 
+                                               class="form-check-input mt-1"
+                                               :checked="selectedNaskah.includes(item.nomor_naskah)"
+                                               @change="toggleSelection(item.nomor_naskah)">
+                                        <div>
+                                            <h6 class="fw-bold mb-0 text-primary">{{ item.nama_snapshot }}</h6>
+                                            <small class="text-muted font-monospace">{{ item.nip }}</small>
+                                        </div>
                                     </div>
                                     <span class="small fw-bold" :class="item.status==='SELESAI' ? 'text-success' : 'text-muted'">
                                         {{ item.status==='SELESAI' ? 'Selesai' : 'Belum Selesai' }}
@@ -325,20 +358,14 @@ export const TplMain = `
                                     <div class="col-6 col-md-3"><label class="form-label small text-muted">Tempat Lahir</label><input v-model="form.tempat_lahir" class="form-control"></div>
                                     <div class="col-6 col-md-3"><label class="form-label small text-muted">Tgl Lahir</label><input v-model="form.tgl_lahir" type="date" class="form-control border-warning" required></div>
                                     <div class="col-12 col-md-6"><label class="form-label small text-muted">Jabatan</label><AutocompleteJabatan v-model="form.jabatan" @select="handleJabatanSelect" /></div>
-                                    
                                     <div class="col-12 col-md-6"><label class="form-label small text-muted">Unit Kerja</label><AutocompleteUnitKerja v-model="form.unit_kerja" /><label class="form-label small text-danger">Bila tidak bisa dihapus : CTRL + A + BACKSPACE</label></div>
-                                    
                                     <div class="col-12 col-md-6"><label class="form-label small text-muted">Perangkat Daerah</label><AutocompletePerangkatDaerah v-model="form.perangkat_daerah" /></div>
-                                    
                                     <div class="col-12 col-md-6"><label class="form-label small text-muted">Jenis Jabatan</label><select v-model="form.jenis_jabatan" class="form-select"><option value="Pelaksana">Pelaksana</option><option value="Fungsional">Fungsional</option><option value="Struktural">Struktural</option></select></div>
                                 </div>
                             </div>
                         </div>
-
                         <div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white py-3"><h6 class="fw-bold text-secondary mb-0">2. Dasar SK Lama</h6></div><div class="card-body"><div class="row g-3"><div class="col-12 col-md-6"><label class="form-label small fw-bold">Dasar Surat</label><SearchSelect :options="listDasarHukum" v-model="form.dasar_hukum" label-key="judul" value-key="judul" placeholder="Pilih..." /></div><div class="col-12 col-md-6"><label class="form-label small text-muted">Pejabat TTD</label><input v-model="form.dasar_pejabat" class="form-control"></div><div class="col-6 col-md-4"><label class="form-label small text-muted">Nomor SK</label><input v-model="form.dasar_nomor" class="form-control"></div><div class="col-6 col-md-4"><label class="form-label small text-muted">Tanggal SK</label><input v-model="form.dasar_tanggal" type="date" class="form-control"></div><div class="col-12 col-md-4"><label class="form-label small fw-bold text-primary">TMT Gaji Lama</label><input v-model="form.dasar_tmt" type="date" class="form-control" required></div><div class="col-12 bg-light p-3 rounded border"><div class="row g-2"><div class="col-12 col-md-4"><label class="small text-muted fw-bold">Gol. Lama</label><SearchSelect :options="filteredGolongan" v-model="form.dasar_golongan" label-key="kode" value-key="kode" /></div><div class="col-6 col-md-2"><label class="small text-muted">MK Thn</label><input v-model.number="form.dasar_mk_tahun" type="number" class="form-control form-control-sm"></div><div class="col-6 col-md-2"><label class="small text-muted">MK Bln</label><input v-model.number="form.dasar_mk_bulan" type="number" class="form-control form-control-sm"></div><div class="col-12 col-md-4"><label class="small text-muted fw-bold">Gaji Lama</label><div class="input-group input-group-sm"><input :value="formatRupiah(form.dasar_gaji_lama)" class="form-control fw-bold text-secondary" readonly><button type="button" @click="cariGajiLama" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i></button></div></div></div></div></div></div></div>
-                        
                         <div class="card shadow-sm border-0 border-start border-4 border-success mb-3"><div class="card-header bg-success bg-opacity-10 py-3"><h6 class="fw-bold text-success mb-0">3. Penetapan Gaji Baru</h6></div><div class="card-body"><div class="row g-3"><div class="col-12 col-md-4"><label class="form-label small fw-bold">Golongan Baru</label><SearchSelect :options="filteredGolongan" v-model="form.golongan" label-key="label_full" value-key="kode" placeholder="Pilih..." @change="handleGolonganChange" /></div><div class="col-6 col-md-2"><label class="form-label small fw-bold">MK Thn</label><input v-model.number="form.mk_baru_tahun" type="number" class="form-control fw-bold"></div><div class="col-6 col-md-2"><label class="form-label small fw-bold">MK Bln</label><input v-model.number="form.mk_baru_bulan" type="number" class="form-control"></div><div class="col-12 col-md-4"><label class="form-label small fw-bold text-success">Gaji Pokok Baru</label><div class="input-group"><input :value="formatRupiah(form.gaji_baru)" class="form-control bg-success text-white fw-bold" readonly><button type="button" @click="cariGajiBaru" class="btn btn-outline-success"><i class="bi bi-arrow-clockwise"></i></button></div></div><div class="col-12"><hr></div><div v-if="form.tipe_asn === 'PPPK'" class="col-12 bg-warning bg-opacity-10 p-3 rounded border border-warning mb-3"><div class="row g-3"><div class="col-12 col-md-6"><label class="form-label small fw-bold">Masa Perjanjian</label><input v-model="form.masa_perjanjian" class="form-control"></div><div class="col-12 col-md-6"><label class="form-label small fw-bold">Perpanjangan</label><input v-model="form.perpanjangan_perjanjian" class="form-control"></div></div></div><div class="col-12 col-md-3"><label class="form-label small fw-bold">TMT Sekarang</label><input v-model="form.tmt_sekarang" type="date" class="form-control" required></div><div class="col-12 col-md-4"><label class="form-label small text-muted">TMT YAD</label><div class="input-group"><input v-model="form.tmt_selanjutnya" type="date" class="form-control bg-white"><button type="button" @click="setTmtPensiun" class="btn btn-danger text-white btn-sm fw-bold"><i class="bi bi-stop-circle me-1"></i> STOP</button></div><div class="small text-danger fw-bold mt-1" v-if="pensiunMsg">{{ pensiunMsg }}</div></div><div class="col-12 col-md-5"><label class="form-label small fw-bold text-primary">Pejabat TTD</label><SearchSelect :options="listPejabat" v-model="form.pejabat_baru_nip" label-key="jabatan" value-key="nip" /></div></div></div></div>
-                        
                         <div class="card shadow-sm border-0 border-start border-4 border-danger"><div class="card-body py-2"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" v-model="form.is_pensiun_manual" id="manualPensiunCheck"><label class="form-check-label small fw-bold text-danger" for="manualPensiunCheck">Set Status: Berhenti Berkala (Pensiun/Meninggal/Berakhirnya masa KGB)</label></div></div></div>
                     </form>
                 </div>

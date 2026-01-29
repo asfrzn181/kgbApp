@@ -224,3 +224,195 @@ export const srikandiBookmarklet = `javascript:(function(){
         }
     })();
 })();`.replace(/(\r\n|\n|\r)/gm, "");
+
+export const downloadSrikandiBookmartlet = `javascript:(function(){
+    if(document.getElementById('bot-status-box')) document.getElementById('bot-status-box').remove();
+    var statusBox = document.createElement('div');
+    statusBox.id = 'bot-status-box';
+    statusBox.style.cssText = "position:fixed; bottom:20px; right:20px; background:#000; color:#0f0; padding:15px; border-radius:8px; z-index:999999; font-family:monospace; width:400px; box-shadow:0 10px 40px rgba(0,0,0,0.8); border:1px solid #333; font-size:11px;";
+    statusBox.innerHTML = "<div><strong>🤖 KGB ROBOT (ORIGINAL NAME)</strong></div><div id='bot-log' style='height:120px; overflow-y:auto; margin-top:10px; border-top:1px solid #333; padding-top:5px; color:#ccc;'>Waiting...</div><div style='background:#333; height:5px; margin-top:5px;'><div id='bot-bar' style='width:0%; height:100%; background:#0f0;'></div></div>";
+    document.body.appendChild(statusBox);
+
+    function log(msg) { 
+        var l = document.getElementById('bot-log');
+        var time = new Date().toLocaleTimeString().split(' ')[0];
+        l.innerHTML = "<div><span style='color:#666'>["+time+"]</span> " + msg + "</div>" + l.innerHTML;
+    }
+    function setProgress(percent) { document.getElementById('bot-bar').style.width = percent + '%'; }
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    async function loadLib(url) {
+        return new Promise(resolve => {
+            if(document.querySelector("script[src='" + url + "']")) return resolve();
+            var s = document.createElement('script'); s.src = url; s.onload = resolve;
+            document.head.appendChild(s);
+        });
+    }
+
+    async function smartType(element, text) {
+        element.focus();
+        var proto = window.HTMLInputElement.prototype;
+        var setter = Object.getOwnPropertyDescriptor(proto, "value").set;
+        setter.call(element, "");
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        await sleep(50);
+        setter.call(element, text);
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        await sleep(200);
+        element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+        element.blur();
+    }
+
+    async function scrapPdfFromHiddenFrame(url) {
+        return new Promise(resolve => {
+            var frame = document.createElement('iframe');
+            frame.style.cssText = "width:1px;height:1px;opacity:0;position:absolute;left:-9999px;";
+            frame.src = url;
+            document.body.appendChild(frame);
+
+            var attempts = 0;
+            var interval = setInterval(() => {
+                attempts++;
+                try {
+                    var doc = frame.contentDocument || frame.contentWindow.document;
+                    if (doc) {
+                        var pdfFrame = doc.querySelector('iframe[src*=".pdf"]');
+                        if (pdfFrame && pdfFrame.src) {
+                            clearInterval(interval);
+                            var result = pdfFrame.src;
+                            document.body.removeChild(frame); 
+                            resolve(result);
+                            return;
+                        }
+                        
+                        var directLink = doc.querySelector('a[href*=".pdf"]');
+                        if(directLink && directLink.href) {
+                            clearInterval(interval);
+                            var result = directLink.href;
+                            document.body.removeChild(frame);
+                            resolve(result);
+                            return;
+                        }
+                    }
+                } catch (e) { }
+
+                if (attempts > 30) {
+                    clearInterval(interval);
+                    document.body.removeChild(frame);
+                    resolve(null);
+                }
+            }, 500);
+        });
+    }
+
+    function cleanText(str) { return str ? str.replace(/\\s+/g, ' ').trim() : ""; }
+
+    (async function(){
+        await loadLib('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+        await loadLib('https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js');
+
+        if (!window.opener) { log("❌ Error: Buka dari tombol Download!"); return; }
+
+        log("📡 Handshake...");
+        window.opener.postMessage("SRIKANDI_BOT_READY", "*");
+
+        window.addEventListener("message", async function(event) {
+            if (event.data && event.data.type === 'DATA_NASKAH_KGB') {
+                var list = event.data.list;
+                if(!list || list.length === 0) { log("⚠️ Data kosong."); return; }
+                log("✅ Start: " + list.length + " antrian.");
+                await processQueue(list);
+            }
+        });
+
+        async function processQueue(targetList) {
+            var zip = new JSZip();
+            var folder = zip.folder("SK_KGB_DOWNLOAD");
+            var searchInput = document.querySelector('input[placeholder="Cari Nomor Naskah"]');
+
+            if(!searchInput) { log("❌ Input Pencarian tidak ketemu!"); return; }
+
+            for (var i = 0; i < targetList.length; i++) {
+                var noNaskah = targetList[i].trim();
+                
+                log("🔍 ["+(i+1)+"] Cari: " + noNaskah);
+                setProgress((i / targetList.length) * 100);
+
+                await smartType(searchInput, noNaskah);
+                
+                var linkUrl = null;
+                var attempts = 0;
+                
+                while(attempts < 20) { 
+                    await sleep(500); 
+                    var rows = document.querySelectorAll('table tbody tr');
+                    var foundRow = false;
+
+                    for(var r=0; r<rows.length; r++){
+                        var row = rows[r];
+                        if(row.querySelector('input')) continue; 
+
+                        var cols = row.querySelectorAll('td');
+                        if(cols.length < 3) continue;
+
+                        var colText = cleanText(cols[2].innerText); 
+                        if(colText.includes("Tidak ada data") || colText.includes("Loading")) { break; }
+
+                        if(colText.includes(cleanText(noNaskah))) {
+                            var btn = row.querySelector('a[href*="detail"]');
+                            if(btn) { 
+                                linkUrl = btn.href;
+                                foundRow = true;
+                            }
+                            break; 
+                        }
+                    }
+                    if(foundRow) break;
+                    attempts++;
+                }
+
+                if(linkUrl) {
+                    log("⏳ Rendering...");
+                    var pdfUrl = await scrapPdfFromHiddenFrame(linkUrl);
+
+                    if(pdfUrl) {
+                        try {
+                            if(pdfUrl.startsWith('/')) pdfUrl = window.location.origin + pdfUrl;
+                            pdfUrl = pdfUrl.replace(/&amp;/g, '&');
+
+                            var originalName = pdfUrl.split('?')[0].split('/').pop();
+                            originalName = decodeURIComponent(originalName);
+                            if(!originalName.toLowerCase().endsWith('.pdf')) originalName += ".pdf";
+
+                            log("⬇️ " + originalName);
+                            var blob = await (await fetch(pdfUrl)).blob();
+                            
+                            if(blob.size > 500) {
+                                folder.file(originalName, blob);
+                                log("💾 Tersimpan.");
+                            } else {
+                                log("⚠️ File 0KB.");
+                                folder.file("ERROR_" + noNaskah.replace(/[^a-zA-Z0-9]/g, "_") + ".txt", "Size: " + blob.size);
+                            }
+                        } catch(e) {
+                            log("❌ Err Download: " + e.message);
+                            folder.file("ERROR_NET.txt", e.message);
+                        }
+                    } else {
+                        log("⚠️ Gagal Render PDF.");
+                        folder.file("MISSING_PDF_" + noNaskah.replace(/[^a-zA-Z0-9]/g, "_") + ".txt", "Gagal scrape.");
+                    }
+                } else {
+                    log("⛔ Timeout. Data tidak muncul.");
+                    folder.file("NOT_FOUND_" + noNaskah.replace(/[^a-zA-Z0-9]/g, "_") + ".txt", "Not Found");
+                }
+            }
+
+            log("📦 Zipping...");
+            setProgress(100);
+            var zipBlob = await zip.generateAsync({type:"blob"});
+            saveAs(zipBlob, "Arsip_KGB_" + new Date().toISOString().slice(0,10) + ".zip");
+            alert("Selesai! Cek Download.");
+        }
+    })();
+})()`.replace(/(\r\n|\n|\r)/gm, "");
