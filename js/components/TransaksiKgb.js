@@ -293,14 +293,35 @@ export default {
             return pageItems.every(item => selectedNaskah.value.includes(item.nomor_naskah));
         });
 
-        // watch(() => form.dasar_hukum, (newVal) => {
-        //     if (!newVal || listDasarHukum.value.length === 0) return;
-        //     const selectedMaster = listDasarHukum.value.find(item => item.judul === newVal);
-        //     if (selectedMaster) {
-        //         if (selectedMaster.pejabat) form.dasar_pejabat = selectedMaster.pejabat;
-        //         if (selectedMaster.nomor && !form.dasar_nomor) form.dasar_nomor = selectedMaster.nomor;
-        //     }
-        // });
+        watch(() => form.dasar_hukum, (newVal, oldVal) => {
+            // 1. Validasi dasar
+            if (!newVal || listDasarHukum.value.length === 0) return;
+
+            // 2. Cari data master
+            const selectedMaster = listDasarHukum.value.find(item => item.judul === newVal);
+
+            if (selectedMaster) {
+                // --- SOLUSI MASALAH 1 & 2 ---
+                
+                // Cek apakah User sedang mengganti pilihan (oldVal ada isinya)
+                // Atau ini baru inisialisasi awal (oldVal undefined/kosong)?
+                const isUserChangingOption = (oldVal && oldVal !== newVal);
+
+                // Jika user yang mengganti pilihan secara sadar, 
+                // MAKA timpa semua data (Pejabat & Nomor) agar sesuai master baru.
+                if (isUserChangingOption) {
+                    if (selectedMaster.pejabat) form.dasar_pejabat = selectedMaster.pejabat;
+                    if (selectedMaster.nomor) form.dasar_nomor = selectedMaster.nomor;
+                } 
+                // Jika ini adalah load awal (Edit Mode), 
+                // JANGAN timpa apa-apa (biarkan data dari DB), 
+                // KECUALI field-nya memang kosong.
+                else {
+                    if (selectedMaster.pejabat && !form.dasar_pejabat) form.dasar_pejabat = selectedMaster.pejabat;
+                    if (selectedMaster.nomor && !form.dasar_nomor) form.dasar_nomor = selectedMaster.nomor;
+                }
+            }
+        });
 
         
 
@@ -477,7 +498,7 @@ export default {
         watch(tableSearch, debounce(() => fetchTable(1), 800));
         watch(itemsPerPage, () => fetchTable(1));
 
-const updateStatus = async (item, newStatus) => {
+        const updateStatus = async (item, newStatus) => {
             if(!item.id) return showToast("ID Error", "error");
             
             // 1. Simpan state lama untuk backup (Rollback)
