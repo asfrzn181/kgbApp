@@ -382,19 +382,42 @@ export default {
 
                 if (isEditMode.value) {
                     await runTransaction(db, async (transaction) => {
+                        // 1. Update data Log Nomor Surat (Ini pasti ada karena sedang diedit)
                         transaction.update(doc(db, "nomor_surat", editId.value), dataLog);
+
+                        // 2. Cek Old Usulan (Jika pindah usulan)
                         if (oldUsulanId.value && oldUsulanId.value !== form.usulan_id) {
-                            transaction.update(doc(db, "usulan_kgb", oldUsulanId.value), { 
-                                nomor_inpassing: null, tgl_inpassing: null, inpassing_gaji: null, inpassing_golongan: null,
-                                keterangan_inpassing: null, mk_inpassing_tahun: null, mk_inpassing_bulan: null,
-                                mk_berikutnya_tahun: null, mk_berikutnya_bulan: null, gaji_lama_inpassing: null,
-                                tanggal_inpassing_manual: null, tmt_inpassing: null
-                            });
+                            const oldRef = doc(db, "usulan_kgb", oldUsulanId.value);
+                            const oldSnap = await transaction.get(oldRef);
+                            
+                            // HANYA UPDATE JIKA DOKUMEN ADA
+                            if (oldSnap.exists()) {
+                                transaction.update(oldRef, { 
+                                    nomor_inpassing: null, tgl_inpassing: null, inpassing_gaji: null, inpassing_golongan: null,
+                                    keterangan_inpassing: null, mk_inpassing_tahun: null, mk_inpassing_bulan: null,
+                                    mk_berikutnya_tahun: null, mk_berikutnya_bulan: null, gaji_lama_inpassing: null,
+                                    tanggal_inpassing_manual: null, tmt_inpassing: null
+                                });
+                            }
                         }
-                        transaction.update(doc(db, "usulan_kgb", form.usulan_id), dataUpdateUtama);
+
+                        // 3. Cek Usulan Target (DOKUMEN YANG ERROR TADI)
+                        const targetRef = doc(db, "usulan_kgb", form.usulan_id);
+                        const targetSnap = await transaction.get(targetRef);
+
+                        if (targetSnap.exists()) {
+                            // Jika ada, lakukan update normal
+                            transaction.update(targetRef, dataUpdateUtama);
+                        } else {
+                            // Jika tidak ada (Data Zombie), opsional: 
+                            // Kita bisa melempar error agar user tahu, atau biarkan update nomor surat saja.
+                            // Saran saya: Throw error agar user sadar datanya cacat.
+                            throw new Error(`Data Usulan KGB (ID: ${form.usulan_id}) tidak ditemukan/sudah dihapus!`);
+                        }
                     });
+                    
                     showToast("Update berhasil!", 'success');
-                } else {
+                }   else {
                     const counterId = `${form.tahun}_INPASSING`;
                     const counterRef = doc(db, "counters_nomor", counterId);
                     const snapCount = await getDoc(counterRef);
