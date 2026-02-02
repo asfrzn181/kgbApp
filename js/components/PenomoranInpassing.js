@@ -376,7 +376,8 @@ export default {
                     usulan_id: form.usulan_id, nama_pegawai: form.nama_pegawai, nip: form.nip,
                     jenis_jabatan: form.jenis_jabatan, kategori: 'INPASSING', 
                     tahun: form.tahun, golongan: form.golongan, no_urut: currentUrut, nomor_lengkap: form.nomor_custom,
-                    ...dataUpdateUtama
+                    ...dataUpdateUtama,
+                    created_by: auth.currentUser.uid
                 };
 
                 if (isEditMode.value) {
