@@ -383,7 +383,14 @@ export const TplMain = `
                 <div class="modal-header bg-dark text-white border-0 py-2 align-items-center justify-content-between">
                     <h6 class="modal-title mb-0"><i class="bi bi-eye me-2"></i>Preview SK</h6>
                     <div>
-                        <button class="btn btn-sm btn-success me-2" @click="downloadFromPreview"><i class="bi bi-download me-1"></i> <span class="d-none d-md-inline">Download</span></button>
+                        <button class="btn btn-sm btn-primary me-2" @click="printDocument">
+                            <i class="bi bi-printer me-1"></i> <span class="d-none d-md-inline">Cetak</span>
+                        </button>
+
+                        <button class="btn btn-sm btn-success me-2" @click="downloadFromPreview">
+                            <i class="bi bi-download me-1"></i> <span class="d-none d-md-inline">Download</span>
+                        </button>
+                        
                         <button type="button" class="btn-close btn-close-white" @click="closePreview"></button>
                     </div>
                 </div>

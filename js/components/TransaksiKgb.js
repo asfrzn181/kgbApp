@@ -12,7 +12,7 @@ import { srikandiBookmarklet, downloadSrikandiBookmartlet } from '../bookmartScr
 // ==========================================
 const LIST_SINGKATAN = [
     'UPTD', 'SMP', 'SD', 'RSUD', 'TK', 'PAUD', 'BLUD', 
-    'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN', "DPRD", "PPKN", "IPA", "IPS", "TIK","SDM","SDMD","BKPSDMD","TPA","PPI"
+    'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN', "DPRD", "PPKN", "IPA", "IPS", "TIK","SDM","SDMD","BKPSDMD","TPA","PPI","DR"
 ];
 const LIST_KECIL = [
     'dan', 'di', 'ke', 'dari', 'yang', 'pada', 'untuk', 'atau', 'dengan', 'atas', 'oleh'
