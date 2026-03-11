@@ -1,8 +1,8 @@
 import { ref, reactive, onMounted, watch } from 'vue';
-import { 
-    db, collection, getDocs, setDoc, deleteDoc, doc, 
+import {
+    db, collection, getDocs, setDoc, deleteDoc, doc,
     query, orderBy, limit, startAfter, writeBatch, serverTimestamp,
-    where, getCountFromServer 
+    where, getCountFromServer
 } from '../firebase.js';
 import { showToast, showConfirm, formatRupiah, debounce } from '../utils.js';
 
@@ -10,17 +10,17 @@ import { showToast, showConfirm, formatRupiah, debounce } from '../utils.js';
 import { TplMasterGaji } from '../views/MasterGajiView.js';
 
 export default {
-    template: TplMasterGaji, 
+    template: TplMasterGaji,
     setup() {
         // State
         const listData = ref([]);
-        const totalReal = ref(0); 
+        const totalReal = ref(0);
         const loading = ref(true);
         const showModal = ref(false);
         const isEdit = ref(false);
         const isSaving = ref(false);
-        const form = reactive({ golongan: '', mkg: 0, gaji: 0 });
-        
+        const form = reactive({ golongan: '', mkg: 0, gaji: 0, perpres: '' });
+
         // Import & Search & Pagination State
         const isImporting = ref(false);
         const fileInput = ref(null);
@@ -52,15 +52,15 @@ export default {
                     const term = searchQuery.value.trim();
                     // Asumsi: Golongan di DB disimpan standar (misal "III/a" atau "IV/b")
                     // Jika user ketik "III", akan muncul semua gol III.
-                    
-                    q = query(collRef, 
-                        orderBy('golongan'), 
+
+                    q = query(collRef,
+                        orderBy('golongan'),
                         where('golongan', '>=', term),
                         where('golongan', '<=', term + '\uf8ff'),
                         limit(itemsPerPage)
                     );
-                    
-                    if(direction === 'first') { currentPage.value = 1; pageStack.value = []; }
+
+                    if (direction === 'first') { currentPage.value = 1; pageStack.value = []; }
                 } else {
                     // [NORMAL MODE] Stable Sort by Golongan -> MKG
                     // Index Composite Diperlukan: (golongan ASC, mkg ASC)
@@ -87,10 +87,10 @@ export default {
                 } else {
                     isLastPage.value = snap.docs.length < itemsPerPage;
                     listData.value = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    
+
                     if (direction !== 'prev' && !searchQuery.value) {
                         const lastVisible = snap.docs[snap.docs.length - 1];
-                        if(direction === 'next' || pageStack.value.length === 0) pageStack.value.push(lastVisible);
+                        if (direction === 'next' || pageStack.value.length === 0) pageStack.value.push(lastVisible);
                     }
                 }
             } catch (e) {
@@ -118,26 +118,29 @@ export default {
                     const data = new Uint8Array(e.target.result);
                     const wb = XLSX.read(data, { type: 'array' });
                     const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                    
+
                     const CHUNK = 400; // Batch limit 500
                     let count = 0;
-                    
-                    for(let i=0; i<json.length; i+=CHUNK){
+
+                    for (let i = 0; i < json.length; i += CHUNK) {
                         const batch = writeBatch(db);
-                        json.slice(i, i+CHUNK).forEach(row => {
+                        json.slice(i, i + CHUNK).forEach(row => {
                             const gol = row['GOLONGAN'] || row['golongan'];
                             const mk = row['MKG'] || row['mkg'];
                             const gaji = row['GAJI'] || row['gaji'];
-                            
-                            if(gol && gaji) {
-                                // ID Unik: GOL_MK (Contoh: III/A_0)
-                                const docId = String(gol).trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase() + '_' + (mk||0);
+
+                            if (gol && gaji) {
+                                // ID Unik: GOL_MK_PERPRES
+                                const p = String(row['PERPRES'] || row['perpres'] || '').trim();
+                                const pClean = p.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().substring(0, 15);
+                                const docId = String(gol).trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase() + '_' + (mk || 0) + (pClean ? '_' + pClean : '');
                                 batch.set(doc(db, "master_gaji", docId), {
-                                    golongan: String(gol).trim(), 
-                                    mkg: Number(mk||0), 
+                                    golongan: String(gol).trim(),
+                                    mkg: Number(mk || 0),
                                     gaji: Number(gaji),
+                                    perpres: row['PERPRES'] || row['perpres'] || '',
                                     updated_at: serverTimestamp()
-                                }, {merge:true});
+                                }, { merge: true });
                                 count++;
                             }
                         });
@@ -146,32 +149,36 @@ export default {
 
                     showToast(`Import ${count} data gaji selesai!`);
                     fetchData('first');
-                    hitungTotalReal(); 
+                    hitungTotalReal();
 
-                } catch (err) { showToast(err.message, 'error'); } 
+                } catch (err) { showToast(err.message, 'error'); }
                 finally { isImporting.value = false; event.target.value = ''; }
             };
             reader.readAsArrayBuffer(file);
         };
 
         // --- CRUD Manual ---
-        const generateId = (gol, mk) => String(gol).trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase() + '_' + mk;
+        const generateId = (gol, mk, perpres) => {
+            const pClean = String(perpres || '').trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase().substring(0, 15);
+            return String(gol).trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase() + '_' + mk + (pClean ? '_' + pClean : '');
+        };
 
         const simpanData = async () => {
             isSaving.value = true;
             try {
-                const docId = generateId(form.golongan, form.mkg);
+                const docId = generateId(form.golongan, form.mkg, form.perpres);
                 await setDoc(doc(db, "master_gaji", docId), {
-                    golongan: form.golongan, 
-                    mkg: Number(form.mkg), 
+                    golongan: form.golongan,
+                    mkg: Number(form.mkg),
                     gaji: Number(form.gaji),
+                    perpres: form.perpres || '',
                     updated_at: serverTimestamp()
                 }, { merge: true });
-                
-                showToast("Disimpan!"); closeModal(); 
+
+                showToast("Disimpan!"); closeModal();
                 fetchData('first');
                 hitungTotalReal();
-            } catch (e) { showToast(e.message, 'error'); } 
+            } catch (e) { showToast(e.message, 'error'); }
             finally { isSaving.value = false; }
         };
 
@@ -179,17 +186,17 @@ export default {
             if (await showConfirm('Hapus?', `Hapus data gaji ini?`)) {
                 try {
                     await deleteDoc(doc(db, "master_gaji", item.id));
-                    showToast("Terhapus"); 
+                    showToast("Terhapus");
                     fetchData('first');
                     hitungTotalReal();
-                } catch(e) { showToast(e.message, 'error'); }
+                } catch (e) { showToast(e.message, 'error'); }
             }
         };
 
         const openModal = (item) => {
             isEdit.value = !!item;
             if (item) Object.assign(form, item);
-            else { form.golongan = ''; form.mkg = 0; form.gaji = 0; }
+            else { form.golongan = ''; form.mkg = 0; form.gaji = 0; form.perpres = ''; }
             showModal.value = true;
         };
         const closeModal = () => showModal.value = false;
@@ -199,13 +206,13 @@ export default {
             hitungTotalReal();
         });
 
-        return { 
+        return {
             listData, totalReal, hitungTotalReal,
-            loading, showModal, isEdit, isSaving, 
+            loading, showModal, isEdit, isSaving,
             form, searchQuery, isImporting,
             currentPage, isLastPage, nextPage, prevPage,
-            simpanData, hapusData, openModal, closeModal, 
-            handleImportExcel, formatRupiah 
+            simpanData, hapusData, openModal, closeModal,
+            handleImportExcel, formatRupiah
         };
     }
 };

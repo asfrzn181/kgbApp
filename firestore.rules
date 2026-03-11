@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- FUNGSI BANTUAN (HELPER) ---
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Pastikan collection 'users' ada dan document ID-nya sesuai UID user
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // --- ATURAN COLLECTION ---
+
+    // A. COLLECTION USER (Profil)
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // B. MASTER DATA (DINAMIS)
+    match /master_pegawai/{doc} { 
+      allow read, create, update: if isAuthenticated(); 
+      allow delete: if isAdmin(); 
+    }
+    match /master_jabatan/{doc} { 
+      allow read, create, update: if isAuthenticated(); 
+      allow delete: if isAdmin(); 
+    }
+
+    // C. MASTER DATA (STATIS)
+    match /master_gaji/{doc}     { allow read: if isAuthenticated(); allow write: if isAdmin(); }
+    match /master_golongan/{doc} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
+    match /master_pejabat/{doc}  { allow read: if isAuthenticated(); allow write: if isAdmin(); }
+    match /config_template/{doc} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
+
+    // D. TRANSAKSI KGB (BAGIAN INI YANG SAYA PERBAIKI)
+    match /usulan_kgb/{docId} {
+      // Baca: Boleh membaca jika ini dokumen miliknya ATAU jika dia adalah ADMIN
+      allow read: if isAuthenticated() && (resource.data.created_by == request.auth.uid || isAdmin());
+      
+      // Buat: Semua user login boleh
+      allow create: if isAuthenticated(); 
+
+      // Update & Hapus: Boleh jika PEMILIK asli ATAU jika ADMIN
+      allow update, delete: if isAuthenticated() && (resource.data.created_by == request.auth.uid || isAdmin());
+    }
+    
+    // E. MODUL PENOMORAN
+    match /nomor_surat/{docId} {
+      // Hanya mengizinkan Read dan Create secara default
+      allow read, create: if isAuthenticated();
+      // Update dan Delete dibatasi hanya untuk pembuat asli atau admin
+      allow update, delete: if isAuthenticated() && (resource.data.created_by == request.auth.uid || resource.data.created_by == null || isAdmin());
+    }
+
+		match /counters_nomor/{docId} {
+      // Izinkan create juga (jika tahun baru belum ada counternya)
+      allow read, update, create: if isAuthenticated(); 
+      allow delete: if isAdmin();
+    }
+  }
+}

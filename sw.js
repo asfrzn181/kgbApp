@@ -2,7 +2,7 @@
 
 // 1. GANTI VERSI INI SETIAP KALI ANDA DEPLOY UPDATE KODE!
 // Contoh: v2.1, v2.2, v2.3 ...
-const CACHE_NAME = 'maspri-v2.2-cache';
+const CACHE_NAME = 'maspri-v3.1-cache';
 
 // Daftar file statis yang mau disimpan agar aplikasi kencang
 const urlsToCache = [
@@ -10,10 +10,12 @@ const urlsToCache = [
   './index.html',
   './style.css',
   './js/main.js',
-  // Masukkan library CDN jika ingin aplikasi jalan offline total
-  // Tapi hati-hati, CDN jarang berubah, jadi aman di-cache
-  'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
-  'https://unpkg.com/vue@3.3.4/dist/vue.esm-browser.prod.js'
+  './assets/vendor/bootstrap.min.css',
+  './assets/vendor/vue.esm-browser.prod.js',
+  './assets/vendor/bootstrap-icons.css',
+  './assets/vendor/bootstrap.bundle.min.js',
+  './assets/vendor/sweetalert2.all.min.js',
+  './assets/vendor/jquery-3.7.1.min.js'
 ];
 
 // --- INSTALL: Simpan file ke cache ---
@@ -47,25 +49,25 @@ self.addEventListener('activate', (event) => {
 
 // --- FETCH: Strategi "Network First, Fallback to Cache" ---
 // Ini strategi paling aman untuk aplikasi data yang sering update
-self.addEventListener('fetch', function(event) {
+self.addEventListener('fetch', function (event) {
   // --- [FIX] FILTER WAJIB ---
   // Jangan cache request dari Chrome Extension, Data URI, atau selain HTTP/HTTPS
   if (!event.request.url.startsWith('http')) {
-      return; 
+    return;
   }
 
   event.respondWith(
     caches.match(event.request)
-      .then(function(response) {
+      .then(function (response) {
         // Cache hit - return response
         if (response) {
           return response;
         }
 
         return fetch(event.request).then(
-          function(response) {
+          function (response) {
             // Check if we received a valid response
-            if(!response || response.status !== 200 || response.type !== 'basic') {
+            if (!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
 
@@ -76,12 +78,12 @@ self.addEventListener('fetch', function(event) {
             var responseToCache = response.clone();
 
             caches.open(CACHE_NAME) // Pastikan variabel CACHE_NAME sesuai dengan kode Bapak
-              .then(function(cache) {
+              .then(function (cache) {
                 // Bungkus put dalam try-catch agar tidak crash jika ada error aneh
                 try {
-                    cache.put(event.request, responseToCache);
+                  cache.put(event.request, responseToCache);
                 } catch (err) {
-                    console.warn('Gagal caching:', event.request.url, err);
+                  console.warn('Gagal caching:', event.request.url, err);
                 }
               });
 
@@ -89,5 +91,5 @@ self.addEventListener('fetch', function(event) {
           }
         );
       })
-    );
+  );
 });

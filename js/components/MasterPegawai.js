@@ -1,8 +1,8 @@
 import { ref, reactive, onMounted, watch } from 'vue';
-import { 
-    db, collection, getDocs, setDoc, deleteDoc, doc, 
+import {
+    db, collection, getDocs, setDoc, deleteDoc, doc,
     query, orderBy, limit, startAfter, writeBatch, serverTimestamp,
-    where 
+    where
 } from '../firebase.js';
 import { showToast, showConfirm, debounce, formatTitleCase } from '../utils.js'; // Pastikan formatTitleCase di-export dari utils
 
@@ -15,15 +15,15 @@ export default {
         // --- STATE DASAR ---
         const listData = ref([]);
         const loading = ref(true);
-        const loadingStats = ref(false); 
+        const loadingStats = ref(false);
         const showModal = ref(false);
         const isEdit = ref(false);
         const isSaving = ref(false);
-        
+
         // FORMATTER TITLE CASE PADA FORM
         // Kita gunakan reactive form dengan watcher atau interceptor
-        const form = reactive({ nip: '', nama: '', tempat_lahir: '', perangkat_daerah: '' });
-        
+        const form = reactive({ nip: '', nama: '', tempat_lahir: '', perangkat_daerah: '', tmt_kgb_berikutnya: '' });
+
         // Import
         const isImporting = ref(false);
         const fileInput = ref(null);
@@ -43,13 +43,13 @@ export default {
 
         // --- 1. LOGIKA GENERASI & INFO NIP ---
         const getInfoNip = (nip) => {
-            if(!nip || nip.length < 4) return { tgl: '-', gender: '-', generation: '?', genderIcon: '' };
-            
+            if (!nip || nip.length < 4) return { tgl: '-', gender: '-', generation: '?', genderIcon: '' };
+
             const year = parseInt(nip.substring(0, 4));
-            const m = nip.substring(4,6);
-            const d = nip.substring(6,8);
+            const m = nip.substring(4, 6);
+            const d = nip.substring(6, 8);
             const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
-            const tglString = `${d} ${months[parseInt(m)-1] || ''} ${year}`;
+            const tglString = `${d} ${months[parseInt(m) - 1] || ''} ${year}`;
 
             let generation = 'Tidak Diketahui';
             if (year >= 1946 && year <= 1964) generation = 'Baby Boomers';
@@ -60,39 +60,39 @@ export default {
 
             let gender = '-';
             let genderIcon = 'bi-gender-ambiguous';
-            if(nip.length >= 15) {
+            if (nip.length >= 15) {
                 const g = nip.substring(14, 15);
-                if(g === '1') { gender = 'Laki-laki'; genderIcon = 'bi-gender-male'; }
-                if(g === '2') { gender = 'Perempuan'; genderIcon = 'bi-gender-female'; }
+                if (g === '1') { gender = 'Laki-laki'; genderIcon = 'bi-gender-male'; }
+                if (g === '2') { gender = 'Perempuan'; genderIcon = 'bi-gender-female'; }
             }
             return { tgl: tglString, gender, generation, genderIcon };
         };
 
         const getGenColor = (gen) => {
-            if(gen === 'Baby Boomers') return 'bg-secondary';
-            if(gen === 'Gen X') return 'bg-success';
-            if(gen === 'Millennials') return 'bg-primary';
-            if(gen === 'Gen Z') return 'bg-info text-dark';
-            if(gen === 'Gen Alpha') return 'bg-warning text-dark';
+            if (gen === 'Baby Boomers') return 'bg-secondary';
+            if (gen === 'Gen X') return 'bg-success';
+            if (gen === 'Millennials') return 'bg-primary';
+            if (gen === 'Gen Z') return 'bg-info text-dark';
+            if (gen === 'Gen Alpha') return 'bg-warning text-dark';
             return 'bg-light text-dark border';
         };
 
         // --- 2. LOGIKA HITUNG STATISTIK (MANUAL TRIGGER) ---
         // [HEMAT] Hanya jalankan jika diminta user, karena membaca seluruh DB mahal.
         const hitungStatistik = async () => {
-            if(!await showConfirm("Hitung Statistik?", "Proses ini akan membaca semua data pegawai. Lanjutkan?")) return;
-            
+            if (!await showConfirm("Hitung Statistik?", "Proses ini akan membaca semua data pegawai. Lanjutkan?")) return;
+
             loadingStats.value = true;
             try {
                 // Query ALL documents (Costly operation)
                 const q = query(collection(db, "master_pegawai"));
                 const snap = await getDocs(q);
-                
+
                 stats.boomers = 0; stats.genx = 0; stats.millennials = 0; stats.genz = 0; stats.alpha = 0;
                 stats.total = snap.size;
 
                 snap.forEach(doc => {
-                    const nip = doc.id; 
+                    const nip = doc.id;
                     const year = parseInt(nip.substring(0, 4));
                     if (year >= 1946 && year <= 1964) stats.boomers++;
                     else if (year >= 1965 && year <= 1980) stats.genx++;
@@ -118,11 +118,11 @@ export default {
                     // [OPTIMIZED SEARCH] Prefix Search
                     const term = searchQuery.value.trim();
                     const isNumber = /^\d+$/.test(term);
-                    
+
                     if (isNumber) {
                         // Cari NIP
-                        q = query(collRef, 
-                            orderBy('nip'), 
+                        q = query(collRef,
+                            orderBy('nip'),
                             where('nip', '>=', term),
                             where('nip', '<=', term + '\uf8ff'),
                             limit(itemsPerPage)
@@ -132,31 +132,31 @@ export default {
                         // Karena kita pakai formatTitleCase saat simpan, kita search pakai format itu juga
                         // ATAU pakai Uppercase jika data lama uppercase. 
                         // Asumsi: Data Master Pegawai biasanya UPPERCASE.
-                        const termSearch = term.toUpperCase(); 
-                        
+                        const termSearch = term.toUpperCase();
+
                         // Note: Perlu index (nama, asc)
-                        q = query(collRef, 
-                            orderBy('nama'), 
+                        q = query(collRef,
+                            orderBy('nama'),
                             where('nama', '>=', termSearch),
                             where('nama', '<=', termSearch + '\uf8ff'),
                             limit(itemsPerPage)
                         );
                     }
-                    
-                    if(direction !== 'next' && direction !== 'prev') { currentPage.value=1; pageStack.value=[]; }
+
+                    if (direction !== 'next' && direction !== 'prev') { currentPage.value = 1; pageStack.value = []; }
                 } else {
                     // Pagination Normal
                     if (direction === 'first') {
                         q = query(collRef, orderBy(sortBy.value, sortOrder.value), limit(itemsPerPage));
                         pageStack.value = []; currentPage.value = 1;
                     } else if (direction === 'next') {
-                        const lastVisible = pageStack.value[pageStack.value.length-1];
+                        const lastVisible = pageStack.value[pageStack.value.length - 1];
                         q = query(collRef, orderBy(sortBy.value, sortOrder.value), startAfter(lastVisible), limit(itemsPerPage));
                         currentPage.value++;
                     } else if (direction === 'prev') {
                         pageStack.value.pop();
-                        const prevDoc = pageStack.value[pageStack.value.length-1];
-                        if(!prevDoc) q = query(collRef, orderBy(sortBy.value, sortOrder.value), limit(itemsPerPage));
+                        const prevDoc = pageStack.value[pageStack.value.length - 1];
+                        if (!prevDoc) q = query(collRef, orderBy(sortBy.value, sortOrder.value), limit(itemsPerPage));
                         else q = query(collRef, orderBy(sortBy.value, sortOrder.value), startAfter(prevDoc), limit(itemsPerPage));
                         currentPage.value--;
                     }
@@ -169,15 +169,15 @@ export default {
                 } else {
                     isLastPage.value = snap.docs.length < itemsPerPage;
                     listData.value = snap.docs.map(d => d.data());
-                    
+
                     if (direction !== 'prev' && !searchQuery.value) {
-                        const lastVisible = snap.docs[snap.docs.length-1];
-                        if(direction === 'next' || pageStack.value.length === 0) pageStack.value.push(lastVisible);
+                        const lastVisible = snap.docs[snap.docs.length - 1];
+                        if (direction === 'next' || pageStack.value.length === 0) pageStack.value.push(lastVisible);
                     }
                 }
-                
+
                 // Estimasi total hanya saat awal (sekali saja)
-                if(totalEstimasi.value === 0 && !searchQuery.value) totalEstimasi.value = listData.value.length + (isLastPage.value ? 0 : 100); 
+                if (totalEstimasi.value === 0 && !searchQuery.value) totalEstimasi.value = listData.value.length + (isLastPage.value ? 0 : 100);
             } catch (e) {
                 console.error(e);
                 showToast("Gagal memuat data (Cek Koneksi/Index)", 'error');
@@ -186,8 +186,8 @@ export default {
 
         // Helpers
         const changeSort = (field) => {
-            if(searchQuery.value) return showToast("Sort nonaktif saat search", 'info');
-            if(sortBy.value === field) sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+            if (searchQuery.value) return showToast("Sort nonaktif saat search", 'info');
+            if (sortBy.value === field) sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
             else { sortBy.value = field; sortOrder.value = 'asc'; }
             pageStack.value = []; currentPage.value = 1;
             fetchData('first');
@@ -200,7 +200,7 @@ export default {
 
         const runSearch = debounce(() => { pageStack.value = []; fetchData('first'); }, 800);
         watch(searchQuery, runSearch);
-        
+
         const nextPage = () => fetchData('next');
         const prevPage = () => fetchData('prev');
 
@@ -209,7 +209,7 @@ export default {
             const file = event.target.files[0];
             if (!file) return;
             isImporting.value = true;
-            
+
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
@@ -221,7 +221,7 @@ export default {
                     if (json.length === 0) throw new Error("Excel kosong!");
 
                     // Batch Limit Firestore adalah 500
-                    const CHUNK = 400; 
+                    const CHUNK = 400;
                     let processedCount = 0;
 
                     for (let i = 0; i < json.length; i += CHUNK) {
@@ -231,10 +231,11 @@ export default {
                             const nama = row['NAMA'] || row['nama'];
                             const tempat = row['TEMPAT_LAHIR'] || row['tempat_lahir'] || '';
                             const opd = row['PERANGKAT_DAERAH'] || row['perangkat_daerah'] || '';
+                            const tmtKgb = row['TMT_KGB_BERIKUTNYA'] || row['tmt_kgb_berikutnya'] || '';
 
                             if (nip && nama) {
                                 const nipStr = String(nip).replace(/['"\s]/g, '');
-                                
+
                                 // AUTO FORMAT DATA EXCEL (Agar rapi)
                                 const cleanNama = String(nama).trim().toUpperCase(); // Nama biasanya Upper
                                 const cleanTempat = formatTitleCase(String(tempat));
@@ -245,6 +246,7 @@ export default {
                                     nama: cleanNama,
                                     tempat_lahir: cleanTempat,
                                     perangkat_daerah: cleanOpd,
+                                    tmt_kgb_berikutnya: tmtKgb,
                                     updated_at: serverTimestamp()
                                 }, { merge: true });
                                 processedCount++;
@@ -275,11 +277,12 @@ export default {
                     nama: form.nama.trim().toUpperCase(), // Standardize Nama
                     tempat_lahir: formatTitleCase(form.tempat_lahir),
                     perangkat_daerah: formatTitleCase(form.perangkat_daerah),
+                    tmt_kgb_berikutnya: form.tmt_kgb_berikutnya || '',
                     updated_at: serverTimestamp()
                 };
 
                 await setDoc(doc(db, "master_pegawai", cleanData.nip), cleanData, { merge: true });
-                
+
                 showToast("Pegawai Tersimpan!");
                 closeModal();
                 fetchData('first');
@@ -291,10 +294,10 @@ export default {
         };
 
         const hapusData = async (item) => {
-            if(await showConfirm('Hapus?', `Hapus ${item.nama}?`)) {
+            if (await showConfirm('Hapus?', `Hapus ${item.nama}?`)) {
                 try {
                     await deleteDoc(doc(db, "master_pegawai", item.nip));
-                    showToast("Terhapus"); 
+                    showToast("Terhapus");
                     fetchData('first');
                 } catch (e) {
                     showToast(e.message, 'error');
@@ -305,19 +308,19 @@ export default {
         const openModal = (item) => {
             isEdit.value = !!item;
             if (item) Object.assign(form, item);
-            else { form.nip=''; form.nama=''; form.tempat_lahir=''; form.perangkat_daerah=''; }
+            else { form.nip = ''; form.nama = ''; form.tempat_lahir = ''; form.perangkat_daerah = ''; form.tmt_kgb_berikutnya = ''; }
             showModal.value = true;
         };
         const closeModal = () => showModal.value = false;
 
         onMounted(() => fetchData('first'));
 
-        return { 
-            listData, loading, loadingStats, showModal, isEdit, isSaving, 
-            form, searchQuery, 
+        return {
+            listData, loading, loadingStats, showModal, isEdit, isSaving,
+            form, searchQuery,
             currentPage, isLastPage, nextPage, prevPage, totalEstimasi,
-            isImporting, handleImportExcel, 
-            simpanData, hapusData, openModal, closeModal, 
+            isImporting, handleImportExcel,
+            simpanData, hapusData, openModal, closeModal,
             getInfoNip, getGenColor, hitungStatistik, stats,
             changeSort, getSortIcon
         };

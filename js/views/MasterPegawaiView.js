@@ -95,6 +95,9 @@ export const TplMasterPegawai = `
                             <th class="cursor-pointer" @click="changeSort('perangkat_daerah')">
                                 Perangkat Daerah <i class="bi" :class="getSortIcon('perangkat_daerah')"></i>
                             </th>
+                            <th class="cursor-pointer" @click="changeSort('tmt_kgb_berikutnya')">
+                                TMT Berikutnya <i class="bi" :class="getSortIcon('tmt_kgb_berikutnya')"></i>
+                            </th>
                             <th class="text-end pe-4">Aksi</th>
                         </tr>
                     </thead>
@@ -132,6 +135,10 @@ export const TplMasterPegawai = `
                                 <span class="badge bg-light text-secondary border text-wrap text-start" style="max-width: 250px;">
                                     {{ item.perangkat_daerah || '-' }}
                                 </span>
+                            </td>
+                            <td>
+                                <span v-if="item.tmt_kgb_berikutnya" class="badge bg-warning text-dark border border-warning shadow-sm"><i class="bi bi-clock-history me-1"></i> {{ item.tmt_kgb_berikutnya }}</span>
+                                <span v-else class="text-muted small">-</span>
                             </td>
                             <td class="text-end pe-4">
                                 <button @click="openModal(item)" class="btn btn-sm btn-light border me-1 text-primary"><i class="bi bi-pencil-square"></i></button>
@@ -185,6 +192,10 @@ export const TplMasterPegawai = `
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">Perangkat Daerah</label>
                             <input v-model="form.perangkat_daerah" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-primary">TMT KGB Berikutnya <i class="bi bi-info-circle ms-1" title="Digunakan untuk alarm KGB"></i></label>
+                            <input type="date" v-model="form.tmt_kgb_berikutnya" class="form-control border-primary">
                         </div>
                         <div class="d-grid mt-4">
                             <button type="submit" class="btn btn-primary py-2" :disabled="isSaving">

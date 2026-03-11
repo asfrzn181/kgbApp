@@ -41,6 +41,15 @@ export const TplLaporan = `
                     </div>
 
                     <div class="col-12 col-md-2">
+                        <label class="form-label small fw-bold text-muted">Status</label>
+                        <select v-model="filterStatus" class="form-select shadow-sm">
+                            <option value="ALL">Semua Status</option>
+                            <option value="SELESAI">SK Selesai</option>
+                            <option value="DRAFT">Draft Belum Selesai</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-2">
                         <button type="submit" class="btn btn-primary w-100 shadow-sm" :disabled="loading">
                             <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
                             {{ loading ? 'Memuat...' : 'Analisis Data' }}
@@ -94,11 +103,21 @@ export const TplLaporan = `
 
     <div v-if="hasSearched" class="fade-in">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
-            <h5 class="fw-bold text-secondary mb-0">
-                Rincian Data 
-                <span class="badge bg-secondary ms-2">{{ previewData.length }} Data</span>
-            </h5>
-            <button v-if="previewData.length > 0" @click="downloadExcel" class="btn btn-success shadow-sm w-100 w-md-auto">
+            <div>
+                <h5 class="fw-bold text-secondary mb-0">
+                    Rincian Data 
+                    <span class="badge bg-secondary ms-2">{{ filteredPreviewData.length }} Data</span>
+                </h5>
+                <div v-if="activeChartFilter" class="mt-2">
+                    <span class="badge bg-primary text-white p-2">
+                        <i class="bi bi-funnel-fill me-1"></i> Filter: {{ activeChartFilter.type.replace('_', ' ') }} = {{ activeChartFilter.value }}
+                    </span>
+                    <button @click="clearChartFilter" class="btn btn-sm btn-outline-danger ms-2" style="padding: 2px 8px; font-size: 0.8rem;">
+                        <i class="bi bi-x-lg"></i> Hapus Filter
+                    </button>
+                </div>
+            </div>
+            <button v-if="filteredPreviewData.length > 0" @click="downloadExcel" class="btn btn-success shadow-sm w-100 w-md-auto mt-2 mt-md-0 align-self-md-start">
                 <i class="bi bi-file-earmark-excel me-2"></i>Download Excel
             </button>
         </div>
@@ -117,14 +136,15 @@ export const TplLaporan = `
                                 <th class="text-end">Gaji Lama</th>
                                 <th class="text-end">Gaji Baru</th>
                                 <th>Unit Kerja</th>
+                                <th>Status</th>
                                 <th v-if="store.isAdmin">Input Oleh</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-if="previewData.length === 0">
-                                <td colspan="9" class="text-center py-5 text-muted">Tidak ada data pada periode ini.</td>
+                            <tr v-if="filteredPreviewData.length === 0">
+                                <td colspan="10" class="text-center py-5 text-muted">Tidak ada data pada filter ini.</td>
                             </tr>
-                            <tr v-else v-for="item in previewData" :key="item.id">
+                            <tr v-else v-for="item in filteredPreviewData" :key="item.id">
                                 <td class="ps-3 fw-bold">{{ item.nama_snapshot }}</td>
                                 <td class="font-monospace">{{ item.nip }}</td>
                                 <td>{{ item.golongan }}</td>
@@ -136,6 +156,10 @@ export const TplLaporan = `
                                 <td class="text-end text-muted">{{ formatRupiah(item.dasar_gaji_lama) }}</td>
                                 <td class="text-end pe-4 fw-bold text-success">{{ formatRupiah(item.gaji_baru) }}</td>
                                 <td class="text-truncate" style="max-width: 150px;" :title="item.unit_kerja">{{ item.unit_kerja }}</td>
+                                <td>
+                                    <span v-if="(item.status || 'DRAFT') === 'SELESAI'" class="badge bg-success bg-opacity-10 text-success border border-success">Selesai</span>
+                                    <span v-else class="badge bg-warning bg-opacity-10 text-warning border border-warning">Draft</span>
+                                </td>
                                 <td v-if="store.isAdmin" class="text-muted fst-italic">{{ item.creator_email }}</td>
                             </tr>
                         </tbody>

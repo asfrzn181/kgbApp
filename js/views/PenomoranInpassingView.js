@@ -98,14 +98,15 @@ export const TplPenomoran = `
                             <th class="ps-4">No. Surat Lengkap</th>
                             <th>Nama Pegawai</th>
                             <th>Kategori & Tahun</th>
+                            <th>Pembuat</th>
                             <th>Tanggal Dibuat</th>
                             <th>Urutan</th>
                             <th class="text-end pe-4">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-if="loading"><td colspan="6" class="text-center py-5"><div class="spinner-border text-primary spinner-border-sm me-2"></div>Loading...</td></tr>
-                        <tr v-else-if="listData.length === 0"><td colspan="6" class="text-center py-5 text-muted">Data tidak ditemukan.</td></tr>
+                        <tr v-if="loading"><td colspan="7" class="text-center py-5"><div class="spinner-border text-primary spinner-border-sm me-2"></div>Loading...</td></tr>
+                        <tr v-else-if="listData.length === 0"><td colspan="7" class="text-center py-5 text-muted">Data tidak ditemukan.</td></tr>
                         
                         <tr v-else v-for="item in listData" :key="item.id">
                             <td class="ps-4">
@@ -125,6 +126,9 @@ export const TplPenomoran = `
                                 <span v-if="item.kategori === 'INPASSING'" class="badge bg-warning text-dark ms-1" style="font-size: 0.65rem;">INP</span>
                             </td>
                             <td>
+                                <div class="small text-muted fw-bold"><i class="bi bi-person-circle me-1 text-secondary"></i>{{ item.creator_email ? item.creator_email.split('@')[0] : 'Sistem' }}</div>
+                            </td>
+                            <td>
                                 <div class="small text-muted">{{ item.created_at_formatted }}</div>
                             </td>
                             <td>
@@ -132,9 +136,6 @@ export const TplPenomoran = `
                             </td>
                             <td class="text-end pe-4">
                                 <div class="btn-group">
-                                    <button @click="previewSK(item)" class="btn btn-sm btn-light border text-primary" title="Preview">
-                                        <i class="bi bi-eye-fill"></i>
-                                    </button>
                                     <button @click="editNomor(item)" class="btn btn-sm btn-light border text-warning" title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
@@ -260,6 +261,14 @@ export const TplPenomoran = `
                                             <input v-model.number="form.gaji_lama_inpassing" type="number" class="form-control" placeholder="Contoh: 3500000">
                                         </div>
                                         <div class="form-text small text-muted">Input angka tanpa titik/koma.</div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-dark">Acuan Aturan / Perpres</label>
+                                        <select v-model="form.perpres_inpassing" class="form-select form-select-sm text-secondary font-monospace">
+                                            <option value="">-- Pilih Perpres --</option>
+                                            <option v-for="p in listPerpres" :key="p.judul" :value="p.judul">{{ p.judul }}</option>
+                                        </select>
                                     </div>
 
                                     <div class="col-12">
@@ -419,34 +428,6 @@ export const TplPenomoran = `
         </div>
     </div>
 
-    <div v-if="showPreviewModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.8); z-index: 1060;" tabindex="-1" @click.self="closePreview">
-        <div class="modal-dialog modal-xl modal-fullscreen-sm-down modal-dialog-scrollable" style="height: 95vh;">
-            <div class="modal-content h-100 border-0">
-                <div class="modal-header bg-dark text-white border-0 py-2 align-items-center justify-content-between">
-                    <h6 class="modal-title mb-0"><i class="bi bi-eye me-2"></i>Preview SK Inpassing</h6>
-                    <div>
-                        <button class="btn btn-sm btn-success me-2" @click="downloadFromPreview"><i class="bi bi-download me-1"></i> <span class="d-none d-md-inline">Download</span></button>
-                        <button type="button" class="btn-close btn-close-white" @click="closePreview"></button>
-                    </div>
-                </div>
-                
-                <div class="modal-body p-0 d-flex flex-column bg-light position-relative">
-                    <ul class="nav nav-tabs nav-justified bg-white border-bottom shadow-sm">
-                        <li class="nav-item"><a class="nav-link rounded-0 py-3 fw-bold" :class="previewTab === 'BASAH' ? 'active text-primary' : 'text-muted'" @click="changePreviewTab('BASAH')">TTD BASAH</a></li>
-                        <li class="nav-item"><a class="nav-link rounded-0 py-3 fw-bold" :class="previewTab === 'TTE' ? 'active text-success' : 'text-muted'" @click="changePreviewTab('TTE')">TTE (Srikandi)</a></li>
-                    </ul>
-
-                    <div class="flex-grow-1 bg-secondary d-flex justify-content-center overflow-auto py-4 position-relative">
-                        <div v-if="previewLoading" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-secondary bg-opacity-75" style="z-index: 10;">
-                            <div class="spinner-border text-primary" role="status"></div>
-                        </div>
-                        
-                        <div id="docx-preview-container" 
-                             class="bg-white shadow-lg transition-all" >
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
+</div>
 `;

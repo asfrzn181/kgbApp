@@ -1,0 +1,115 @@
+{
+    "indexes": [
+        {
+            "collectionGroup": "usulan_kgb",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "created_by",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "created_at",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "usulan_kgb",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "created_by",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "nip",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "usulan_kgb",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "created_by",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "nama",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "nomor_surat",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "kategori",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "created_at",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "nomor_surat",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "kategori",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "created_by",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "created_at",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "nomor_surat",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "kategori",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "created_by",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "nip",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "nomor_surat",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "kategori",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "created_by",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "nama_pegawai",
+                    "order": "ASCENDING"
+                }
+            ]
+        }
+    ],
+    "fieldOverrides": []
+}

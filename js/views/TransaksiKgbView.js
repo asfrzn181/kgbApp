@@ -28,10 +28,10 @@ export const TplSearchSelect = `
 export const TplAutocompleteJabatan = `
     <div class="position-relative w-100">
         <input type="text" class="form-control" :value="modelValue" @input="handleInput"
-            @focus="showSuggestions = true" @blur="delayHide" placeholder="Ketik nama jabatan..." autocomplete="off">
+            @focus="showSuggestions = true" @blur="handleBlur" placeholder="Ketik nama jabatan..." autocomplete="off">
         
         <ul v-if="showSuggestions && suggestions.length > 0" class="list-group position-absolute w-100 shadow mt-1" style="z-index: 1050; max-height: 250px; overflow-y: auto;">
-            <li v-for="item in suggestions" :key="item.id" class="list-group-item list-group-item-action small cursor-pointer py-2" @mousedown="selectItem(item)">
+            <li v-for="item in suggestions" :key="item.id" class="list-group-item list-group-item-action small cursor-pointer py-2" @mousedown.prevent="selectItem(item)">
                 <div class="fw-bold text-dark">{{ item.nama_jabatan }}</div>
                 <div class="d-flex justify-content-between small mt-1">
                     <span class="badge bg-light text-secondary border">{{ item.jenis_jabatan || 'Umum' }}</span>
@@ -48,7 +48,7 @@ export const TplAutocompleteJabatan = `
 export const TplAutocompleteUnitKerja = `
     <div class="position-relative w-100">
         <input type="text" class="form-control" :value="modelValue" @input="handleInput"
-            @focus="showSuggestions = true" @blur="delayHide" placeholder="Cari unit kerja..." autocomplete="off">
+            @focus="showSuggestions = true" @blur="handleBlur" placeholder="Cari unit kerja..." autocomplete="off">
         
         <ul v-if="showSuggestions && suggestions.length > 0" class="list-group position-absolute w-100 shadow mt-1" style="z-index: 1050; max-height: 250px; overflow-y: auto;">
             <li v-for="(item, index) in suggestions" :key="index" class="list-group-item list-group-item-action small cursor-pointer py-2" @mousedown="selectItem(item)">
@@ -64,7 +64,7 @@ export const TplAutocompleteUnitKerja = `
 export const TplAutocompletePerangkatDaerah = `
     <div class="position-relative w-100">
         <input type="text" class="form-control" :value="modelValue" @input="handleInput"
-            @focus="showSuggestions = true" @blur="delayHide" placeholder="Cari perangkat daerah..." autocomplete="off">
+            @focus="showSuggestions = true" @blur="handleBlur" placeholder="Cari perangkat daerah..." autocomplete="off">
         
         <ul v-if="showSuggestions && suggestions.length > 0" class="list-group position-absolute w-100 shadow mt-1" style="z-index: 1050; max-height: 250px; overflow-y: auto;">
             <li v-for="(item, index) in suggestions" :key="index" class="list-group-item list-group-item-action small cursor-pointer py-2" @mousedown="selectItem(item)">
@@ -352,21 +352,185 @@ export const TplMain = `
                             <div class="card-header bg-white py-3"><h6 class="fw-bold text-primary mb-0">1. Identitas Pegawai</h6></div>
                             <div class="card-body">
                                 <div class="row g-3">
-                                    <div class="col-12 col-md-4"><label class="form-label small fw-bold">NIP</label><div class="input-group"><input v-model="form.nip" type="text" class="form-control" :disabled="isEditMode" placeholder="Ketik NIP..." @input="handleNipInput"><span v-if="isSearching" class="input-group-text bg-white"><div class="spinner-border spinner-border-sm"></div></span></div></div>
-                                    <div class="col-6 col-md-2"><label class="form-label small fw-bold">Tipe ASN</label><select v-model="form.tipe_asn" class="form-select"><option value="PNS">PNS</option><option value="PPPK">PPPK</option></select></div>
-                                    <div class="col-12 col-md-6"><label class="form-label small text-muted">Nama Lengkap</label><input v-model="form.nama" class="form-control fw-bold" required></div>
-                                    <div class="col-6 col-md-3"><label class="form-label small text-muted">Tempat Lahir</label><input v-model="form.tempat_lahir" class="form-control"></div>
-                                    <div class="col-6 col-md-3"><label class="form-label small text-muted">Tgl Lahir</label><input v-model="form.tgl_lahir" type="date" class="form-control border-warning" required></div>
-                                    <div class="col-12 col-md-6"><label class="form-label small text-muted">Jabatan</label><AutocompleteJabatan v-model="form.jabatan" @select="handleJabatanSelect" /></div>
-                                    <div class="col-12 col-md-6"><label class="form-label small text-muted">Unit Kerja</label><AutocompleteUnitKerja v-model="form.unit_kerja" /><label class="form-label small text-danger">Bila tidak bisa dihapus : CTRL + A + BACKSPACE</label></div>
-                                    <div class="col-12 col-md-6"><label class="form-label small text-muted">Perangkat Daerah</label><AutocompletePerangkatDaerah v-model="form.perangkat_daerah" /></div>
-                                    <div class="col-12 col-md-6"><label class="form-label small text-muted">Jenis Jabatan</label><select v-model="form.jenis_jabatan" class="form-select"><option value="Pelaksana">Pelaksana</option><option value="Fungsional">Fungsional</option><option value="Struktural">Struktural</option></select></div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small fw-bold">NIP</label>
+                                        <div class="input-group">
+                                            <input v-model="form.nip" type="text" class="form-control" :disabled="isEditMode" placeholder="Ketik NIP..." @input="handleNipInput">
+                                            <span v-if="isSearching" class="input-group-text bg-white"><div class="spinner-border spinner-border-sm"></div></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label small fw-bold">Tipe ASN</label>
+                                        <select v-model="form.tipe_asn" class="form-select">
+                                            <option value="PNS">PNS</option>
+                                            <option value="PPPK">PPPK</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small text-muted">Nama Lengkap</label>
+                                        <input v-model="form.nama" class="form-control fw-bold" required>
+                                    </div>
+                                    
+                                    <div class="col-6 col-md-3">
+                                        <label class="form-label small text-muted">Tempat Lahir</label>
+                                        <input v-model="form.tempat_lahir" class="form-control">
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label class="form-label small text-muted">Tgl Lahir</label>
+                                        <input v-model="form.tgl_lahir" type="date" class="form-control border-warning" required>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small text-muted">Jabatan</label>
+                                        <AutocompleteJabatan v-model="form.jabatan" @select="handleJabatanSelect" />
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-6">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <label class="form-label small text-muted mb-0">Unit Kerja</label>
+                                        </div>
+                                        <AutocompleteUnitKerja v-model="form.unit_kerja" />
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small text-muted">Perangkat Daerah</label>
+                                        <AutocompletePerangkatDaerah v-model="form.perangkat_daerah" />
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small text-muted">Jenis Jabatan</label>
+                                        <select v-model="form.jenis_jabatan" class="form-select">
+                                            <option value="Pelaksana">Pelaksana</option>
+                                            <option value="Fungsional">Fungsional</option>
+                                            <option value="Struktural">Struktural</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white py-3"><h6 class="fw-bold text-secondary mb-0">2. Dasar SK Lama</h6></div><div class="card-body"><div class="row g-3"><div class="col-12 col-md-6"><label class="form-label small fw-bold">Dasar Surat</label><SearchSelect :options="listDasarHukum" v-model="form.dasar_hukum" label-key="judul" value-key="judul" placeholder="Pilih..." /></div><div class="col-12 col-md-6"><label class="form-label small text-muted">Pejabat TTD</label><input v-model="form.dasar_pejabat" class="form-control"></div><div class="col-6 col-md-4"><label class="form-label small text-muted">Nomor SK</label><input v-model="form.dasar_nomor" class="form-control"></div><div class="col-6 col-md-4"><label class="form-label small text-muted">Tanggal SK</label><input v-model="form.dasar_tanggal" type="date" class="form-control"></div><div class="col-12 col-md-4"><label class="form-label small fw-bold text-primary">TMT Gaji Lama</label><input v-model="form.dasar_tmt" type="date" class="form-control" required></div><div class="col-12 bg-light p-3 rounded border"><div class="row g-2"><div class="col-12 col-md-4"><label class="small text-muted fw-bold">Gol. Lama</label><SearchSelect :options="filteredGolongan" v-model="form.dasar_golongan" label-key="kode" value-key="kode" /></div><div class="col-6 col-md-2"><label class="small text-muted">MK Thn</label><input v-model.number="form.dasar_mk_tahun" type="number" class="form-control form-control-sm"></div><div class="col-6 col-md-2"><label class="small text-muted">MK Bln</label><input v-model.number="form.dasar_mk_bulan" type="number" class="form-control form-control-sm"></div><div class="col-12 col-md-4"><label class="small text-muted fw-bold">Gaji Lama</label><div class="input-group input-group-sm"><input :value="formatRupiah(form.dasar_gaji_lama)" class="form-control fw-bold text-secondary" readonly><button type="button" @click="cariGajiLama" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i></button></div></div></div></div></div></div></div>
-                        <div class="card shadow-sm border-0 border-start border-4 border-success mb-3"><div class="card-header bg-success bg-opacity-10 py-3"><h6 class="fw-bold text-success mb-0">3. Penetapan Gaji Baru</h6></div><div class="card-body"><div class="row g-3"><div class="col-12 col-md-4"><label class="form-label small fw-bold">Golongan Baru</label><SearchSelect :options="filteredGolongan" v-model="form.golongan" label-key="label_full" value-key="kode" placeholder="Pilih..." @change="handleGolonganChange" /></div><div class="col-6 col-md-2"><label class="form-label small fw-bold">MK Thn</label><input v-model.number="form.mk_baru_tahun" type="number" class="form-control fw-bold"></div><div class="col-6 col-md-2"><label class="form-label small fw-bold">MK Bln</label><input v-model.number="form.mk_baru_bulan" type="number" class="form-control"></div><div class="col-12 col-md-4"><label class="form-label small fw-bold text-success">Gaji Pokok Baru</label><div class="input-group"><input :value="formatRupiah(form.gaji_baru)" class="form-control bg-success text-white fw-bold" readonly><button type="button" @click="cariGajiBaru" class="btn btn-outline-success"><i class="bi bi-arrow-clockwise"></i></button></div></div><div class="col-12"><hr></div><div v-if="form.tipe_asn === 'PPPK'" class="col-12 bg-warning bg-opacity-10 p-3 rounded border border-warning mb-3"><div class="row g-3"><div class="col-12 col-md-6"><label class="form-label small fw-bold">Masa Perjanjian</label><input v-model="form.masa_perjanjian" class="form-control"></div><div class="col-12 col-md-6"><label class="form-label small fw-bold">Perpanjangan</label><input v-model="form.perpanjangan_perjanjian" class="form-control"></div></div></div><div class="col-12 col-md-3"><label class="form-label small fw-bold">TMT Sekarang</label><input v-model="form.tmt_sekarang" type="date" class="form-control" required></div><div class="col-12 col-md-4"><label class="form-label small text-muted">TMT YAD</label><div class="input-group"><input v-model="form.tmt_selanjutnya" type="date" class="form-control bg-white"><button type="button" @click="setTmtPensiun" class="btn btn-danger text-white btn-sm fw-bold"><i class="bi bi-stop-circle me-1"></i> STOP</button></div><div class="small text-danger fw-bold mt-1" v-if="pensiunMsg">{{ pensiunMsg }}</div></div><div class="col-12 col-md-5"><label class="form-label small fw-bold text-primary">Pejabat TTD</label><SearchSelect :options="listPejabat" v-model="form.pejabat_baru_nip" label-key="jabatan" value-key="nip" /></div></div></div></div>
-                        <div class="card shadow-sm border-0 border-start border-4 border-danger"><div class="card-body py-2"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" v-model="form.is_pensiun_manual" id="manualPensiunCheck"><label class="form-check-label small fw-bold text-danger" for="manualPensiunCheck">Set Status: Berhenti Berkala (Pensiun/Meninggal/Berakhirnya masa KGB)</label></div></div></div>
+                        
+                        <div class="card shadow-sm border-0 mb-3">
+                            <div class="card-header bg-white py-3"><h6 class="fw-bold text-secondary mb-0">2. Dasar SK Lama</h6></div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small fw-bold">Dasar Surat</label>
+                                        <SearchSelect :options="listDasarHukum" v-model="form.dasar_hukum" label-key="judul" value-key="judul" placeholder="Pilih..." />
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small text-muted">Pejabat TTD</label>
+                                        <input v-model="form.dasar_pejabat" class="form-control">
+                                    </div>
+                                    
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label small text-muted">Nomor SK</label>
+                                        <input v-model="form.dasar_nomor" class="form-control">
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label small text-muted">Tanggal SK</label>
+                                        <input v-model="form.dasar_tanggal" type="date" class="form-control">
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small fw-bold text-primary">TMT Gaji Lama</label>
+                                        <input v-model="form.dasar_tmt" type="date" class="form-control" required>
+                                    </div>
+                                    
+                                    <div class="col-12 bg-light p-3 rounded border">
+                                        <div class="row g-2">
+                                            <div class="col-12 col-md-4">
+                                                <SearchSelect :options="filteredGolongan" v-model="form.dasar_golongan" label-key="kode" value-key="kode" @change="handleGolonganLamaChange" />
+                                            </div>
+                                            <div class="col-6 col-md-2">
+                                                <label class="small text-muted">MK Thn</label>
+                                                <input v-model.number="form.dasar_mk_tahun" type="number" class="form-control form-control-sm">
+                                            </div>
+                                            <div class="col-6 col-md-2">
+                                                <label class="small text-muted">MK Bln</label>
+                                                <input v-model.number="form.dasar_mk_bulan" type="number" class="form-control form-control-sm">
+                                            </div>
+                                            <div class="col-12 col-md-4">
+                                                <label class="small text-muted fw-bold">Gaji Lama</label>
+                                                <div class="input-group input-group-sm">
+                                                    <input :value="formatRupiah(form.dasar_gaji_lama)" class="form-control fw-bold text-secondary" readonly>
+                                                    <button type="button" @click="cariGajiLama" class="btn btn-outline-secondary" title="Load Gaji Lama"><i class="bi bi-arrow-clockwise"></i></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card shadow-sm border-0 border-start border-4 border-success mb-3">
+                            <div class="card-header bg-success bg-opacity-10 py-3"><h6 class="fw-bold text-success mb-0">3. Penetapan Gaji Baru</h6></div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted mb-1"><i class="bi bi-info-circle me-1"></i>Acuan Aturan / Perpres Gaji (Pilih Pertama)</label>
+                                        <SearchSelect :options="listPerpres" v-model="form.perpres" label-key="judul" value-key="judul" placeholder="Pilih Peraturan Gaji..." />
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small fw-bold">Golongan Baru</label>
+                                        <SearchSelect :options="filteredGolongan" v-model="form.golongan" label-key="label_full" value-key="kode" placeholder="Pilih..." @change="handleGolonganChange" />
+                                    </div>
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label small fw-bold">MK Thn</label>
+                                        <input v-model.number="form.mk_baru_tahun" type="number" class="form-control fw-bold">
+                                    </div>
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label small fw-bold">MK Bln</label>
+                                        <input v-model.number="form.mk_baru_bulan" type="number" class="form-control">
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small fw-bold text-success">Gaji Pokok Baru</label>
+                                        <div class="input-group">
+                                            <input :value="formatRupiah(form.gaji_baru)" class="form-control bg-success text-white fw-bold" readonly>
+                                            <button type="button" @click="cariGajiBaru" class="btn btn-outline-success"><i class="bi bi-arrow-clockwise"></i></button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-12"><hr></div>
+                                    
+                                    <div v-if="form.tipe_asn === 'PPPK'" class="col-12 mb-3">
+                                        <div class="bg-warning bg-opacity-10 p-3 rounded border border-warning">
+                                            <div class="row g-3">
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label small fw-bold">Masa Perjanjian</label>
+                                                    <input v-model="form.masa_perjanjian" class="form-control">
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                    <label class="form-label small fw-bold">Perpanjangan</label>
+                                                    <input v-model="form.perpanjangan_perjanjian" class="form-control">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label small fw-bold">TMT Sekarang</label>
+                                        <input v-model="form.tmt_sekarang" type="date" class="form-control" required>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small text-muted">TMT YAD</label>
+                                        <div class="input-group">
+                                            <input v-model="form.tmt_selanjutnya" type="date" class="form-control bg-white">
+                                            <button type="button" @click="setTmtPensiun" class="btn btn-danger text-white btn-sm fw-bold"><i class="bi bi-stop-circle me-1"></i> STOP</button>
+                                        </div>
+                                        <div class="small text-danger fw-bold mt-1" v-if="pensiunMsg">{{ pensiunMsg }}</div>
+                                    </div>
+                                    <div class="col-12 col-md-5">
+                                        <label class="form-label small fw-bold text-primary">Pejabat TTD</label>
+                                        <SearchSelect :options="listPejabat" v-model="form.pejabat_baru_nip" label-key="jabatan" value-key="nip" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card shadow-sm border-0 border-start border-4 border-danger">
+                            <div class="card-body py-2">
+                                <div class="form-check form-switch m-0 pt-1">
+                                    <input class="form-check-input mt-1" type="checkbox" v-model="form.is_pensiun_manual" id="manualPensiunCheck">
+                                    <label class="form-check-label small fw-bold text-danger ms-1" style="line-height: 1.5;" for="manualPensiunCheck">Set Status: Berhenti Berkala (Pensiun/Meninggal/Berakhirnya Masa Kontrak)</label>
+                                </div>
+                            </div>
+                        </div>
                     </form>
                 </div>
                 <div class="modal-footer bg-white">
@@ -383,10 +547,6 @@ export const TplMain = `
                 <div class="modal-header bg-dark text-white border-0 py-2 align-items-center justify-content-between">
                     <h6 class="modal-title mb-0"><i class="bi bi-eye me-2"></i>Preview SK</h6>
                     <div>
-                        <button class="btn btn-sm btn-primary me-2" @click="printDocument">
-                            <i class="bi bi-printer me-1"></i> <span class="d-none d-md-inline">Cetak</span>
-                        </button>
-
                         <button class="btn btn-sm btn-success me-2" @click="downloadFromPreview">
                             <i class="bi bi-download me-1"></i> <span class="d-none d-md-inline">Download</span>
                         </button>

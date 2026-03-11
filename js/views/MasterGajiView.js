@@ -46,6 +46,7 @@ export const TplMasterGaji = `
                             <th class="ps-4">Golongan</th>
                             <th>Masa Kerja (MKG)</th>
                             <th>Gaji Pokok</th>
+                            <th>Dasar Perpres</th>
                             <th class="text-end pe-4">Aksi</th>
                         </tr>
                     </thead>
@@ -62,6 +63,7 @@ export const TplMasterGaji = `
                                 <span class="badge bg-light text-dark border">{{ item.mkg }} Tahun</span>
                             </td>
                             <td class="fw-bold text-success">{{ formatRupiah(item.gaji) }}</td>
+                            <td><small class="text-muted">{{ item.perpres || '-' }}</small></td>
                             <td class="text-end pe-4">
                                 <div class="btn-group">
                                     <button @click="openModal(item)" class="btn btn-sm btn-light border text-primary" title="Edit">
@@ -107,6 +109,10 @@ export const TplMasterGaji = `
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted">Gaji Pokok</label>
                             <input v-model.number="form.gaji" type="number" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Dasar Perpres (Opsional)</label>
+                            <input v-model="form.perpres" type="text" class="form-control" placeholder="Contoh: Peraturan Pemerintah Nomor 5 Tahun 2024">
                         </div>
                         
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
