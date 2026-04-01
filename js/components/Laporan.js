@@ -295,7 +295,7 @@ export default {
             }));
 
             // 2. FORMAT DATA INPASSING
-            const inpassingData = dataToExport.filter(d => d.nomor_inpassing);
+            const inpassingData = filteredPreviewData.value.filter(d => d.nomor_inpassing);
             const inpassingRows = inpassingData.map(data => ({
                 NIP: "'" + data.nip,
                 NAMA: data.nama,
