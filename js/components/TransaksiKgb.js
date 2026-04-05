@@ -915,7 +915,7 @@ export default {
                 DASAR_HUKUM: textHukum, MK_BARU: `${(item.mk_baru_tahun || 0).toString().padStart(2, '0')} Tahun ${(item.mk_baru_bulan || 0).toString().padStart(2, '0')} Bulan`,
                 GAJI_BARU: formatRupiah(item.gaji_baru), TMT_SEKARANG: formatTanggal(item.tmt_sekarang), TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
                 MASA_PERJANJIAN_KERJA: item.masa_perjanjian || "-", PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian || "-",
-                KOP: kopT, ALAMAT_KOP: kopA, NOMOR_NASKAH: item.nomor_naskah || "....................", TANGGAL_NASKAH: "${tanggal_naskah}",
+                KOP: kopT, ALAMAT_KOP: kopA, NOMOR_NASKAH: item.nomor_naskah || "....................", TANGGAL_NASKAH: previewTab.value === 'TTE' ? "${tanggal_naskah}" : tanggalSurat,
                 SIFAT: "Biasa", TTD_PENGIRIM: ttdContent, JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp,
                 NAMA_PENGIRIM: pjn || "${nama_pengirim}", NIP_PENGIRIM: pjnip || "${nip_pengirim}"
             });
