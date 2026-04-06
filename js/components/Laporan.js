@@ -318,6 +318,32 @@ export default {
             const pnsGol4 = excelRows.filter(d => d.TIPE === 'PNS' && (String(d.GOLONGAN).startsWith('IV') || String(d.GOLONGAN).startsWith('4')));
             const pppp = excelRows.filter(d => d.TIPE === 'PPPK');
 
+            // 4. REKAPITULASI GOLONGAN
+            const rekapGolonganMap = {};
+            excelRows.forEach(d => {
+                const tipe = d.TIPE || 'PNS';
+                const gol = d.GOLONGAN || '-';
+                const key = `${tipe}_${gol}`;
+                if (!rekapGolonganMap[key]) {
+                    rekapGolonganMap[key] = { TIPE: tipe, GOLONGAN: gol, JUMLAH: 0 };
+                }
+                rekapGolonganMap[key].JUMLAH++;
+            });
+            const rekapGolonganRows = Object.values(rekapGolonganMap).sort((a, b) => a.TIPE.localeCompare(b.TIPE) || String(a.GOLONGAN).localeCompare(String(b.GOLONGAN)));
+
+            // 5. REKAPITULASI UNIT KERJA
+            const rekapUnitMap = {};
+            excelRows.forEach(d => {
+                const tipe = d.TIPE || 'PNS';
+                const unit = d['UNIT KERJA'] || '-';
+                const key = `${tipe}_${unit}`;
+                if (!rekapUnitMap[key]) {
+                    rekapUnitMap[key] = { TIPE: tipe, "UNIT KERJA": unit, JUMLAH: 0 };
+                }
+                rekapUnitMap[key].JUMLAH++;
+            });
+            const rekapUnitRows = Object.values(rekapUnitMap).sort((a, b) => a.TIPE.localeCompare(b.TIPE) || String(a['UNIT KERJA']).localeCompare(String(b['UNIT KERJA'])));
+
             const wb = XLSX.utils.book_new();
 
             const appendSheet = (data, name, isKGB = true) => {
@@ -340,6 +366,8 @@ export default {
             appendSheet(pnsGol4, "PNS GOL IV");
             appendSheet(pppp, "PPPK");
             appendSheet(inpassingRows, "REKAP INPASSING", false);
+            appendSheet(rekapGolonganRows, "REKAP GOLONGAN", false);
+            appendSheet(rekapUnitRows, "REKAP UNIT KERJA", false);
 
             const labelFilter = filterType.value === 'TMT' ? 'TMT' : 'Input';
             XLSX.writeFile(wb, `Rekap_Data_${labelFilter}_${startDate.value}_sd_${endDate.value}.xlsx`);
