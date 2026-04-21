@@ -411,46 +411,65 @@ export default {
                     const counterId = `${form.tahun}_INPASSING`;
                     const counterRef = doc(db, "counters_nomor", counterId);
 
+                    // =========================================
+                    // PHASE 1: SEMUA READ DULU BARU WRITE
+                    // =========================================
                     const snapCount = await transaction.get(counterRef);
                     let dbCount = snapCount.exists() ? snapCount.data().count : 0;
 
                     let targetDocRef;
+                    let targetDocSnap = null;
                     if (isEditMode.value) {
                         targetDocRef = doc(db, "nomor_surat", editId.value);
                     } else {
                         const srtId = `INPASSING_${form.tahun}_${currentUrut}`;
                         targetDocRef = doc(db, "nomor_surat", srtId);
-                        const targetSnap = await transaction.get(targetDocRef);
-                        if (targetSnap.exists()) {
-                            throw new Error(`Nomor Urut ${currentUrut} baru saja diambil orang lain. Coba lagi.`);
-                        }
+                        targetDocSnap = await transaction.get(targetDocRef);
                     }
 
+                    // Read old usulan jika usulan berubah (edit mode)
+                    let oldRef = null;
+                    let oldSnap = null;
+                    if (isEditMode.value && oldUsulanId.value && oldUsulanId.value !== form.usulan_id) {
+                        oldRef = doc(db, "usulan_kgb", oldUsulanId.value);
+                        oldSnap = await transaction.get(oldRef);
+                    }
+
+                    // Read target usulan baru
+                    const targetRef = doc(db, "usulan_kgb", form.usulan_id);
+                    const targetUsulanSnap = await transaction.get(targetRef);
+
+                    // =========================================
+                    // PHASE 2: VALIDASI (Setelah Semua Read)
+                    // =========================================
+                    if (!isEditMode.value && targetDocSnap && targetDocSnap.exists()) {
+                        throw new Error(`Nomor Urut ${currentUrut} baru saja diambil orang lain. Coba lagi.`);
+                    }
+                    if (!targetUsulanSnap.exists()) {
+                        throw new Error(`Data Usulan KGB tidak ditemukan!`);
+                    }
+
+                    // =========================================
+                    // PHASE 3: SEMUA WRITE
+                    // =========================================
                     if (currentUrut > dbCount) transaction.set(counterRef, { count: currentUrut }, { merge: true });
 
                     if (isEditMode.value) {
                         transaction.update(targetDocRef, dataLog);
-                        if (oldUsulanId.value && oldUsulanId.value !== form.usulan_id) {
-                            const oldRef = doc(db, "usulan_kgb", oldUsulanId.value);
-                            const oldSnap = await transaction.get(oldRef);
-                            if (oldSnap.exists()) {
-                                transaction.update(oldRef, {
-                                    nomor_inpassing: null, tgl_inpassing: null, inpassing_gaji: null, inpassing_golongan: null,
-                                    keterangan_inpassing: null, mk_inpassing_tahun: null, mk_inpassing_bulan: null,
-                                    mk_berikutnya_tahun: null, mk_berikutnya_bulan: null, gaji_lama_inpassing: null,
-                                    tanggal_inpassing_manual: null, tmt_inpassing: null
-                                });
-                            }
+                        if (oldRef && oldSnap && oldSnap.exists()) {
+                            transaction.update(oldRef, {
+                                nomor_inpassing: null, tgl_inpassing: null, inpassing_gaji: null, inpassing_golongan: null,
+                                keterangan_inpassing: null, mk_inpassing_tahun: null, mk_inpassing_bulan: null,
+                                mk_berikutnya_tahun: null, mk_berikutnya_bulan: null, gaji_lama_inpassing: null,
+                                tanggal_inpassing_manual: null, tmt_inpassing: null
+                            });
                         }
                     } else {
                         dataLog.created_at = serverTimestamp();
                         transaction.set(targetDocRef, dataLog);
                     }
 
-                    const targetRef = doc(db, "usulan_kgb", form.usulan_id);
-                    const targetSnap = await transaction.get(targetRef);
-                    if (targetSnap.exists()) transaction.update(targetRef, dataUpdateUtama);
-                    else throw new Error(`Data Usulan KGB tidak ditemukan!`);
+                    transaction.update(targetRef, dataUpdateUtama);
                 });
 
                 showToast("Berhasil disimpan!", 'success');
