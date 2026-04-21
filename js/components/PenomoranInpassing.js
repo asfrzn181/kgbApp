@@ -412,23 +412,21 @@ export default {
                     const counterRef = doc(db, "counters_nomor", counterId);
 
                     // =========================================
-                    // PHASE 1: SEMUA READ DULU BARU WRITE
+                    // PHASE 1: SEMUA READ DULU — TIDAK BOLEH ADA WRITE DI SINI
                     // =========================================
                     const snapCount = await transaction.get(counterRef);
-                    let dbCount = snapCount.exists() ? snapCount.data().count : 0;
+                    const dbCount = snapCount.exists() ? snapCount.data().count : 0;
 
                     let targetDocRef;
-                    let targetDocSnap = null;
+                    let targetDocSnap;
                     if (isEditMode.value) {
                         targetDocRef = doc(db, "nomor_surat", editId.value);
-                        targetDocSnap = await transaction.get(targetDocRef); // WAJIB: read dulu sebelum update
                     } else {
                         const srtId = `INPASSING_${form.tahun}_${currentUrut}`;
                         targetDocRef = doc(db, "nomor_surat", srtId);
-                        targetDocSnap = await transaction.get(targetDocRef);
                     }
+                    targetDocSnap = await transaction.get(targetDocRef);
 
-                    // Read old usulan jika usulan berubah (edit mode)
                     let oldRef = null;
                     let oldSnap = null;
                     if (isEditMode.value && oldUsulanId.value && oldUsulanId.value !== form.usulan_id) {
@@ -436,7 +434,6 @@ export default {
                         oldSnap = await transaction.get(oldRef);
                     }
 
-                    // Read target usulan baru
                     const targetRef = doc(db, "usulan_kgb", form.usulan_id);
                     const targetUsulanSnap = await transaction.get(targetRef);
 
@@ -451,9 +448,16 @@ export default {
                     }
 
                     // =========================================
-                    // PHASE 3: SEMUA WRITE
+                    // PHASE 3: SEMUA WRITE — TIDAK BOLEH ADA AWAIT / GET DI SINI
                     // =========================================
-                    if (currentUrut > dbCount) transaction.set(counterRef, { count: currentUrut }, { merge: true });
+                    if (currentUrut > dbCount) {
+                        // Gunakan set (tanpa merge) atau update tergantung dokumen sudah ada
+                        if (snapCount.exists()) {
+                            transaction.update(counterRef, { count: currentUrut });
+                        } else {
+                            transaction.set(counterRef, { count: currentUrut });
+                        }
+                    }
 
                     if (isEditMode.value) {
                         transaction.update(targetDocRef, dataLog);
