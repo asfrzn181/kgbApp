@@ -421,6 +421,7 @@ export default {
                     let targetDocSnap = null;
                     if (isEditMode.value) {
                         targetDocRef = doc(db, "nomor_surat", editId.value);
+                        targetDocSnap = await transaction.get(targetDocRef); // WAJIB: read dulu sebelum update
                     } else {
                         const srtId = `INPASSING_${form.tahun}_${currentUrut}`;
                         targetDocRef = doc(db, "nomor_surat", srtId);
@@ -500,9 +501,23 @@ export default {
             if (await showConfirm('Batalkan Nomor Inpassing?', 'Nomor ini akan menjadi KOSONG (Gap).')) {
                 try {
                     await runTransaction(db, async (transaction) => {
-                        transaction.delete(doc(db, "nomor_surat", item.id));
+                        // PHASE 1: Semua READ dulu (wajib sebelum write)
+                        const nomorRef = doc(db, "nomor_surat", item.id);
+                        const nomorSnap = await transaction.get(nomorRef);
+
+                        let usulanRef = null;
+                        let usulanSnap = null;
                         if (item.usulan_id) {
-                            transaction.update(doc(db, "usulan_kgb", item.usulan_id), {
+                            usulanRef = doc(db, "usulan_kgb", item.usulan_id);
+                            usulanSnap = await transaction.get(usulanRef);
+                        }
+
+                        // PHASE 2: Semua WRITE setelah semua read
+                        if (nomorSnap.exists()) {
+                            transaction.delete(nomorRef);
+                        }
+                        if (usulanRef && usulanSnap && usulanSnap.exists()) {
+                            transaction.update(usulanRef, {
                                 nomor_inpassing: null, tgl_inpassing: null, inpassing_gaji: null, inpassing_golongan: null,
                                 keterangan_inpassing: null, mk_inpassing_bulan: null, mk_inpassing_tahun: null,
                                 mk_berikutnya_bulan: null, mk_berikutnya_tahun: null, gaji_lama_inpassing: null,
