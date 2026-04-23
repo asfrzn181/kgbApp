@@ -43,10 +43,10 @@ service cloud.firestore {
     match /master_pejabat/{doc}  { allow read: if isAuthenticated(); allow write: if isAdmin(); }
     match /config_template/{doc} { allow read: if isAuthenticated(); allow write: if isAdmin(); }
 
-    // D. TRANSAKSI KGB (BAGIAN INI YANG SAYA PERBAIKI)
+    // D. TRANSAKSI KGB
     match /usulan_kgb/{docId} {
-      // Baca: Boleh membaca jika ini dokumen miliknya ATAU jika dia adalah ADMIN
-      allow read: if isAuthenticated() && (resource.data.created_by == request.auth.uid || isAdmin());
+      // Baca: Semua user yang login boleh membaca (diperlukan untuk generate/preview SK)
+      allow read: if isAuthenticated();
       
       // Buat: Semua user login boleh
       allow create: if isAuthenticated(); 

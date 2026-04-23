@@ -136,6 +136,9 @@ export const TplPenomoran = `
                             </td>
                             <td class="text-end pe-4">
                                 <div class="btn-group">
+                                    <button @click="previewSK(item)" class="btn btn-sm btn-light border text-info" title="View / Download SK Inpassing">
+                                        <i class="bi bi-eye-fill"></i>
+                                    </button>
                                     <button @click="editNomor(item)" class="btn btn-sm btn-light border text-warning" title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
@@ -427,6 +430,64 @@ export const TplPenomoran = `
             </div>
         </div>
     </div>
+
+    <!-- ======================= MODAL PREVIEW SK INPASSING ======================= -->
+    <div v-if="showPreviewModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1070;" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable" style="max-width: 95vw;">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%);">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="bg-white bg-opacity-20 rounded p-2">
+                            <i class="bi bi-file-earmark-word-fill text-white fs-4"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title fw-bold text-white mb-0">Preview SK Inpassing</h5>
+                            <small class="text-white text-opacity-75" v-if="currentPreviewItem">{{ currentPreviewItem.nama_pegawai }} &mdash; {{ currentPreviewItem.nomor_lengkap }}</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" @click="closePreview"></button>
+                </div>
+                <div class="modal-header bg-white border-bottom py-2 d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                    <ul class="nav nav-pills mb-0">
+                        <li class="nav-item">
+                            <button class="nav-link px-3 py-1" :class="{ active: previewTab === 'BASAH' }" @click="changePreviewTab('BASAH')">
+                                <i class="bi bi-pen-fill me-1"></i>TTD Basah
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link px-3 py-1" :class="{ active: previewTab === 'TTE' }" @click="changePreviewTab('TTE')">
+                                <i class="bi bi-shield-lock-fill me-1"></i>TTE
+                            </button>
+                        </li>
+                    </ul>
+                    <button @click="downloadFromPreview" class="btn btn-success btn-sm shadow-sm" :disabled="previewLoading">
+                        <i class="bi bi-download me-2"></i>Download SK (.docx)
+                    </button>
+                </div>
+                <div class="modal-body p-0" style="min-height: 65vh; background: #f0f2f5;">
+                    <div v-if="previewLoading" class="d-flex flex-column align-items-center justify-content-center" style="min-height: 65vh;">
+                        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                        <div class="text-muted fw-bold">Menyiapkan dokumen...</div>
+                        <small class="text-muted">Mohon tunggu sebentar</small>
+                    </div>
+                    <div v-show="!previewLoading" id="docx-preview-container" class="p-3" style="min-height: 65vh;"></div>
+                </div>
+                <div class="modal-footer bg-white border-top justify-content-between">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Preview bersifat indikatif. Hasil akhir dokumen mungkin sedikit berbeda.
+                    </small>
+                    <div class="d-flex gap-2">
+                        <button @click="downloadFromPreview" class="btn btn-success shadow-sm" :disabled="previewLoading">
+                            <i class="bi bi-download me-2"></i>Download (.docx)
+                        </button>
+                        <button @click="closePreview" class="btn btn-secondary">Tutup</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- ===================== END MODAL PREVIEW SK INPASSING ===================== -->
 
     </div>
 </div>

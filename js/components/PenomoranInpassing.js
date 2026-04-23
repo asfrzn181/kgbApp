@@ -534,11 +534,12 @@ export default {
             }
         };
 
-        const generateDocBlob = async (usulanId) => {
-            if (!window.PizZip || !window.docxtemplater) throw new Error("Library Error");
+        const generateDocBlob = async (usulanId, overrideData = {}) => {
+            if (!window.PizZip || !window.docxtemplater) throw new Error("Library PizZip/docxtemplater tidak ditemukan!");
             const snap = await getDoc(doc(db, "usulan_kgb", usulanId));
-            if (!snap.exists()) throw new Error("Data Usulan tidak ditemukan!");
-            const item = snap.data();
+            if (!snap.exists()) throw new Error("Data Usulan (usulan_kgb) tidak ditemukan untuk ID: " + usulanId);
+            // Gabungkan: data dari usulan_kgb + override dari nomor_surat (lebih prioritas)
+            const item = { ...snap.data(), ...overrideData };
 
             // CACHED TEMPLATE & CONFIG
             if (!cacheTemplates.value["IMPASSING_PNS"]) {
@@ -591,7 +592,9 @@ export default {
             const foundH = mapH.find(h => h.judul === "INPASSING" || h.judul === item.dasar_hukum);
             const textHukum = foundH ? foundH.isi : "-";
 
-            const res = await fetch(url); const buf = await res.arrayBuffer();
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Gagal mengambil template DOCX dari: ${url} (HTTP ${res.status})`);
+            const buf = await res.arrayBuffer();
             const zip = new window.PizZip(buf);
             const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, delimiters: { start: '{', end: '}' }, nullGetter: (p) => "-" });
 
@@ -622,20 +625,27 @@ export default {
         const renderCurrentPreview = async () => {
             try {
                 if (!currentPreviewItem.value) return;
-                const blob = await generateDocBlob(currentPreviewItem.value.usulan_id);
+                if (!window.docx) throw new Error("Library docx-preview (window.docx) tidak tersedia. Coba refresh halaman.");
+                // Kirim data dari nomor_surat sebagai override agar field inpassing tidak hilang
+                const blob = await generateDocBlob(currentPreviewItem.value.usulan_id, currentPreviewItem.value);
                 const container = document.getElementById('docx-preview-container');
-                if (container) { container.innerHTML = ''; await window.docx.renderAsync(blob, container); }
-            } catch (e) { showToast("Gagal Preview", 'error'); } finally { previewLoading.value = false; }
+                if (!container) throw new Error("Elemen docx-preview-container tidak ditemukan di DOM.");
+                container.innerHTML = '';
+                await window.docx.renderAsync(blob, container);
+            } catch (e) {
+                console.error("[Preview SK Inpassing] Error:", e);
+                showToast("Gagal Preview: " + e.message, 'error');
+            } finally { previewLoading.value = false; }
         };
         const downloadFromPreview = async () => { if (currentPreviewItem.value) await cetakSK(currentPreviewItem.value); };
         const closePreview = () => { showPreviewModal.value = false; currentPreviewItem.value = null; };
         const cetakSK = async (logItem) => {
             try {
                 showToast("Menyiapkan download...", 'info');
-                const blob = await generateDocBlob(logItem.usulan_id);
+                const blob = await generateDocBlob(logItem.usulan_id, logItem);
                 const prefix = previewTab.value === 'TTE' ? 'DRAFT_TTE_INPASSING' : 'SK_INPASSING_';
                 window.saveAs(blob, `${prefix}${logItem.nama_pegawai.replace(/\W/g, '')}.docx`);
-            } catch (e) { showToast("Gagal: " + e.message, 'error'); }
+            } catch (e) { showToast("Gagal Download: " + e.message, 'error'); }
         };
 
         const openModal = async () => {
