@@ -147,7 +147,7 @@ export function hitungHariLagi(targetDateStr) {
 // --- KONFIGURASI FORMATTER ---
 const LIST_SINGKATAN = [
     'UPTD', 'SMP', 'SD', 'RSUD', 'RS', 'TK', 'PAUD', 'BLUD',
-    'PUSKESMAS', 'SETDA', 'BKPSDMD', 'DPRD', 'KECAMATAN', 'KELURAHAN',
+    'PUSKESMAS', 'SETDA', 'BKPSDMD', 'DPRD',
     'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN', "PPKN", "IPA", "IPS", "TIK", "SDM", "SDMD", "TPA", "PPI", "DR"
 ];
 
