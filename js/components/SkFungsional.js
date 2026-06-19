@@ -253,6 +253,8 @@ export default {
             no_ser_kom: '', tgl_ser_kom: '',
             jabatan_lama: '', jabatan_baru: '',
             tmt_jabatan: '', angka_kredit: '',
+            kategori_jabatan: 'Keahlian',
+            tunjangan: '',
             pejabat_nip: '',
             nomor_naskah: ''
         });
@@ -507,6 +509,16 @@ export default {
         };
 
         // ============================================================
+        // HANDLE JABATAN BARU SELECT (Auto-fill dari master_jabatan)
+        // ============================================================
+        const handleJabatanBaruSelect = (jabatanItem) => {
+            // Auto-fill tunjangan jika ada di master dan field tunjangan masih kosong
+            if (jabatanItem.tunjangan !== undefined && jabatanItem.tunjangan !== null && jabatanItem.tunjangan !== '') {
+                form.tunjangan = jabatanItem.tunjangan;
+            }
+        };
+
+        // ============================================================
         // OPEN / CLOSE MODAL
         // ============================================================
         const openModal = (item = null) => {
@@ -520,6 +532,7 @@ export default {
                 formId.value = null;
                 Object.keys(form).forEach(k => form[k] = '');
                 form.nomor_naskah = '100.3.3.2/GANTI INI/BKPSDMD/2026';
+                form.kategori_jabatan = 'Keahlian';
             }
             searchMsg.value = '';
             showModal.value = true;
@@ -606,7 +619,9 @@ export default {
         const generateDocBlob = async (item) => {
             if (!window.PizZip || !window.docxtemplater) throw new Error("Library docxtemplater tidak tersedia!");
 
-            const tplId = "SK_FUNGSIONAL";
+            // Pilih template berdasarkan ada/tidaknya tunjangan
+            const hasTunjangan = !!(item.tunjangan && Number(item.tunjangan) > 0);
+            const tplId = hasTunjangan ? "SK_FUNGSIONAL_TUNJANGAN" : "SK_FUNGSIONAL";
 
             // Load dan cache URL template
             if (!cacheTemplates.value[tplId]) {
@@ -691,6 +706,12 @@ export default {
                 valueJabatanLama: item.jabatan_lama || "-",
                 valueJabatanBaru: item.jabatan_baru || "",
                 valueAngkaKredit: item.angka_kredit ? `${item.angka_kredit} (${terbilang(item.angka_kredit)})` : "-",
+
+                // 4b. Kategori & Tunjangan
+                valueKategoriJabatan: item.kategori_jabatan || "Keahlian",
+                valueTunjangan: item.tunjangan ? `Rp ${Number(item.tunjangan).toLocaleString('id-ID')} (${terbilang(item.tunjangan)} rupiah)` : "-",
+                valueTunjanganAngka: item.tunjangan ? `Rp ${Number(item.tunjangan).toLocaleString('id-ID')}` : "-",
+                valueTunjanganTerbilang: item.tunjangan ? `${terbilang(item.tunjangan)} rupiah` : "-",
 
                 // 5. Pengesahan / Penandatangan
                 JABATAN_PEJABAT: pjj || "",
@@ -888,7 +909,7 @@ export default {
             openModal, closeModal,
             simpanData, hapusData,
             updateStatus,
-            handleNipInput, handleGolonganChange, handlePejabatChange,
+            handleNipInput, handleGolonganChange, handlePejabatChange, handleJabatanBaruSelect,
 
             // Preview & Download
             previewSK, closePreview, downloadFromPreview, cetakSK,

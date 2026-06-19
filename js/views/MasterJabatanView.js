@@ -38,9 +38,10 @@ export const TplMasterJabatan = `
                 <table class="table table-hover align-middle mb-0" style="min-width: 600px;">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-4" style="width: 40%;">Nama Jabatan</th>
-                            <th style="width: 30%;">Kode (Auto-Generated)</th>
-                            <th style="width: 20%;">Jenis Jabatan</th>
+                            <th class="ps-4" style="width: 30%;">Nama Jabatan</th>
+                            <th style="width: 20%;">Kode (Auto-Generated)</th>
+                            <th style="width: 15%;">Jenis Jabatan</th>
+                            <th style="width: 25%;">Tunjangan (Rp)</th>
                             <th class="text-end pe-4" style="width: 10%;">Aksi</th>
                         </tr>
                     </thead>
@@ -62,6 +63,12 @@ export const TplMasterJabatan = `
                                 <span class="badge" :class="getBadgeColor(item.jenis_jabatan)">
                                     {{ item.jenis_jabatan }}
                                 </span>
+                            </td>
+                            <td>
+                                <span v-if="item.tunjangan" class="text-success fw-bold small">
+                                    Rp {{ Number(item.tunjangan).toLocaleString('id-ID') }}
+                                </span>
+                                <span v-else class="text-muted small fst-italic">-</span>
                             </td>
                             <td class="text-end pe-4">
                                 <div class="btn-group">
@@ -110,6 +117,17 @@ export const TplMasterJabatan = `
                                 <option value="Fungsional">Fungsional</option>
                                 <option value="Struktural">Struktural</option>
                             </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Tunjangan Jabatan (Rp)
+                                <span class="text-muted fw-normal">(Opsional, khusus fungsional)</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">Rp</span>
+                                <input v-model="form.tunjangan" type="number" min="0" class="form-control" placeholder="Contoh: 540000">
+                            </div>
+                            <div class="small text-muted mt-1"><i class="bi bi-info-circle"></i> Jika diisi, SK akan otomatis menggunakan template <strong>SK Fungsional + Tunjangan</strong>.</div>
                         </div>
 
                         <div class="mb-4 p-3 bg-light rounded border text-center">

@@ -408,7 +408,12 @@ export const TplMain = `
                                     </div>
                                     <div class="col-12 col-md-6">
                                         <label class="form-label small fw-bold text-primary">Jabatan Fungsional Baru <span class="text-danger">*</span></label>
-                                        <AutocompleteJabatan v-model="form.jabatan_baru" :placeholder="'Ketik jabatan baru...'" />
+                                        <AutocompleteJabatan v-model="form.jabatan_baru" :placeholder="'Ketik jabatan baru...'" @select="handleJabatanBaruSelect" />
+                                        <div v-if="form.tunjangan" class="small text-success mt-1">
+                                            <i class="bi bi-check-circle-fill"></i>
+                                            Tunjangan dari master: <strong>Rp {{ Number(form.tunjangan).toLocaleString('id-ID') }}</strong>
+                                            <span class="text-muted ms-1">(dapat diubah di kolom bawah)</span>
+                                        </div>
                                     </div>
                                     <div class="col-12 col-md-4">
                                         <label class="form-label small fw-bold text-primary">TMT Jabatan Baru <span class="text-danger">*</span></label>
@@ -417,6 +422,44 @@ export const TplMain = `
                                     <div class="col-12 col-md-4">
                                         <label class="form-label small fw-bold">Angka Kredit</label>
                                         <input v-model="form.angka_kredit" type="text" class="form-control" placeholder="Contoh: 150,00">
+                                    </div>
+
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small fw-bold">Kategori Jabatan</label>
+                                        <div class="d-flex gap-3 mt-1 pt-1">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" v-model="form.kategori_jabatan" value="Keahlian" id="katKeahlian">
+                                                <label class="form-check-label fw-semibold" for="katKeahlian">
+                                                    <i class="bi bi-mortarboard-fill text-primary me-1"></i>Keahlian
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" v-model="form.kategori_jabatan" value="Keterampilan" id="katKeterampilan">
+                                                <label class="form-check-label fw-semibold" for="katKeterampilan">
+                                                    <i class="bi bi-tools text-warning me-1"></i>Keterampilan
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <div class="card border-warning border-2 bg-warning bg-opacity-10">
+                                            <div class="card-body py-2 px-3">
+                                                <label class="form-label small fw-bold text-warning-emphasis mb-1">
+                                                    <i class="bi bi-cash-coin me-1"></i>Tunjangan Jabatan (Rp)
+                                                    <span class="fw-normal text-muted ms-1">— Kosongkan jika tidak ada tunjangan</span>
+                                                </label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text bg-white fw-bold">Rp</span>
+                                                    <input v-model="form.tunjangan" type="number" min="0" class="form-control" placeholder="Contoh: 540000">
+                                                </div>
+                                                <div class="small text-warning-emphasis mt-1">
+                                                    <i class="bi bi-info-circle"></i>
+                                                    Jika diisi → otomatis menggunakan template <strong>SK_FUNGSIONAL_TUNJANGAN</strong>.
+                                                    Jika dikosongkan → menggunakan template <strong>SK_FUNGSIONAL</strong>.
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

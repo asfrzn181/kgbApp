@@ -31,7 +31,8 @@ export default {
         // FORM
         const form = reactive({ 
             nama_jabatan: '', 
-            jenis_jabatan: 'Pelaksana' 
+            jenis_jabatan: 'Pelaksana',
+            tunjangan: ''
         });
 
         // --- 1. FETCH DATA (OPTIMIZED SEARCH) ---
@@ -103,6 +104,7 @@ export default {
                     kode_jabatan: id,
                     nama_jabatan: form.nama_jabatan,
                     jenis_jabatan: form.jenis_jabatan,
+                    tunjangan: form.tunjangan || '',
                     updated_at: serverTimestamp()
                 }, { merge: true });
 
@@ -169,10 +171,12 @@ export default {
             if (item) {
                 form.nama_jabatan = item.nama_jabatan;
                 form.jenis_jabatan = item.jenis_jabatan;
+                form.tunjangan = item.tunjangan || '';
             }
             else { 
                 form.nama_jabatan = ''; 
-                form.jenis_jabatan = 'Pelaksana'; 
+                form.jenis_jabatan = 'Pelaksana';
+                form.tunjangan = '';
             }
             showModal.value = true;
         };
