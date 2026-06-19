@@ -38,6 +38,10 @@ export default {
                         <i class="bi bi-pencil-square me-2"></i> Input KGB
                     </router-link>
 
+                    <router-link to="/sk-fungsional" class="nav-link link-dark" active-class="active text-white" style="--bs-nav-link-color: #5c35a5;" @click="handleMobileClick">
+                        <i class="bi bi-file-earmark-person me-2"></i> SK Fungsional
+                    </router-link>
+
                     <router-link to="/penomoran" class="nav-link link-dark" active-class="active bg-primary text-white" @click="handleMobileClick">
                         <i class="bi bi-123 me-2"></i> Penomoran SPT KGB
                     </router-link>

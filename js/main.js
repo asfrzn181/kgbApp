@@ -21,6 +21,7 @@ import MasterJabatan from './components/MasterJabatan.js';
 import Penomoran from './components/Penomoran.js';
 import PenomoranInpassing from './components/PenomoranInpassing.js';
 import CekDuplikat from './components/CekDuplikat.js';
+import SkFungsional from './components/SkFungsional.js';
 // --- KONFIGURASI ROUTER ---
 const routes = [
     // 1. Dashboard
@@ -34,6 +35,7 @@ const routes = [
     { path: '/laporan', component: Laporan },
 
     { path: '/duplikat', component: CekDuplikat },
+    { path: '/sk-fungsional', component: SkFungsional },
 
     // 4. Master Data CRUD
     { path: '/master/pegawai', component: MasterPegawai },
