@@ -467,13 +467,9 @@ export const TplMain = `
                             </div>
                             <div class="card-body">
                                 <div class="row g-3">
-                                    <div class="col-12 col-md-5">
+                                    <div class="col-12">
                                         <label class="form-label small text-muted">Nomor SK / Naskah</label>
                                         <input v-model="form.nomor_naskah" class="form-control font-monospace" placeholder="Biarkan kosong jika belum ada...">
-                                    </div>
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label small text-muted">Tanggal Naskah</label>
-                                        <input v-model="form.tanggal_naskah" type="date" class="form-control">
                                     </div>
                                 </div>
                             </div>

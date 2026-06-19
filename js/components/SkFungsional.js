@@ -254,7 +254,7 @@ export default {
             jabatan_lama: '', jabatan_baru: '',
             tmt_jabatan: '', angka_kredit: '',
             pejabat_nip: '',
-            nomor_naskah: '', tanggal_naskah: ''
+            nomor_naskah: ''
         });
 
         // Pejabat yang sedang terpilih di form (untuk ditampilkan preview)
@@ -646,13 +646,6 @@ export default {
                 ? "\n\n\n${ttd_pengirim}\n\n\n\n"
                 : "\n\n\n";
 
-            // Tanggal naskah
-            let tanggalSurat = "-";
-            if (item.tanggal_naskah) {
-                const tgl = item.tanggal_naskah;
-                tanggalSurat = formatTanggal(typeof tgl === 'string' ? tgl : (tgl.toDate ? tgl.toDate() : new Date(tgl)));
-            }
-
             // Fetch dan render template
             const res = await fetch(url);
             if (!res.ok) throw new Error(`Gagal mengunduh template dari: ${url}`);
@@ -668,7 +661,7 @@ export default {
             docRender.render({
                 // 1. Identitas Surat
                 NOMOR_NASKAH: item.nomor_naskah || "....................",
-                tanggal_naskah: previewTab.value === 'TTE' ? "${tanggal_naskah}" : tanggalSurat,
+                tanggal_naskah: "${tanggal_naskah}",
 
                 // 2. Dokumen Dasar (Konsideran)
                 valueNoPertekBKN: item.no_pertek_bkn || "-",

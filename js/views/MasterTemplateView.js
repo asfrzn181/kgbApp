@@ -215,6 +215,7 @@ export const TplMasterTemplate = `
                                 <option value="IMPASSING_PNS">IMPASSING PNS</option>
                                 <option value="PPPK">PPPK</option>
                                 <option value="IMPASSING_PPPK">IMPASSING PPPK</option>
+                                <option value="SK_FUNGSIONAL">SK FUNGSIONAL</option>
                             </select>
                         </div>
                         <div class="mb-4">
