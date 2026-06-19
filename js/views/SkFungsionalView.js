@@ -343,6 +343,9 @@ export const TplMain = `
                                     <div class="col-12 col-md-6">
                                         <label class="form-label small text-muted">Perangkat Daerah</label>
                                         <input v-model="form.perangkat_daerah" class="form-control" placeholder="Perangkat daerah...">
+                                        <div class="small text-muted mt-1" style="font-size: 0.7rem;">
+                                            <i class="bi bi-info-circle"></i> Jika unit kerja berbeda dengan perangkat daerah, format cetak otomatis menjadi: <strong>Unit Kerja - Perangkat Daerah</strong>
+                                        </div>
                                     </div>
 
                                     <div class="col-12 col-md-6">

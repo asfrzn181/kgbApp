@@ -6,7 +6,7 @@ import {
 import {
     showToast, showConfirm, debounce,
     formatTanggal, formatTitleCase,
-    fetchWithCache
+    fetchWithCache, terbilang
 } from '../utils.js';
 
 import {
@@ -519,6 +519,7 @@ export default {
                 isEditMode.value = false;
                 formId.value = null;
                 Object.keys(form).forEach(k => form[k] = '');
+                form.nomor_naskah = '100.3.3.2/GANTI INI/BKPSDMD/2026';
             }
             searchMsg.value = '';
             showModal.value = true;
@@ -657,39 +658,64 @@ export default {
                 nullGetter: () => ""
             });
 
-            // Mapping variabel sesuai SK Fungsional.md
-            docRender.render({
+            // Helper format string
+            const toUp = (str) => (str || '').toString().toUpperCase();
+            const toLow = (str) => (str || '').toString().toLowerCase();
+            const toTitle = (str) => (str || '').toString().replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+
+            let combinedUnitKerja = item.unit_kerja || "";
+            if (item.unit_kerja && item.perangkat_daerah) {
+                const uk = item.unit_kerja.trim().toLowerCase();
+                const pd = item.perangkat_daerah.trim().toLowerCase();
+                if (uk !== pd) {
+                    combinedUnitKerja = `${item.unit_kerja.trim()} - ${item.perangkat_daerah.trim()}`;
+                }
+            }
+
+            const baseVars = {
                 // 1. Identitas Surat
                 NOMOR_NASKAH: item.nomor_naskah || "....................",
-                tanggal_naskah: "${tanggal_naskah}",
-
+                
                 // 2. Dokumen Dasar (Konsideran)
                 valueNoPertekBKN: item.no_pertek_bkn || "-",
-                valueTanggalPertekBKN: formatTanggal(item.tgl_pertek_bkn),
                 valueSerKom: item.no_ser_kom || "-",
-                valueTanggalSerKom: formatTanggal(item.tgl_ser_kom),
-
+                
                 // 3. Identitas PNS
                 valueNama: item.nama || "",
                 valueNamaPns: item.nama || "",
                 valueNip: item.nip || "",
                 valuePangkatGolongan: item.pangkat_golongan || "",
-                valueTmtPangkatGolongan: formatTanggal(item.tmt_pangkat_golongan),
-                valueUnitKerja: item.unit_kerja || "",
+                valueUnitKerja: combinedUnitKerja,
 
                 // 4. Detail Jabatan Fungsional
                 valueJabatanLama: item.jabatan_lama || "-",
                 valueJabatanBaru: item.jabatan_baru || "",
-                valueTmtJabatan: formatTanggal(item.tmt_jabatan),
-                valueAngkaKredit: String(item.angka_kredit || "-"),
+                valueAngkaKredit: item.angka_kredit ? `${item.angka_kredit} (${terbilang(item.angka_kredit)})` : "-",
 
                 // 5. Pengesahan / Penandatangan
                 JABATAN_PEJABAT: pjj || "",
                 NAMA_PENGIRIM: pjn || "${nama_pengirim}",
                 PANGKAT_PEJABAT: pjp || "",
                 NIP_PENGIRIM: pjnip || "${nip_pengirim}",
-                TTD_PENGIRIM: ttdContent,
-            });
+            };
+
+            const expandedVars = {};
+            for (const [key, val] of Object.entries(baseVars)) {
+                expandedVars[key] = val;
+                expandedVars[`${key}Up`] = toUp(val);
+                expandedVars[`${key}Low`] = toLow(val);
+                expandedVars[`${key}Title`] = toTitle(val);
+            }
+
+            // Tambahkan variabel tanggal & statis
+            expandedVars.tanggal_naskah = "${tanggal_naskah}";
+            expandedVars.valueTanggalPertekBKN = formatTanggal(item.tgl_pertek_bkn);
+            expandedVars.valueTanggalSerKom = formatTanggal(item.tgl_ser_kom);
+            expandedVars.valueTmtPangkatGolongan = formatTanggal(item.tmt_pangkat_golongan);
+            expandedVars.valueTmtJabatan = formatTanggal(item.tmt_jabatan);
+            expandedVars.TTD_PENGIRIM = ttdContent;
+
+            docRender.render(expandedVars);
 
             return docRender.getZip().generate({
                 type: "blob",

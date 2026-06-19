@@ -190,3 +190,52 @@ export const formatTitleCase = (text) => {
 
     return hasTrailingSpace ? formatted + ' ' : formatted;
 };
+
+// --- FUNGSI TERBILANG (Angka ke Kata) ---
+export function terbilang(angka) {
+    if (angka === null || angka === undefined || angka === '') return '';
+    const strAngka = String(angka).replace(',', '.').trim();
+    
+    const parts = strAngka.split('.');
+    const intPart = Math.abs(parseInt(parts[0], 10));
+    const decPart = parts.length > 1 ? parts[1] : '';
+
+    const huruf = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
+    
+    function sebut(n) {
+        if (n < 12) return huruf[n];
+        if (n < 20) return sebut(n - 10) + " belas";
+        if (n < 100) return sebut(Math.floor(n / 10)) + " puluh " + sebut(n % 10);
+        if (n < 200) return "seratus " + sebut(n - 100);
+        if (n < 1000) return sebut(Math.floor(n / 100)) + " ratus " + sebut(n % 100);
+        if (n < 2000) return "seribu " + sebut(n - 1000);
+        if (n < 1000000) return sebut(Math.floor(n / 1000)) + " ribu " + sebut(n % 1000);
+        if (n < 1000000000) return sebut(Math.floor(n / 1000000)) + " juta " + sebut(n % 1000000);
+        return "";
+    }
+
+    if (isNaN(intPart)) return strAngka;
+
+    let hasil = '';
+    if (intPart === 0) {
+        hasil = 'nol';
+    } else {
+        hasil = sebut(intPart).trim();
+    }
+    
+    hasil = hasil.replace(/\s+/g, ' ');
+
+    if (decPart) {
+        let decText = " koma";
+        for (let i = 0; i < decPart.length; i++) {
+            const digit = parseInt(decPart[i], 10);
+            if (digit === 0) decText += " nol";
+            else decText += " " + huruf[digit];
+        }
+        hasil += decText;
+    }
+
+    if (strAngka.startsWith('-')) hasil = "minus " + hasil;
+    
+    return hasil.trim();
+}
