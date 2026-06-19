@@ -644,7 +644,7 @@ export default {
 
             // TTD Content berdasarkan mode preview
             let ttdContent = previewTab.value === 'TTE'
-                ? "\n\n\n      ${ttd_pengirim}\n\n\n\n"
+                ? "\n\n\n       ${ttd_pengirim}\n\n\n\n"
                 : "\n\n\n";
 
             // Fetch dan render template
