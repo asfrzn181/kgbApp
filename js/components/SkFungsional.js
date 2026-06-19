@@ -644,7 +644,7 @@ export default {
 
             // TTD Content berdasarkan mode preview
             let ttdContent = previewTab.value === 'TTE'
-                ? "\n\n\n${ttd_pengirim}\n\n\n\n"
+                ? "\n\n\n      ${ttd_pengirim}\n\n\n\n"
                 : "\n\n\n";
 
             // Fetch dan render template
@@ -675,11 +675,11 @@ export default {
             const baseVars = {
                 // 1. Identitas Surat
                 NOMOR_NASKAH: item.nomor_naskah || "....................",
-                
+
                 // 2. Dokumen Dasar (Konsideran)
                 valueNoPertekBKN: item.no_pertek_bkn || "-",
                 valueSerKom: item.no_ser_kom || "-",
-                
+
                 // 3. Identitas PNS
                 valueNama: item.nama || "",
                 valueNamaPns: item.nama || "",
