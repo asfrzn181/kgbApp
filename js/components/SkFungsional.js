@@ -15,6 +15,7 @@ import {
     TplAutocompleteUnitKerja,
     TplMain
 } from '../views/SkFungsionalView.js';
+import { siasnBookmarklet } from '../bookmartScript.js';
 
 // ============================================================
 // SUB-COMPONENT: SearchSelect (Dropdown Searchable)
@@ -889,31 +890,50 @@ export default {
         // ============================================================
         const cekSIASN = (nip) => {
             if (!nip) return;
-            // Simpan NIP ke localStorage agar bookmarklet bisa membacanya
-            localStorage.setItem('KGBAPP_SIASN_NIP', nip.trim());
-            localStorage.setItem('KGBAPP_SIASN_ORIGIN', window.location.origin);
-            window.open('https://siasn-instansi.bkn.go.id/peremajaan/profil/pns/', '_blank');
-            showToast('Tab SIASN dibuka. Jalankan Bookmarklet di halaman tersebut.', 'info');
+            // Embed NIP & origin di URL agar bookmarklet bisa baca tanpa cross-domain issue
+            const encodedNip = encodeURIComponent(nip.trim());
+            const encodedOrigin = encodeURIComponent(window.location.origin);
+            const siasUrl = `https://siasn-instansi.bkn.go.id/peremajaan/profil/pns/?kgb_nip=${encodedNip}&kgb_origin=${encodedOrigin}`;
+            window.open(siasUrl, '_blank');
+            showToast('Tab SIASN dibuka. Jalankan Bookmarklet SIASN di halaman tersebut.', 'info');
         };
 
         // Handler: Terima data balik dari bookmarklet via postMessage
         const handleSIASNMessage = (event) => {
-            // Hanya terima dari domain SIASN
-            if (!event.origin.includes('siasn-instansi.bkn.go.id')) return;
+            // Terima dari SIASN atau localhost (dev)
+            if (!event.origin.includes('siasn-instansi.bkn.go.id') && !event.origin.includes('localhost') && !event.origin.includes('127.0.0.1')) return;
             if (!event.data || event.data.type !== 'KGBAPP_SIASN_DATA') return;
 
             const d = event.data.payload;
             if (!d) return;
 
             // Auto-fill form dengan data dari SIASN
-            if (d.nama) form.nama = d.nama;
-            if (d.unit_kerja) form.unit_kerja = d.unit_kerja;
+            if (d.nama)            form.nama            = d.nama;
+            if (d.unit_kerja)      form.unit_kerja      = d.unit_kerja;
             if (d.perangkat_daerah) form.perangkat_daerah = d.perangkat_daerah;
             if (d.pangkat_golongan) form.pangkat_golongan = d.pangkat_golongan;
-            if (d.golongan_kode) form.golongan_kode = d.golongan_kode;
+            if (d.golongan_kode)   form.golongan_kode   = d.golongan_kode;
             if (d.tmt_pangkat_golongan) form.tmt_pangkat_golongan = d.tmt_pangkat_golongan;
 
-            showToast(`Data SIASN berhasil diimport: ${d.nama || ''}`, 'success');
+            showToast(`✅ Data SIASN diimport: ${d.nama || ''}`, 'success');
+        };
+
+        // Copy bookmarklet SIASN ke clipboard
+        const copyBookmarkletSIASN = async () => {
+            if (!siasnBookmarklet) { showToast('Bookmarklet kosong!', 'error'); return; }
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(siasnBookmarklet);
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = siasnBookmarklet;
+                    ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
+                    document.body.appendChild(ta); ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                }
+                showToast('Bookmarklet SIASN berhasil dicopy! Paste di URL bookmark.', 'success');
+            } catch (e) { showToast('Gagal copy: ' + e.message, 'error'); }
         };
 
         // ============================================================
@@ -967,7 +987,7 @@ export default {
             openSrikandi,
 
             // SIASN
-            cekSIASN,
+            cekSIASN, copyBookmarkletSIASN,
 
             // Utils
             formatTanggal,
