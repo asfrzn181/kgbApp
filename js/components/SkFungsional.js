@@ -15,7 +15,7 @@ import {
     TplAutocompleteUnitKerja,
     TplMain
 } from '../views/SkFungsionalView.js';
-import { siasnBookmarklet } from '../bookmartScript.js';
+import { siasnBookmarklet } from '../siasnBookmarklet.js';
 
 // ============================================================
 // SUB-COMPONENT: SearchSelect (Dropdown Searchable)
