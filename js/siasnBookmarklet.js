@@ -3,23 +3,17 @@
 // agar tidak ada masalah escaping nested di template literal
 // ============================================================
 
-// Kode bookmarklet ditulis sebagai fungsi biasa, lalu dikonversi ke string
 function buildSiasnBookmarklet() {
-    // PERHATIAN: Fungsi ini di-toString() lalu dieksekusi sebagai bookmarklet.
-    // Jangan gunakan arrow function atau syntax ES6+ yang tidak semua browser support.
-    // Semua string di sini adalah string biasa — tidak ada masalah escaping.
-
     function bookmarkletCode() {
         var p = new URLSearchParams(window.location.search);
         var nip = p.get('kgb_nip');
         var origin = p.get('kgb_origin') || '*';
 
         if (!nip) {
-            alert('Buka dari KGB App dulu!\nKlik tombol Cek SIASN di form SK Fungsional, jangan buka SIASN manual.');
+            alert('Buka dari KGB App dulu!\nKlik tombol Cek SIASN di form SK Fungsional.');
             return;
         }
 
-        // Set value ke elemen input (Vue/React friendly)
         function setVal(el, v) {
             if (!el) return;
             var ns = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -28,7 +22,6 @@ function buildSiasnBookmarklet() {
             el.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        // Ambil teks dari elemen berdasarkan teks label
         function getVal(lbl) {
             var ls = document.querySelectorAll('label');
             for (var i = 0; i < ls.length; i++) {
@@ -43,7 +36,6 @@ function buildSiasnBookmarklet() {
             return '';
         }
 
-        // Parse tanggal Indonesia "1 Agustus 2001" ke "2001-08-01"
         function parseDate(str) {
             if (!str || str === '-') return '';
             var bln = {
@@ -57,7 +49,6 @@ function buildSiasnBookmarklet() {
             return pts[2] + '-' + (bln[pts[1]] || '01') + '-' + d;
         }
 
-        // Ekstrak data dari halaman SIASN dan kirim ke KGB App
         function extract() {
             var nama = getVal('Nama');
             var golR = getVal('Golongan Ruang Akhir') || getVal('Golongan Ruang') || getVal('Golongan');
@@ -65,12 +56,9 @@ function buildSiasnBookmarklet() {
             var unit = getVal('Unit Organisasi') || getVal('Unit Kerja');
             var induk = getVal('Unit Organisasi Induk') || getVal('Perangkat Daerah') || getVal('Satuan Kerja');
             var pkt = getVal('Pangkat');
-
-            // Match pola golongan: III/b, IV/a, dst
             var gm = golR.match(new RegExp('([IVX]+[/][a-d])', 'i'));
             var gk = gm ? gm[1].toUpperCase() : golR;
             var pg = (pkt && gk) ? (pkt + ' / ' + gk) : golR;
-
             var payload = {
                 nama: nama,
                 unit_kerja: unit,
@@ -79,33 +67,27 @@ function buildSiasnBookmarklet() {
                 golongan_kode: gk,
                 tmt_pangkat_golongan: parseDate(tmtG)
             };
-
             if (window.opener) {
                 window.opener.postMessage({ type: 'KGBAPP_SIASN_DATA', payload: payload }, decodeURIComponent(origin));
                 alert('\u2705 Data dikirim ke KGB App!\n\nNama: ' + nama + '\nGolongan: ' + pg + '\nUnit: ' + unit + '\n\nTab ini bisa ditutup.');
             } else {
                 navigator.clipboard.writeText(JSON.stringify(payload)).then(function () {
-                    alert('Data disalin ke clipboard (window.opener tidak tersedia).');
+                    alert('Data disalin ke clipboard.');
                 }).catch(function () {
                     alert('Payload:\n' + JSON.stringify(payload));
                 });
             }
         }
 
-        // Cari field NIP di halaman SIASN
         var nipInp = document.querySelector('input[name="nip_nama"]') || document.querySelector('input[placeholder*="NIP"]');
         if (!nipInp) {
-            alert('Field NIP tidak ditemukan di halaman ini. Pastikan Anda di halaman SIASN yang benar.');
+            alert('Field NIP tidak ditemukan. Pastikan di halaman SIASN yang benar.');
             return;
         }
-
-        // Klik tombol mode NIP jika ada
         var btnNip = Array.from(document.querySelectorAll('button')).find(function (b) {
             return b.textContent.trim() === 'NIP';
         });
         if (btnNip && !btnNip.className.includes('bg-secondaryBkn')) btnNip.click();
-
-        // Isi NIP dan klik Cari
         setVal(nipInp, nip);
         setTimeout(function () {
             var btnCari = Array.from(document.querySelectorAll('button')).find(function (b) {
@@ -115,18 +97,21 @@ function buildSiasnBookmarklet() {
                 btnCari.click();
                 setTimeout(extract, 2800);
             } else {
-                alert('Tombol Cari tidak ditemukan. Klik Cari manual lalu jalankan bookmarklet lagi.');
+                alert('Tombol Cari tidak ditemukan.');
                 extract();
             }
         }, 400);
     }
 
-    // Konversi fungsi ke string lalu bungkus sebagai IIFE
     var fnBody = bookmarkletCode.toString();
-    // Ambil isi fungsi saja (antara { dan } terluar)
     var body = fnBody.substring(fnBody.indexOf('{') + 1, fnBody.lastIndexOf('}'));
-    // Hapus newline dan spasi berlebih untuk meminimalkan ukuran
-    var minified = body.replace(/\s+/g, ' ').trim();
+    var minified = body
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n')
+        .map(function (line) { return line.replace(/\/\/.*$/, ''); })
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
     return 'javascript:(function(){' + minified + '})();';
 }
 
