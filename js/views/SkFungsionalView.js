@@ -337,9 +337,20 @@ export const TplMain = `
                                             <span v-if="isSearching" class="input-group-text bg-white">
                                                 <div class="spinner-border spinner-border-sm text-primary"></div>
                                             </span>
+                                            <button type="button" class="btn btn-outline-info btn-sm"
+                                                :disabled="!form.nip"
+                                                @click="cekSIASN(form.nip)"
+                                                title="Buka profil PNS di SIASN BKN (tab baru)">
+                                                <i class="bi bi-box-arrow-up-right me-1"></i>
+                                                <span class="d-none d-md-inline">Cek SIASN</span>
+                                            </button>
                                         </div>
                                         <div v-if="searchMsg" class="small mt-1" :class="searchMsg === 'Ditemukan' ? 'text-success' : 'text-warning'">
                                             <i class="bi" :class="searchMsg === 'Ditemukan' ? 'bi-check-circle-fill' : 'bi-plus-circle'"></i> {{ searchMsg }}
+                                        </div>
+                                        <div class="small text-muted mt-1" style="font-size: 0.7rem;">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            Klik "Cek SIASN" lalu jalankan <strong>Bookmarklet SIASN</strong> di browser untuk auto-isi data.
                                         </div>
                                     </div>
                                     <div class="col-12 col-md-7">

@@ -315,27 +315,26 @@ export default {
                 const limitVal = parseInt(itemsPerPage.value) || 10;
                 let q;
 
+                // Semua user yang login bisa melihat semua data (tidak difilter per user)
                 const baseConstraints = [];
-                if (auth.currentUser) {
-                    baseConstraints.push(where("created_by", "==", auth.currentUser.uid));
-                }
 
                 const isFilteringDate = filterStartDate.value || filterEndDate.value;
 
                 if (tableSearch.value.trim()) {
                     const term = tableSearch.value.trim();
                     const isNumber = /^\d+$/.test(term);
-                    let searchConstraints = [...baseConstraints];
+                    let searchConstraints = [];
 
                     if (isNumber) {
                         searchConstraints.push(orderBy("nip"));
                         searchConstraints.push(where("nip", ">=", term));
                         searchConstraints.push(where("nip", "<=", term + "\uf8ff"));
                     } else {
-                        const termNama = term.toUpperCase();
-                        searchConstraints.push(orderBy("nama"));
-                        searchConstraints.push(where("nama", ">=", termNama));
-                        searchConstraints.push(where("nama", "<=", termNama + "\uf8ff"));
+                        // Cari pakai nama_search (lowercase) agar case-insensitive
+                        const termNama = term.toLowerCase();
+                        searchConstraints.push(orderBy("nama_search"));
+                        searchConstraints.push(where("nama_search", ">=", termNama));
+                        searchConstraints.push(where("nama_search", "<=", termNama + "\uf8ff"));
                     }
 
                     q = query(collRef, ...searchConstraints, limit(50));
@@ -576,7 +575,8 @@ export default {
                 }
 
                 const safeForm = { ...form };
-                safeForm.nama = safeForm.nama.toUpperCase(); // Simpan nama UPPERCASE untuk search
+                // Simpan nama apa adanya sesuai input
+                safeForm.nama_search = safeForm.nama.toLowerCase(); // Field khusus untuk search case-insensitive
                 safeForm.unit_kerja = formatTitleCase(safeForm.unit_kerja);
                 safeForm.perangkat_daerah = formatTitleCase(safeForm.perangkat_daerah);
                 safeForm.jabatan_lama = formatTitleCase(safeForm.jabatan_lama);
@@ -885,6 +885,38 @@ export default {
         };
 
         // ============================================================
+        // CEK SIASN — Buka tab SIASN & terima data balik dari bookmarklet
+        // ============================================================
+        const cekSIASN = (nip) => {
+            if (!nip) return;
+            // Simpan NIP ke localStorage agar bookmarklet bisa membacanya
+            localStorage.setItem('KGBAPP_SIASN_NIP', nip.trim());
+            localStorage.setItem('KGBAPP_SIASN_ORIGIN', window.location.origin);
+            window.open('https://siasn-instansi.bkn.go.id/peremajaan/profil/pns/', '_blank');
+            showToast('Tab SIASN dibuka. Jalankan Bookmarklet di halaman tersebut.', 'info');
+        };
+
+        // Handler: Terima data balik dari bookmarklet via postMessage
+        const handleSIASNMessage = (event) => {
+            // Hanya terima dari domain SIASN
+            if (!event.origin.includes('siasn-instansi.bkn.go.id')) return;
+            if (!event.data || event.data.type !== 'KGBAPP_SIASN_DATA') return;
+
+            const d = event.data.payload;
+            if (!d) return;
+
+            // Auto-fill form dengan data dari SIASN
+            if (d.nama) form.nama = d.nama;
+            if (d.unit_kerja) form.unit_kerja = d.unit_kerja;
+            if (d.perangkat_daerah) form.perangkat_daerah = d.perangkat_daerah;
+            if (d.pangkat_golongan) form.pangkat_golongan = d.pangkat_golongan;
+            if (d.golongan_kode) form.golongan_kode = d.golongan_kode;
+            if (d.tmt_pangkat_golongan) form.tmt_pangkat_golongan = d.tmt_pangkat_golongan;
+
+            showToast(`Data SIASN berhasil diimport: ${d.nama || ''}`, 'success');
+        };
+
+        // ============================================================
         // LIFECYCLE
         // ============================================================
         onMounted(() => {
@@ -896,6 +928,8 @@ export default {
                     listData.value = [];
                 }
             });
+            // Dengarkan data balik dari bookmarklet SIASN
+            window.addEventListener('message', handleSIASNMessage);
         });
 
         // ============================================================
@@ -931,6 +965,9 @@ export default {
 
             // Srikandi
             openSrikandi,
+
+            // SIASN
+            cekSIASN,
 
             // Utils
             formatTanggal,
