@@ -37,8 +37,12 @@ export const TplAutocompleteJabatan = `
         <ul v-if="showSuggestions && suggestions.length > 0" class="list-group position-absolute w-100 shadow mt-1" style="z-index: 1050; max-height: 250px; overflow-y: auto;">
             <li v-for="item in suggestions" :key="item.id" class="list-group-item list-group-item-action small cursor-pointer py-2" @mousedown.prevent="selectItem(item)">
                 <div class="fw-bold text-dark">{{ item.nama_jabatan }}</div>
-                <div class="d-flex justify-content-between small mt-1">
+                <div class="d-flex justify-content-between align-items-center small mt-1">
                     <span class="badge bg-light text-secondary border">{{ item.jenis_jabatan || 'Umum' }}</span>
+                    <span v-if="item.tunjangan && Number(item.tunjangan) > 0" class="badge bg-success text-white ms-1">
+                        <i class="bi bi-cash-coin me-1"></i>Rp {{ Number(item.tunjangan).toLocaleString('id-ID') }}
+                    </span>
+                    <span v-else class="badge bg-light text-muted border ms-1">Non Tunjangan</span>
                 </div>
             </li>
         </ul>
@@ -197,6 +201,13 @@ export const TplMain = `
                                                     <div class="mb-1"><i class="bi bi-person-badge me-2"></i>{{ item.pangkat_golongan || '-' }}</div>
                                                     <div class="mb-1"><i class="bi bi-calendar me-2"></i>TMT Pangkat: {{ formatTanggal(item.tmt_pangkat_golongan) }}</div>
                                                     <div class="mb-1"><i class="bi bi-star me-2"></i>Angka Kredit: {{ item.angka_kredit || '-' }}</div>
+                                                    <div class="mb-1">
+                                                        <i class="bi bi-cash-coin me-2"></i>
+                                                        <span v-if="item.tunjangan && Number(item.tunjangan) > 0" class="fw-bold text-success">
+                                                            Tunjangan: Rp {{ Number(item.tunjangan).toLocaleString('id-ID') }}
+                                                        </span>
+                                                        <span v-else class="text-muted fst-italic">Non Tunjangan</span>
+                                                    </div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <h6 class="fw-bold text-muted mb-2 text-uppercase" style="font-size: 0.7rem;">Dokumen Dasar</h6>
@@ -445,18 +456,35 @@ export const TplMain = `
                                     <div class="col-12">
                                         <div class="card border-warning border-2 bg-warning bg-opacity-10">
                                             <div class="card-body py-2 px-3">
-                                                <label class="form-label small fw-bold text-warning-emphasis mb-1">
-                                                    <i class="bi bi-cash-coin me-1"></i>Tunjangan Jabatan (Rp)
-                                                    <span class="fw-normal text-muted ms-1">— Kosongkan jika tidak ada tunjangan</span>
+                                                <label class="form-label small fw-bold text-warning-emphasis mb-2">
+                                                    <i class="bi bi-cash-coin me-1"></i>Tunjangan Jabatan
                                                 </label>
-                                                <div class="input-group">
+                                                <!-- Radio: Dengan / Non Tunjangan -->
+                                                <div class="d-flex gap-4 mb-2">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" id="tunjanganYa"
+                                                            v-model="opsiTunjangan" value="dengan">
+                                                        <label class="form-check-label fw-semibold text-success" for="tunjanganYa">
+                                                            <i class="bi bi-check-circle-fill me-1"></i>Dengan Tunjangan
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" id="tunjanganTidak"
+                                                            v-model="opsiTunjangan" value="non">
+                                                        <label class="form-check-label fw-semibold text-secondary" for="tunjanganTidak">
+                                                            <i class="bi bi-x-circle me-1"></i>Non Tunjangan
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <!-- Input nominal, hanya muncul jika Dengan Tunjangan -->
+                                                <div v-if="opsiTunjangan === 'dengan'" class="input-group mb-1">
                                                     <span class="input-group-text bg-white fw-bold">Rp</span>
                                                     <input v-model="form.tunjangan" type="number" min="0" class="form-control" placeholder="Contoh: 540000">
                                                 </div>
                                                 <div class="small text-warning-emphasis mt-1">
                                                     <i class="bi bi-info-circle"></i>
-                                                    Jika diisi → otomatis menggunakan template <strong>SK_FUNGSIONAL_TUNJANGAN</strong>.
-                                                    Jika dikosongkan → menggunakan template <strong>SK_FUNGSIONAL</strong>.
+                                                    <strong>Dengan Tunjangan</strong> &rarr; template <strong>SK_FUNGSIONAL_TUNJANGAN</strong>.
+                                                    <strong>Non Tunjangan</strong> &rarr; template <strong>SK_FUNGSIONAL</strong>.
                                                 </div>
                                             </div>
                                         </div>

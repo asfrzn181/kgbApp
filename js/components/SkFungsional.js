@@ -259,6 +259,12 @@ export default {
             nomor_naskah: ''
         });
 
+        // Opsi radio tunjangan: 'dengan' | 'non'
+        const opsiTunjangan = ref('non');
+        watch(opsiTunjangan, (val) => {
+            if (val === 'non') form.tunjangan = '';
+        });
+
         // Pejabat yang sedang terpilih di form (untuk ditampilkan preview)
         const pejabatTerpilih = computed(() => {
             if (!form.pejabat_nip || listPejabat.value.length === 0) return null;
@@ -512,9 +518,13 @@ export default {
         // HANDLE JABATAN BARU SELECT (Auto-fill dari master_jabatan)
         // ============================================================
         const handleJabatanBaruSelect = (jabatanItem) => {
-            // Auto-fill tunjangan jika ada di master dan field tunjangan masih kosong
+            // Auto-fill tunjangan dari master_jabatan
             if (jabatanItem.tunjangan !== undefined && jabatanItem.tunjangan !== null && jabatanItem.tunjangan !== '') {
                 form.tunjangan = jabatanItem.tunjangan;
+                opsiTunjangan.value = 'dengan';
+            } else {
+                form.tunjangan = '';
+                opsiTunjangan.value = 'non';
             }
         };
 
@@ -527,12 +537,15 @@ export default {
                 isEditMode.value = true;
                 formId.value = item.id;
                 Object.assign(form, item);
+                // Set opsi tunjangan sesuai data yang dimuat
+                opsiTunjangan.value = (item.tunjangan && Number(item.tunjangan) > 0) ? 'dengan' : 'non';
             } else {
                 isEditMode.value = false;
                 formId.value = null;
                 Object.keys(form).forEach(k => form[k] = '');
                 form.nomor_naskah = '100.3.3.2/GANTI INI/BKPSDMD/2026';
                 form.kategori_jabatan = 'Keahlian';
+                opsiTunjangan.value = 'non';
             }
             searchMsg.value = '';
             showModal.value = true;
@@ -903,6 +916,7 @@ export default {
 
             // Form & Master Data
             form, listGolongan, listPejabat, pejabatTerpilih,
+            opsiTunjangan,
 
             // Actions
             fetchTable, goToPage,
