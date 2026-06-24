@@ -136,41 +136,76 @@
 const bookmarkletCode = `(function(){
   var nip=localStorage.getItem('KGBAPP_SIASN_NIP');
   var origin=localStorage.getItem('KGBAPP_SIASN_ORIGIN')||'*';
-  if(!nip){alert('NIP tidak ditemukan.\\nBuka KGB App, isi NIP, klik Cek SIASN terlebih dahulu.');return;}
-  function getElByLabel(t){var ls=document.querySelectorAll('label');for(var i=0;i<ls.length;i++){if(ls[i].textContent.trim().toLowerCase().includes(t.toLowerCase())){var p=ls[i].parentElement;if(p){var el=p.querySelector('p');if(el)return el;}return ls[i].nextElementSibling;}}return null;}
-  function getVal(t){var el=getElByLabel(t);return el?el.textContent.trim():'';}
+  if(!nip){
+    var p=new URLSearchParams(window.location.search);
+    nip=p.get('kgb_nip')||p.get('nip');
+    if(p.get('kgb_origin')) origin=p.get('kgb_origin');
+  }
+  if(!nip){alert('NIP tidak ditemukan.\\nBuka KGB App, isi NIP, klik Cek SIASN terlebih dahulu.\\nAtau isi NIP manual, Cari, lalu klik bookmark ini.');}
+  
+  function getVal(lbl){
+    var ls=document.querySelectorAll('label, div.font-semibold, span.font-semibold');
+    for(var i=0;i<ls.length;i++){
+      var t=ls[i].textContent.trim().toLowerCase();
+      var tag=ls[i].tagName;
+      if(t===lbl.toLowerCase()||(tag==='LABEL'&&t.includes(lbl.toLowerCase()))){
+        var p=ls[i].parentElement;
+        if(p){
+          var el=p.querySelector('p, h4, div.font-medium, span.font-medium');
+          if(el&&el!==ls[i])return el.textContent.trim();
+        }
+        if(ls[i].nextElementSibling)return ls[i].nextElementSibling.textContent.trim();
+      }
+    }
+    return '';
+  }
   function parseDate(s){if(!s||s==='-')return'';var m={'januari':'01','februari':'02','maret':'03','april':'04','mei':'05','juni':'06','juli':'07','agustus':'08','september':'09','oktober':'10','november':'11','desember':'12'};var p=s.toLowerCase().trim().split(/\\s+/);if(p.length<3)return'';return p[2]+'-'+(m[p[1]]||'01')+'-'+p[0].padStart(2,'0');}
-  function doExtract(){
-    var nama=getVal('Nama');
+  
+  var payload={};
+  function getTab(name){return Array.from(document.querySelectorAll('button, a, div')).find(function(b){return b.textContent&&b.textContent.trim().toLowerCase().includes(name.toLowerCase())&&(b.tagName==='BUTTON'||b.tagName==='A');});}
+  
+  function step1(){var tab=getTab('Data Pribadi')||getTab('Data Utama');if(tab)tab.click();setTimeout(step2,1200);}
+  function step2(){
+    payload.nama=getVal('Nama')||getVal('Nama KTP');
+    var n=getVal('NIP Baru')||getVal('NIP');if(n)payload.nip=n;
+    var tab=getTab('Posisi & Jabatan')||getTab('Riwayat Jabatan');
+    if(tab){tab.click();setTimeout(step3,1200);}else{step3();}
+  }
+  function step3(){
     var golRaw=getVal('Golongan Ruang Akhir')||getVal('Golongan Ruang')||getVal('Golongan');
     var tmtGol=getVal('TMT Golongan')||getVal('TMT Gol');
-    var unit=getVal('Unit Organisasi')||getVal('Unit Kerja');
-    var induk=getVal('Unit Organisasi Induk')||getVal('Perangkat Daerah')||getVal('Satuan Kerja');
+    var unit=getVal('Unit Organisasi')||getVal('Unit Kerja')||getVal('Instansi Induk');
+    var induk=getVal('Unit Organisasi Induk')||getVal('Perangkat Daerah')||getVal('Satuan Kerja')||getVal('Instansi Daerah');
     var pangkat=getVal('Pangkat');
+    var jabatan=getVal('Jabatan')||getVal('Nama Jabatan');
     var golMatch=golRaw.match(/([IVX]+\\/[a-d])/i);
     var golKode=golMatch?golMatch[1].toUpperCase():golRaw;
     var pangkatGol=pangkat&&golKode?pangkat+' / '+golKode:golRaw;
-    var payload={nama:nama,unit_kerja:unit,perangkat_daerah:induk,pangkat_golongan:pangkatGol,golongan_kode:golKode,tmt_pangkat_golongan:parseDate(tmtGol)};
+    
+    payload.unit_kerja=unit;payload.perangkat_daerah=induk;payload.pangkat_golongan=pangkatGol;
+    payload.golongan_kode=golKode;payload.tmt_pangkat_golongan=parseDate(tmtGol);
+    if(jabatan)payload.jabatan=jabatan;
+    
     console.log('[KGBAPP] Payload:',payload);
-    if(window.opener){window.opener.postMessage({type:'KGBAPP_SIASN_DATA',payload:payload},origin);alert('\\u2705 Data dikirim ke KGB App!\\n\\nNama: '+nama+'\\nGolongan: '+pangkatGol+'\\nUnit Kerja: '+unit+'\\n\\nTab ini bisa ditutup.');}
-    else{var j=JSON.stringify(payload);navigator.clipboard.writeText(j).then(function(){alert('Data disalin ke clipboard (gunakan Paste di KGB App jika diperlukan).');}).catch(function(){alert('Data:\\n'+j);});}
+    if(window.opener){window.opener.postMessage({type:'KGBAPP_SIASN_DATA',payload:payload},origin);alert('\\u2705 Data dikirim ke KGB App!\\n\\nNama: '+(payload.nama||'-')+'\\nGolongan: '+pangkatGol+'\\nUnit Kerja: '+unit+'\\n\\nTab ini bisa ditutup.');}
+    else{var j=JSON.stringify(payload);navigator.clipboard.writeText(j).then(function(){alert('Data disalin ke clipboard.\\n\\nNama: '+(payload.nama||'-'));}).catch(function(){alert('Data:\\n'+j);});}
   }
+
   function doSearch(){
     var nipInput=document.querySelector('input[name="nip_nama"]')||document.querySelector('input[placeholder*="NIP"]');
-    if(!nipInput){alert('Field NIP tidak ditemukan!');return;}
+    if(!nipInput||!nip){step1();return;}
     var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
-    setter.call(nipInput,nip);
-    nipInput.dispatchEvent(new Event('input',{bubbles:true}));
+    setter.call(nipInput,nip);nipInput.dispatchEvent(new Event('input',{bubbles:true}));
     var btnNip=Array.from(document.querySelectorAll('button')).find(function(b){return b.textContent.trim()==='NIP';});
     if(btnNip&&!btnNip.classList.contains('bg-secondaryBkn'))btnNip.click();
     setTimeout(function(){
       var btnCari=Array.from(document.querySelectorAll('button')).find(function(b){return b.textContent.trim().includes('Cari');});
-      if(btnCari){btnCari.click();setTimeout(doExtract,2500);}
-      else{alert('Tombol Cari tidak ditemukan. Klik Cari manual lalu jalankan bookmarklet lagi.');doExtract();}
-    },300);
+      if(btnCari){btnCari.click();setTimeout(step1,3000);}
+      else{alert('Tombol Cari tidak ditemukan. Klik Cari manual lalu jalankan bookmarklet lagi.');step1();}
+    },600);
   }
   doSearch();
-})()`;
+})\x28\x29`;
 
 document.getElementById('bm-link').href = 'javascript:' + bookmarkletCode;
 
