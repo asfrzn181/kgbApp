@@ -673,7 +673,7 @@ export default {
 
             // TTD Content berdasarkan mode preview
             let ttdContent = previewTab.value === 'TTE'
-                ? "\n\n\n\xA0\xA0\xA0\xA0\xA0\xA0\xA0${ttd_pengirim}\n\n\n\n"
+                ? "\n\n\n\xA0\xA0\xA0\xA0\xA0\xA0\xA0${ttd_pengirim}\n\n\n"
                 : "\n\n\n";
 
             // Fetch dan render template
@@ -908,8 +908,8 @@ export default {
             if (!d) return;
 
             // Auto-fill form dengan data dari SIASN
-            if (d.nama)            form.nama            = d.nama;
-            if (d.unit_kerja)      form.unit_kerja      = d.unit_kerja;
+            if (d.nama) form.nama = d.nama;
+            if (d.unit_kerja) form.unit_kerja = d.unit_kerja;
             if (d.perangkat_daerah) form.perangkat_daerah = d.perangkat_daerah;
             if (d.pangkat_golongan) form.pangkat_golongan = d.pangkat_golongan;
             if (d.golongan_kode) {
