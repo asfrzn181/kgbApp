@@ -11,7 +11,6 @@ function buildSiasnBookmarklet() {
 
         if (!nip) {
             alert('Buka dari KGB App dulu!\nAtau isi NIP Anda, klik Cari, dan jalankan ulang bookmarklet.');
-            // Tidak return agar tetap bisa manual jika sudah dicari
         }
 
         function setVal(el, v) {
@@ -20,24 +19,6 @@ function buildSiasnBookmarklet() {
             ns.call(el, v);
             el.dispatchEvent(new Event('input', { bubbles: true }));
             el.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-
-        function getVal(lbl) {
-            // Sifat global: cari berdasarkan elemen label secara luas
-            var ls = document.querySelectorAll('label, div.font-semibold, span.font-semibold');
-            for (var i = 0; i < ls.length; i++) {
-                var text = ls[i].textContent.trim().toLowerCase();
-                var tag = ls[i].tagName;
-                if (text === lbl.toLowerCase() || (tag === 'LABEL' && text.indexOf(lbl.toLowerCase()) !== -1)) {
-                    var pe = ls[i].parentElement;
-                    if (pe) {
-                        var el = pe.querySelector('p, h4, div.font-medium, span.font-medium');
-                        if (el && el !== ls[i]) return el.textContent.trim();
-                    }
-                    if (ls[i].nextElementSibling) return ls[i].nextElementSibling.textContent.trim();
-                }
-            }
-            return '';
         }
 
         function parseDate(str) {
@@ -53,7 +34,38 @@ function buildSiasnBookmarklet() {
             return pts[2] + '-' + (bln[pts[1]] || '01') + '-' + d;
         }
 
+        var allData = {};
         var payload = {};
+
+        function extractCurrentTab() {
+            var ls = document.querySelectorAll('label, div.font-semibold, span.font-semibold');
+            for (var i = 0; i < ls.length; i++) {
+                var el = ls[i];
+                var key = el.textContent.trim();
+                if (!key) continue;
+
+                var pe = el.parentElement;
+                var valEl = pe ? pe.querySelector('p, h4, div.font-medium, span.font-medium') : null;
+
+                if (valEl && valEl !== el) {
+                    allData[key] = valEl.textContent.trim();
+                } else if (el.nextElementSibling) {
+                    allData[key] = el.nextElementSibling.textContent.trim();
+                }
+            }
+        }
+
+        function getSafeVal(keys) {
+            for (var i = 0; i < keys.length; i++) {
+                var exactKey = Object.keys(allData).find(function(k) { 
+                    return k.toLowerCase() === keys[i].toLowerCase(); 
+                });
+                if (exactKey && allData[exactKey] && allData[exactKey] !== '-') {
+                    return allData[exactKey];
+                }
+            }
+            return '';
+        }
 
         function getTab(name) {
             return Array.from(document.querySelectorAll('button, a, div')).find(function (b) {
@@ -64,48 +76,70 @@ function buildSiasnBookmarklet() {
         function step1() {
             var tab = getTab('Data Pribadi') || getTab('Data Utama');
             if (tab) tab.click();
-            setTimeout(step2, 1200);
+            setTimeout(step2, 1500);
         }
 
         function step2() {
-            payload.nama = getVal('Nama') || getVal('Nama KTP');
-            var nipBaru = getVal('NIP Baru') || getVal('NIP');
-            if (nipBaru) payload.nip = nipBaru;
-
+            extractCurrentTab(); // Ambil data dari tab Data Pribadi
             var tab = getTab('Posisi & Jabatan') || getTab('Riwayat Jabatan');
             if (tab) {
                 tab.click();
-                setTimeout(step3, 1200);
+                setTimeout(step3, 1500);
             } else {
                 step3();
             }
         }
 
         function step3() {
-            var golRaw = getVal('Golongan Ruang Akhir') || getVal('Golongan Ruang') || getVal('Golongan');
-            var tmtGol = getVal('TMT Golongan') || getVal('TMT Gol');
-            var unit = getVal('Unit Organisasi') || getVal('Unit Kerja') || getVal('Instansi Induk');
-            var induk = getVal('Unit Organisasi Induk') || getVal('Perangkat Daerah') || getVal('Satuan Kerja') || getVal('Instansi Daerah');
-            var pangkat = getVal('Pangkat');
-            var jabatan = getVal('Jabatan') || getVal('Nama Jabatan');
+            extractCurrentTab(); // Ambil data dari tab Posisi & Jabatan
+
+            // DEBUG: Console log semua data yang diekstrak
+            console.log('=== SEMUA DATA SIASN YANG DIEKSTRAK ===');
+            console.log(allData);
+
+            var nipBaru = getSafeVal(['NIP Baru', 'NIP']);
+            var namaAsli = getSafeVal(['Nama', 'Nama KTP']);
+            var gelarDepan = getSafeVal(['Gelar Depan']);
+            var gelarBelakang = getSafeVal(['Gelar Belakang']);
+
+            // Susun nama lengkap dengan gelar
+            var namaLengkap = namaAsli;
+            if (gelarDepan) namaLengkap = gelarDepan + ' ' + namaLengkap;
+            if (gelarBelakang) {
+                if (namaLengkap.indexOf(',') === -1) namaLengkap += ',';
+                namaLengkap += ' ' + gelarBelakang;
+            }
+
+            var golRaw = getSafeVal(['Golongan Ruang Akhir', 'Golongan Ruang', 'Golongan']);
+            var tmtGol = getSafeVal(['TMT Golongan', 'TMT Gol']);
+            var unit = getSafeVal(['Unit Organisasi', 'Unit Kerja', 'Instansi Induk']);
+            var induk = getSafeVal(['Unit Organisasi Induk', 'Perangkat Daerah', 'Satuan Kerja', 'Instansi Daerah']);
+            var pangkat = getSafeVal(['Pangkat']);
+            var jabatan = getSafeVal(['Jabatan', 'Nama Jabatan']);
 
             var golMatch = golRaw.match(new RegExp('([IVX]+[/][a-d])', 'i'));
             var golKode = golMatch ? golMatch[1].toUpperCase() : golRaw;
             var pangkatGol = (pangkat && golKode) ? (pangkat + ' / ' + golKode) : golRaw;
 
+            // Masukkan data tambahan yang mungkin berguna
+            payload.nip = nipBaru;
+            payload.nama = namaLengkap;
             payload.unit_kerja = unit;
             payload.perangkat_daerah = induk;
             payload.pangkat_golongan = pangkatGol;
             payload.golongan_kode = golKode;
             payload.tmt_pangkat_golongan = parseDate(tmtGol);
-            if (jabatan) payload.jabatan = jabatan;
+            payload.jabatan = jabatan;
+            
+            // Simpan seluruh raw data untuk referensi
+            payload.raw_data = allData;
 
             if (window.opener) {
                 window.opener.postMessage({ type: 'KGBAPP_SIASN_DATA', payload: payload }, decodeURIComponent(origin));
-                alert('\u2705 Data dikirim ke KGB App!\n\nNama: ' + (payload.nama || '-') + '\nGolongan: ' + pangkatGol + '\nUnit: ' + unit + '\n\nTab ini bisa ditutup.');
+                alert('\u2705 Data dikirim ke KGB App!\n\nNama Lengkap: ' + (payload.nama || '-') + '\nGolongan: ' + pangkatGol + '\nUnit: ' + unit + '\n\nCek Console browser (F12) untuk melihat seluruh data yang diekstrak. Tab ini bisa ditutup.');
             } else {
                 navigator.clipboard.writeText(JSON.stringify(payload)).then(function () {
-                    alert('Data disalin ke clipboard.\n\nNama: ' + (payload.nama || '-'));
+                    alert('Data disalin ke clipboard.\n\nNama Lengkap: ' + (payload.nama || '-') + '\n\nCek Console browser (F12) untuk melihat seluruh data yang diekstrak.');
                 }).catch(function () {
                     alert('Payload:\n' + JSON.stringify(payload));
                 });
@@ -132,7 +166,6 @@ function buildSiasnBookmarklet() {
                 }
             }, 600);
         } else {
-            // Jika sudah di-Cari sebelumnya, atau tidak ada field NIP
             step1();
         }
     }

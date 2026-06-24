@@ -1,139 +1,297 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Instalasi Bookmarklet SIASN — KGB App</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
-  .card { background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); max-width: 680px; width: 100%; overflow: hidden; }
-  .header { background: linear-gradient(135deg, #5c35a5, #3d1f85); color: white; padding: 32px; text-align: center; }
-  .header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
-  .header p { opacity: 0.85; font-size: 0.9rem; }
-  .body { padding: 32px; }
-  .step { display: flex; gap: 16px; margin-bottom: 28px; }
-  .step-num { width: 36px; height: 36px; border-radius: 50%; background: #5c35a5; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0; }
-  .step-content h3 { font-size: 1rem; font-weight: 600; color: #1a1a2e; margin-bottom: 6px; }
-  .step-content p { font-size: 0.875rem; color: #6b7280; line-height: 1.6; }
-  .bookmarklet-btn {
-    display: inline-block;
-    background: linear-gradient(135deg, #5c35a5, #7c4dca);
-    color: white !important;
-    text-decoration: none !important;
-    padding: 14px 28px;
-    border-radius: 12px;
-    font-weight: 700;
-    font-size: 1rem;
-    box-shadow: 0 4px 16px rgba(92,53,165,0.35);
-    cursor: grab;
-    border: 3px dashed rgba(255,255,255,0.4);
-    transition: transform 0.2s, box-shadow 0.2s;
-    user-select: none;
-  }
-  .bookmarklet-btn:hover { transform: scale(1.03); box-shadow: 0 6px 24px rgba(92,53,165,0.45); }
-  .bookmarklet-btn:active { cursor: grabbing; }
-  .drag-area { background: #f8f5ff; border: 2px dashed #c4b0e8; border-radius: 12px; padding: 28px; text-align: center; margin: 16px 0; }
-  .drag-area .label { font-size: 0.8rem; color: #888; margin-top: 12px; }
-  .note { background: #fff7ed; border-left: 4px solid #f97316; border-radius: 8px; padding: 14px 18px; font-size: 0.85rem; color: #7c2d12; margin-top: 20px; }
-  .note strong { display: block; margin-bottom: 4px; }
-  .divider { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
-  .flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.85rem; color: #374151; background: #f9fafb; border-radius: 10px; padding: 16px; }
-  .flow span { background: #5c35a5; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
-  .flow .arrow { color: #9ca3af; font-size: 1.2rem; }
-  .copy-btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: #f3f0ff; color: #5c35a5;
-    border: 2px solid #c4b0e8; border-radius: 10px;
-    padding: 10px 20px; font-size: 0.875rem; font-weight: 600;
-    cursor: pointer; transition: all 0.2s; margin-top: 10px;
-  }
-  .copy-btn:hover { background: #e9e3ff; border-color: #5c35a5; transform: scale(1.02); }
-  .copy-btn.copied { background: #dcfce7; color: #166534; border-color: #86efac; }
-  .copy-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instalasi Bookmarklet SIASN — KGB App</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+      max-width: 680px;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #5c35a5, #3d1f85);
+      color: white;
+      padding: 32px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      opacity: 0.85;
+      font-size: 0.9rem;
+    }
+
+    .body {
+      padding: 32px;
+    }
+
+    .step {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .step-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #5c35a5;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    .step-content h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 6px;
+    }
+
+    .step-content p {
+      font-size: 0.875rem;
+      color: #6b7280;
+      line-height: 1.6;
+    }
+
+    .bookmarklet-btn {
+      display: inline-block;
+      background: linear-gradient(135deg, #5c35a5, #7c4dca);
+      color: white !important;
+      text-decoration: none !important;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 1rem;
+      box-shadow: 0 4px 16px rgba(92, 53, 165, 0.35);
+      cursor: grab;
+      border: 3px dashed rgba(255, 255, 255, 0.4);
+      transition: transform 0.2s, box-shadow 0.2s;
+      user-select: none;
+    }
+
+    .bookmarklet-btn:hover {
+      transform: scale(1.03);
+      box-shadow: 0 6px 24px rgba(92, 53, 165, 0.45);
+    }
+
+    .bookmarklet-btn:active {
+      cursor: grabbing;
+    }
+
+    .drag-area {
+      background: #f8f5ff;
+      border: 2px dashed #c4b0e8;
+      border-radius: 12px;
+      padding: 28px;
+      text-align: center;
+      margin: 16px 0;
+    }
+
+    .drag-area .label {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 12px;
+    }
+
+    .note {
+      background: #fff7ed;
+      border-left: 4px solid #f97316;
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 0.85rem;
+      color: #7c2d12;
+      margin-top: 20px;
+    }
+
+    .note strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin: 24px 0;
+    }
+
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      color: #374151;
+      background: #f9fafb;
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .flow span {
+      background: #5c35a5;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .flow .arrow {
+      color: #9ca3af;
+      font-size: 1.2rem;
+    }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #f3f0ff;
+      color: #5c35a5;
+      border: 2px solid #c4b0e8;
+      border-radius: 10px;
+      padding: 10px 20px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 10px;
+    }
+
+    .copy-btn:hover {
+      background: #e9e3ff;
+      border-color: #5c35a5;
+      transform: scale(1.02);
+    }
+
+    .copy-btn.copied {
+      background: #dcfce7;
+      color: #166534;
+      border-color: #86efac;
+    }
+
+    .copy-btn svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+  </style>
 </head>
+
 <body>
-<div class="card">
-  <div class="header">
-    <h1>🔖 Bookmarklet SIASN — KGB App</h1>
-    <p>Tool otomatis untuk mengambil data PNS dari SIASN BKN ke form SK Fungsional</p>
-  </div>
-  <div class="body">
-
-    <div style="margin-bottom: 20px;">
-      <p style="font-size: 0.875rem; color: #374151; margin-bottom: 12px; font-weight: 600;">Alur penggunaan:</p>
-      <div class="flow">
-        <span>Isi NIP di KGB App</span>
-        <span class="arrow">→</span>
-        <span>Klik "Cek SIASN"</span>
-        <span class="arrow">→</span>
-        <span>Tab SIASN terbuka</span>
-        <span class="arrow">→</span>
-        <span>Klik Bookmarklet</span>
-        <span class="arrow">→</span>
-        <span>Data otomatis terisi ✓</span>
-      </div>
+  <div class="card">
+    <div class="header">
+      <h1>🔖 Bookmarklet SIASN — KGB App</h1>
+      <p>Tool otomatis untuk mengambil data PNS dari SIASN BKN ke form SK Fungsional</p>
     </div>
+    <div class="body">
 
-    <hr class="divider">
-
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-content">
-        <h3>Aktifkan Bookmark Bar</h3>
-        <p>Pastikan bookmark bar browser Anda terlihat. Di Chrome: <code>Ctrl+Shift+B</code>. Di Edge: <code>Ctrl+Shift+B</code>. Di Firefox: <code>Ctrl+Shift+B</code>.</p>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-content">
-        <h3>Drag tombol ini ke Bookmark Bar</h3>
-        <p style="margin-bottom: 12px;">Klik dan seret tombol ungu di bawah ke bookmark bar browser Anda:</p>
-        <div class="drag-area">
-          <a id="bm-link" class="bookmarklet-btn" href="PLACEHOLDER">
-            🔖 SIASN → KGB App
-          </a>
-          <div class="label">⬆ Drag ke bookmark bar, atau klik kanan → "Tambahkan ke Bookmark"</div>
-        </div>
-        <div style="text-align: center;">
-          <button id="copy-btn" class="copy-btn" onclick="copyBookmarklet()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            <span id="copy-label">Copy URL Bookmarklet</span>
-          </button>
-          <p style="font-size: 0.75rem; color: #9ca3af; margin-top: 8px;">Alternatif: salin URL-nya, buat bookmark baru, paste di field URL/Address.</p>
+      <div style="margin-bottom: 20px;">
+        <p style="font-size: 0.875rem; color: #374151; margin-bottom: 12px; font-weight: 600;">Alur penggunaan:</p>
+        <div class="flow">
+          <span>Isi NIP di KGB App</span>
+          <span class="arrow">→</span>
+          <span>Klik "Cek SIASN"</span>
+          <span class="arrow">→</span>
+          <span>Tab SIASN terbuka</span>
+          <span class="arrow">→</span>
+          <span>Klik Bookmarklet</span>
+          <span class="arrow">→</span>
+          <span>Data otomatis terisi ✓</span>
         </div>
       </div>
-    </div>
 
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-content">
-        <h3>Cara pakai</h3>
-        <p>
-          Di KGB App, isi NIP pegawai → klik tombol <strong>"Cek SIASN"</strong> → halaman SIASN terbuka →
-          klik bookmark <strong>"SIASN → KGB App"</strong> → data otomatis terisi ke form.
-        </p>
+      <hr class="divider">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Aktifkan Bookmark Bar</h3>
+          <p>Pastikan bookmark bar browser Anda terlihat. Di Chrome: <code>Ctrl+Shift+B</code>. Di Edge:
+            <code>Ctrl+Shift+B</code>. Di Firefox: <code>Ctrl+Shift+B</code>.</p>
+        </div>
       </div>
-    </div>
 
-    <div class="note">
-      <strong>⚠️ Catatan Penting</strong>
-      Data yang diambil: Nama, Golongan Ruang, TMT Golongan, Unit Kerja, Perangkat Daerah.
-      Bookmarklet hanya bekerja jika halaman SIASN sudah menampilkan data pegawai (setelah Cari berhasil).
-      Jika window.opener tidak tersedia, data akan disalin ke clipboard.
-    </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Drag tombol ini ke Bookmark Bar</h3>
+          <p style="margin-bottom: 12px;">Klik dan seret tombol ungu di bawah ke bookmark bar browser Anda:</p>
+          <div class="drag-area">
+            <a id="bm-link" class="bookmarklet-btn" href="PLACEHOLDER">
+              🔖 SIASN → KGB App
+            </a>
+            <div class="label">⬆ Drag ke bookmark bar, atau klik kanan → "Tambahkan ke Bookmark"</div>
+          </div>
+          <div style="text-align: center;">
+            <button id="copy-btn" class="copy-btn" onclick="copyBookmarklet()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span id="copy-label">Copy URL Bookmarklet</span>
+            </button>
+            <p style="font-size: 0.75rem; color: #9ca3af; margin-top: 8px;">Alternatif: salin URL-nya, buat bookmark
+              baru, paste di field URL/Address.</p>
+          </div>
+        </div>
+      </div>
 
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Cara pakai</h3>
+          <p>
+            Di KGB App, isi NIP pegawai → klik tombol <strong>"Cek SIASN"</strong> → halaman SIASN terbuka →
+            klik bookmark <strong>"SIASN → KGB App"</strong> → data otomatis terisi ke form.
+          </p>
+        </div>
+      </div>
+
+      <div class="note">
+        <strong>⚠️ Catatan Penting</strong>
+        Data yang diambil: Nama, Golongan Ruang, TMT Golongan, Unit Kerja, Perangkat Daerah.
+        Bookmarklet hanya bekerja jika halaman SIASN sudah menampilkan data pegawai (setelah Cari berhasil).
+        Jika window.opener tidak tersedia, data akan disalin ke clipboard.
+      </div>
+
+    </div>
   </div>
-</div>
 
-<script>
-// Build bookmarklet URL
-const bookmarkletCode = `(function(){
+  <script>
+    // Build bookmarklet URL
+    const bookmarkletCode = `(function(){
   var nip=localStorage.getItem('KGBAPP_SIASN_NIP');
   var origin=localStorage.getItem('KGBAPP_SIASN_ORIGIN')||'*';
   if(!nip){
@@ -143,52 +301,72 @@ const bookmarkletCode = `(function(){
   }
   if(!nip){alert('NIP tidak ditemukan.\\nBuka KGB App, isi NIP, klik Cek SIASN terlebih dahulu.\\nAtau isi NIP manual, Cari, lalu klik bookmark ini.');}
   
-  function getVal(lbl){
+  function parseDate(s){if(!s||s==='-')return'';var m={'januari':'01','februari':'02','maret':'03','april':'04','mei':'05','juni':'06','juli':'07','agustus':'08','september':'09','oktober':'10','november':'11','desember':'12'};var p=s.toLowerCase().trim().split(/\\s+/);if(p.length<3)return'';return p[2]+'-'+(m[p[1]]||'01')+'-'+p[0].padStart(2,'0');}
+  
+  var allData={};
+  var payload={};
+
+  function extractCurrentTab(){
     var ls=document.querySelectorAll('label, div.font-semibold, span.font-semibold');
     for(var i=0;i<ls.length;i++){
-      var t=ls[i].textContent.trim().toLowerCase();
-      var tag=ls[i].tagName;
-      if(t===lbl.toLowerCase()||(tag==='LABEL'&&t.includes(lbl.toLowerCase()))){
-        var p=ls[i].parentElement;
-        if(p){
-          var el=p.querySelector('p, h4, div.font-medium, span.font-medium');
-          if(el&&el!==ls[i])return el.textContent.trim();
-        }
-        if(ls[i].nextElementSibling)return ls[i].nextElementSibling.textContent.trim();
-      }
+      var el=ls[i];var key=el.textContent.trim();
+      if(!key)continue;
+      var pe=el.parentElement;
+      var valEl=pe?pe.querySelector('p, h4, div.font-medium, span.font-medium'):null;
+      if(valEl&&valEl!==el){allData[key]=valEl.textContent.trim();}
+      else if(el.nextElementSibling){allData[key]=el.nextElementSibling.textContent.trim();}
+    }
+  }
+
+  function getSafeVal(keys){
+    for(var i=0;i<keys.length;i++){
+      var exactKey=Object.keys(allData).find(function(k){return k.toLowerCase()===keys[i].toLowerCase();});
+      if(exactKey&&allData[exactKey]&&allData[exactKey]!=='-')return allData[exactKey];
     }
     return '';
   }
-  function parseDate(s){if(!s||s==='-')return'';var m={'januari':'01','februari':'02','maret':'03','april':'04','mei':'05','juni':'06','juli':'07','agustus':'08','september':'09','oktober':'10','november':'11','desember':'12'};var p=s.toLowerCase().trim().split(/\\s+/);if(p.length<3)return'';return p[2]+'-'+(m[p[1]]||'01')+'-'+p[0].padStart(2,'0');}
-  
-  var payload={};
+
   function getTab(name){return Array.from(document.querySelectorAll('button, a, div')).find(function(b){return b.textContent&&b.textContent.trim().toLowerCase().includes(name.toLowerCase())&&(b.tagName==='BUTTON'||b.tagName==='A');});}
   
-  function step1(){var tab=getTab('Data Pribadi')||getTab('Data Utama');if(tab)tab.click();setTimeout(step2,1200);}
+  function step1(){var tab=getTab('Data Pribadi')||getTab('Data Utama');if(tab)tab.click();setTimeout(step2,1500);}
   function step2(){
-    payload.nama=getVal('Nama')||getVal('Nama KTP');
-    var n=getVal('NIP Baru')||getVal('NIP');if(n)payload.nip=n;
+    extractCurrentTab();
     var tab=getTab('Posisi & Jabatan')||getTab('Riwayat Jabatan');
-    if(tab){tab.click();setTimeout(step3,1200);}else{step3();}
+    if(tab){tab.click();setTimeout(step3,1500);}else{step3();}
   }
   function step3(){
-    var golRaw=getVal('Golongan Ruang Akhir')||getVal('Golongan Ruang')||getVal('Golongan');
-    var tmtGol=getVal('TMT Golongan')||getVal('TMT Gol');
-    var unit=getVal('Unit Organisasi')||getVal('Unit Kerja')||getVal('Instansi Induk');
-    var induk=getVal('Unit Organisasi Induk')||getVal('Perangkat Daerah')||getVal('Satuan Kerja')||getVal('Instansi Daerah');
-    var pangkat=getVal('Pangkat');
-    var jabatan=getVal('Jabatan')||getVal('Nama Jabatan');
+    extractCurrentTab();
+    console.log('=== SEMUA DATA SIASN YANG DIEKSTRAK ===');
+    console.log(allData);
+
+    var nipBaru=getSafeVal(['NIP Baru','NIP']);
+    var namaAsli=getSafeVal(['Nama','Nama KTP']);
+    var gelarDepan=getSafeVal(['Gelar Depan']);
+    var gelarBelakang=getSafeVal(['Gelar Belakang']);
+
+    var namaLengkap=namaAsli;
+    if(gelarDepan)namaLengkap=gelarDepan+' '+namaLengkap;
+    if(gelarBelakang){if(namaLengkap.indexOf(',')===-1)namaLengkap+=',';namaLengkap+=' '+gelarBelakang;}
+
+    var golRaw=getSafeVal(['Golongan Ruang Akhir','Golongan Ruang','Golongan']);
+    var tmtGol=getSafeVal(['TMT Golongan','TMT Gol']);
+    var unit=getSafeVal(['Unit Organisasi','Unit Kerja','Instansi Induk']);
+    var induk=getSafeVal(['Unit Organisasi Induk','Perangkat Daerah','Satuan Kerja','Instansi Daerah']);
+    var pangkat=getSafeVal(['Pangkat']);
+    var jabatan=getSafeVal(['Jabatan','Nama Jabatan']);
+    
     var golMatch=golRaw.match(/([IVX]+\\/[a-d])/i);
     var golKode=golMatch?golMatch[1].toUpperCase():golRaw;
     var pangkatGol=pangkat&&golKode?pangkat+' / '+golKode:golRaw;
     
+    payload.nip=nipBaru;payload.nama=namaLengkap;
     payload.unit_kerja=unit;payload.perangkat_daerah=induk;payload.pangkat_golongan=pangkatGol;
     payload.golongan_kode=golKode;payload.tmt_pangkat_golongan=parseDate(tmtGol);
-    if(jabatan)payload.jabatan=jabatan;
+    payload.jabatan=jabatan;
+    payload.raw_data=allData;
     
-    console.log('[KGBAPP] Payload:',payload);
-    if(window.opener){window.opener.postMessage({type:'KGBAPP_SIASN_DATA',payload:payload},origin);alert('\\u2705 Data dikirim ke KGB App!\\n\\nNama: '+(payload.nama||'-')+'\\nGolongan: '+pangkatGol+'\\nUnit Kerja: '+unit+'\\n\\nTab ini bisa ditutup.');}
-    else{var j=JSON.stringify(payload);navigator.clipboard.writeText(j).then(function(){alert('Data disalin ke clipboard.\\n\\nNama: '+(payload.nama||'-'));}).catch(function(){alert('Data:\\n'+j);});}
+    if(window.opener){window.opener.postMessage({type:'KGBAPP_SIASN_DATA',payload:payload},origin);alert('\\u2705 Data dikirim ke KGB App!\\n\\nNama Lengkap: '+(payload.nama||'-')+'\\nGolongan: '+pangkatGol+'\\nUnit Kerja: '+unit+'\\n\\nCek Console browser (F12) untuk data lengkap. Tab ini bisa ditutup.');}
+    else{var j=JSON.stringify(payload);navigator.clipboard.writeText(j).then(function(){alert('Data disalin ke clipboard.\\n\\nNama Lengkap: '+(payload.nama||'-')+'\\n\\nCek Console browser (F12) untuk melihat seluruh data.');}).catch(function(){alert('Data:\\n'+j);});}
   }
 
   function doSearch(){
@@ -207,37 +385,38 @@ const bookmarkletCode = `(function(){
   doSearch();
 })\x28\x29`;
 
-document.getElementById('bm-link').href = 'javascript:' + bookmarkletCode;
+    document.getElementById('bm-link').href = 'javascript:' + bookmarkletCode;
 
-function copyBookmarklet() {
-  var fullUrl = 'javascript:' + bookmarkletCode;
-  var btn = document.getElementById('copy-btn');
-  var label = document.getElementById('copy-label');
-  navigator.clipboard.writeText(fullUrl).then(function() {
-    btn.classList.add('copied');
-    label.textContent = 'Tersalin ✓';
-    setTimeout(function() {
-      btn.classList.remove('copied');
-      label.textContent = 'Copy URL Bookmarklet';
-    }, 2500);
-  }).catch(function() {
-    // Fallback untuk browser lama
-    var ta = document.createElement('textarea');
-    ta.value = fullUrl;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    btn.classList.add('copied');
-    label.textContent = 'Tersalin ✓';
-    setTimeout(function() {
-      btn.classList.remove('copied');
-      label.textContent = 'Copy URL Bookmarklet';
-    }, 2500);
-  });
-}
-</script>
+    function copyBookmarklet() {
+      var fullUrl = 'javascript:' + bookmarkletCode;
+      var btn = document.getElementById('copy-btn');
+      var label = document.getElementById('copy-label');
+      navigator.clipboard.writeText(fullUrl).then(function () {
+        btn.classList.add('copied');
+        label.textContent = 'Tersalin ✓';
+        setTimeout(function () {
+          btn.classList.remove('copied');
+          label.textContent = 'Copy URL Bookmarklet';
+        }, 2500);
+      }).catch(function () {
+        // Fallback untuk browser lama
+        var ta = document.createElement('textarea');
+        ta.value = fullUrl;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.classList.add('copied');
+        label.textContent = 'Tersalin ✓';
+        setTimeout(function () {
+          btn.classList.remove('copied');
+          label.textContent = 'Copy URL Bookmarklet';
+        }, 2500);
+      });
+    }
+  </script>
 </body>
+
 </html>
