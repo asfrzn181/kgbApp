@@ -357,6 +357,25 @@ export const TplMain = `
                                         <div class="input-group">
                                             <input v-model="form.nip" type="text" class="form-control" :disabled="isEditMode" placeholder="Ketik NIP..." @input="handleNipInput">
                                             <span v-if="isSearching" class="input-group-text bg-white"><div class="spinner-border spinner-border-sm"></div></span>
+                                            <button type="button" class="btn btn-outline-info btn-sm"
+                                                :disabled="!form.nip"
+                                                @click="cekSIASN(form.nip)"
+                                                title="Buka profil PNS di SIASN BKN (tab baru)">
+                                                <i class="bi bi-box-arrow-up-right me-1"></i>
+                                                <span class="d-none d-md-inline">Cek SIASN</span>
+                                            </button>
+                                        </div>
+                                        <div v-if="searchMsg" class="small mt-1" :class="searchMsg === 'Ditemukan' ? 'text-success' : 'text-warning'">
+                                            <i class="bi" :class="searchMsg === 'Ditemukan' ? 'bi-check-circle-fill' : 'bi-plus-circle'"></i> {{ searchMsg }}
+                                        </div>
+                                        <div class="small text-muted mt-1 d-flex align-items-center gap-2 flex-wrap">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                                @click="copyBookmarkletSIASN"
+                                                title="Salin URL bookmarklet SIASN ke clipboard, lalu paste sebagai URL di bookmark baru browser Anda">
+                                                <i class="bi bi-clipboard me-1"></i>
+                                                <span style="font-size:0.72rem;">Copy Bookmarklet</span>
+                                            </button>
+                                            <span style="font-size:0.7rem;" class="text-muted">← paste di URL bookmark browser</span>
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-2">

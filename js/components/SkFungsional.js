@@ -502,8 +502,8 @@ export default {
             const found = listGolongan.value.find(g => g.kode === kode);
             if (found) {
                 form.golongan_kode = found.kode;
-                // Auto-fill field pangkat_golongan sebagai teks gabungan untuk template
-                form.pangkat_golongan = `${found.pangkat} / ${found.kode}`;
+                // Sesuai permintaan: value yang diset adalah III/a bukan Penata Muda / III/a
+                form.pangkat_golongan = found.kode;
             }
         };
 
@@ -912,7 +912,10 @@ export default {
             if (d.unit_kerja)      form.unit_kerja      = d.unit_kerja;
             if (d.perangkat_daerah) form.perangkat_daerah = d.perangkat_daerah;
             if (d.pangkat_golongan) form.pangkat_golongan = d.pangkat_golongan;
-            if (d.golongan_kode)   form.golongan_kode   = d.golongan_kode;
+            if (d.golongan_kode) {
+                form.golongan_kode = d.golongan_kode;
+                handleGolonganChange(d.golongan_kode);
+            }
             if (d.tmt_pangkat_golongan) form.tmt_pangkat_golongan = d.tmt_pangkat_golongan;
 
             showToast(`✅ Data SIASN diimport: ${d.nama || ''}`, 'success');

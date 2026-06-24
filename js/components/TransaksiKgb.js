@@ -11,6 +11,7 @@ import {
 
 import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplAutocompletePerangkatDaerah, TplMain } from '../views/TransaksiKgbView.js';
 import { srikandiBookmarklet, downloadSrikandiBookmartlet } from '../bookmartScript.js';
+import { siasnBookmarklet } from '../siasnBookmarklet.js';
 
 
 const masterLoading = ref(false);
@@ -1169,6 +1170,55 @@ export default {
             }
         };
 
+        const cekSIASN = (nip) => {
+            if (!nip) {
+                showToast('Masukkan NIP terlebih dahulu!', 'warning');
+                return;
+            }
+            const encodedNip = encodeURIComponent(nip.trim());
+            const encodedOrigin = encodeURIComponent(window.location.origin);
+            const siasUrl = `https://siasn-instansi.bkn.go.id/peremajaan/profil/pns/?kgb_nip=${encodedNip}&kgb_origin=${encodedOrigin}`;
+            window.open(siasUrl, '_blank');
+            showToast('Tab SIASN dibuka. Jalankan Bookmarklet SIASN di halaman tersebut.', 'info');
+        };
+
+        const handleSIASNMessage = (event) => {
+            if (!event.origin.includes('siasn-instansi.bkn.go.id') && !event.origin.includes('localhost') && !event.origin.includes('127.0.0.1')) return;
+            if (!event.data || event.data.type !== 'KGBAPP_SIASN_DATA') return;
+
+            const d = event.data.payload;
+            if (!d) return;
+
+            if (d.nama)            form.nama            = d.nama;
+            if (d.unit_kerja)      form.unit_kerja      = d.unit_kerja;
+            if (d.perangkat_daerah) form.perangkat_daerah = d.perangkat_daerah;
+            if (d.jabatan)         form.jabatan         = d.jabatan;
+            
+            if (d.golongan_kode) {
+                form.golongan = d.golongan_kode;
+                handleGolonganChange(d.golongan_kode);
+            }
+            
+            showToast(`✅ Data SIASN diimport: ${d.nama || ''}`, 'success');
+        };
+
+        const copyBookmarkletSIASN = async () => {
+            if (!siasnBookmarklet) { showToast('Bookmarklet kosong!', 'error'); return; }
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(siasnBookmarklet);
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = siasnBookmarklet;
+                    ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
+                    document.body.appendChild(ta); ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                }
+                showToast('Bookmarklet SIASN berhasil dicopy! Paste di URL bookmark.', 'success');
+            } catch (e) { showToast('Gagal copy: ' + e.message, 'error'); }
+        };
+
         const closePreview = () => { showPreviewModal.value = false; currentPreviewItem.value = null; };
         const downloadFromPreview = async () => { if (currentPreviewItem.value) cetakSK(currentPreviewItem.value); };
         const cetakSK = async (item) => {
@@ -1202,8 +1252,10 @@ export default {
                 if (user) {
                     initRefs(); // ⭐ Panggil di sini
                     fetchTable(1);
+                    window.addEventListener('message', handleSIASNMessage);
                 } else {
                     listData.value = [];
+                    window.removeEventListener('message', handleSIASNMessage);
                 }
             });
         });
@@ -1218,7 +1270,8 @@ export default {
             showPreviewModal, previewLoading, previewSK, closePreview, downloadFromPreview,
             previewTab, changePreviewTab, updateStatus, setTmtPensiun, openSrikandi, copyCode, selectedNaskah, toggleSelection,
             toggleSelectAll,
-            openBotDownloader, copyCodeDownloadSrikandi, isAllPageSelected
+            openBotDownloader, copyCodeDownloadSrikandi, isAllPageSelected,
+            cekSIASN, copyBookmarkletSIASN
         };
     }
 };

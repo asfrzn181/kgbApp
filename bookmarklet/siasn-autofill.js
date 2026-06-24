@@ -129,8 +129,8 @@ function buildBookmarklet() {
             var pangkat = getSafeVal(['Pangkat']);
             var jabatan = getSafeVal(['Jabatan', 'Nama Jabatan']);
 
-            var golMatch = golRaw.match(new RegExp('([IVX]+[/][a-d])', 'i'));
-            var golKode = golMatch ? golMatch[1].toUpperCase() : golRaw;
+            var golMatch = golRaw.match(new RegExp('([IVX]+)[/]([a-d])', 'i'));
+            var golKode = golMatch ? (golMatch[1].toUpperCase() + '/' + golMatch[2].toLowerCase()) : golRaw;
             var pangkatGol = (pangkat && golKode) ? (pangkat + ' / ' + golKode) : golRaw;
 
             // Masukkan data tambahan yang mungkin berguna
