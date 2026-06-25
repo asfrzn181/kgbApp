@@ -16,7 +16,8 @@ export const srikandiBookmarklet = `javascript:(function(){
         ttd: getParam('fill_penandatangan'),
         ver: getParam('fill_verifikator'),
         tuj: getParam('fill_tujuan'),
-        mode: getParam('transfer_mode')
+        mode: getParam('transfer_mode'),
+        klas: getParam('fill_klasifikasi')
     };
 
     if(d.mode === 'direct_post_message'){
@@ -200,7 +201,7 @@ export const srikandiBookmarklet = `javascript:(function(){
             await f("Dikirimkan melalui", "Badan Kepegawaian dan Pengembangan Sumber Daya Manusia");
             await fJenisNaskah(); /* Khusus Jenis Naskah */
             await f("Sifat Naskah", "Biasa");
-            await f("Klasifikasi", "800.1.11.13");
+            await f("Klasifikasi", d.klas || "800.1.11.13");
             await f("Diberkaskan Oleh", "BIDANG MUTASI");
             await f("Utama (Internal", d.tuj);
             await fMulti("Verifikator", d.ver);
