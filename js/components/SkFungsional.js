@@ -543,7 +543,7 @@ export default {
                 isEditMode.value = false;
                 formId.value = null;
                 Object.keys(form).forEach(k => form[k] = '');
-                form.nomor_naskah = '100.3.3.2/GANTI INI/BKPSDMD/2026';
+                form.nomor_naskah = 'B-100.3.3.2/GANTI INI/BKPSDMD/2026';
                 form.kategori_jabatan = 'Keahlian';
                 opsiTunjangan.value = 'non';
             }
@@ -743,8 +743,8 @@ export default {
             }
 
             // Tambahkan variabel tanggal & statis
-            expandedVars.tanggal_naskah = previewTab.value === 'TTE' 
-                ? "${tanggal_naskah}" 
+            expandedVars.tanggal_naskah = previewTab.value === 'TTE'
+                ? "${tanggal_naskah}"
                 : formatTanggal(new Date().toISOString().split('T')[0]);
             expandedVars.valueTanggalPertekBKN = formatTanggal(item.tgl_pertek_bkn);
             expandedVars.valueTanggalSerKom = formatTanggal(item.tgl_ser_kom);
@@ -853,6 +853,7 @@ export default {
                         fill_hal: `SK Jabatan Fungsional a.n ${item.nama}`,
                         fill_ringkasan: `SK Kenaikan Jabatan Fungsional ${item.jabatan_baru} a.n ${item.nama}, ${item.pangkat_golongan || ''}.`,
                         fill_nomor: item.nomor_naskah || "NOMOR KOSONG",
+                        fill_klasifikasi: "100.3.3.2",
                         fill_penandatangan: penandatangan,
                         fill_verifikator: verifikatorString,
                         fill_tujuan: tujuanString,

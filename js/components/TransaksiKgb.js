@@ -998,6 +998,7 @@ export default {
                         fill_hal: `Kenaikan Gaji Berkala a.n ${item.nama} `,
                         fill_ringkasan: `Usulan KGB Tahun ${new Date().getFullYear()} a.n ${item.nama}, ${item.pangkat}, ${item.golongan}.`,
                         fill_nomor: item.nomor_naskah || "NOMOR KOSONG",
+                        fill_klasifikasi: "800.1.11.13",
 
                         fill_penandatangan: penandatangan,
                         fill_verifikator: verifikatorString, // String gabungan
