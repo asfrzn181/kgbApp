@@ -674,7 +674,7 @@ export default {
             // TTD Content berdasarkan mode preview
             let ttdContent = previewTab.value === 'TTE'
                 ? "\n\n\n\xA0\xA0\xA0\xA0\xA0\xA0\xA0${ttd_pengirim}\n\n\n"
-                : "\n\n\n";
+                : "\n\n";
 
             // Fetch dan render template
             const res = await fetch(url);
@@ -756,7 +756,7 @@ export default {
                 type: "blob",
                 mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 compression: "DEFLATE",
-                compressionOptions: { level: 9 }
+                compressionOptions: { level: 7 }
             });
         };
 
@@ -944,13 +944,13 @@ export default {
         // ============================================================
         const downloadExcel = async () => {
             if (!window.XLSX) return showToast("Library Excel tidak tersedia", 'error');
-            
+
             showToast("Menyiapkan data export...", 'info');
             try {
                 const collRef = collection(db, "usulan_sk_fungsional");
                 const baseConstraints = [];
                 const isFilteringDate = filterStartDate.value || filterEndDate.value;
-                
+
                 if (tableSearch.value.trim()) {
                     const term = tableSearch.value.trim();
                     const isNumber = /^\d+$/.test(term);
@@ -979,20 +979,20 @@ export default {
                 } else {
                     baseConstraints.push(orderBy("created_at", "desc"));
                 }
-                
+
                 // Ambil maksimal 1000 data agar tidak memberatkan browser
                 const q = query(collRef, ...baseConstraints, limit(1000));
                 const snap = await getDocs(q);
-                
+
                 if (snap.empty) {
                     return showToast("Tidak ada data untuk diexport", 'warning');
                 }
-                
+
                 const exportData = snap.docs.map(d => {
                     const data = d.data();
                     let tmtJabatan = data.tmt_jabatan || '-';
                     let tmtPangkat = data.tmt_pangkat_golongan || '-';
-                    
+
                     return {
                         NIP: "'" + (data.nip || ''),
                         NAMA: data.nama || '',
@@ -1009,17 +1009,17 @@ export default {
                         NOMOR_SK: data.nomor_naskah || '-'
                     };
                 });
-                
+
                 const ws = XLSX.utils.json_to_sheet(exportData);
                 const keys = Object.keys(exportData[0] || {});
                 ws['!cols'] = keys.map(() => ({ wch: 20 })); // Auto width
-                
+
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "Data SK Fungsional");
-                
+
                 XLSX.writeFile(wb, `Export_SK_Fungsional_${new Date().toISOString().split('T')[0]}.xlsx`);
                 showToast("File Excel berhasil diunduh", 'success');
-                
+
             } catch (error) {
                 console.error("Export Error:", error);
                 if (error.code === 'failed-precondition' || (error.message && error.message.includes('index'))) {
