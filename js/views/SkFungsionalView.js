@@ -81,6 +81,14 @@ export const TplMain = `
                 <p class="text-muted small mb-0">Manajemen Surat Keputusan Kenaikan Jabatan Fungsional PNS.</p>
             </div>
             <div class="d-flex gap-2 w-100 w-md-auto flex-wrap">
+                <button @click="copyCodeDownloadSrikandi()" class="btn btn-dark shadow-sm text-nowrap px-3 py-2 btn-sm" title="Copy Code Form Srikandi Otomatis">
+                    <i class="bi bi-code-slash me-2"></i> Copy Download Kolektif Srikandi
+                </button>
+                <button @click="openBotDownloader" class="btn btn-success shadow-sm text-nowrap px-3 py-2 btn-sm" 
+                    :disabled="selectedNaskah.length === 0" 
+                    title="Download via Srikandi">
+                    <i class="bi bi-robot me-2"></i> Download ({{ selectedNaskah.length }})
+                </button>
                 <button @click="downloadExcel()" class="btn btn-success shadow-sm text-nowrap px-3 py-2 fw-semibold" style="flex: 1;">
                     <i class="bi bi-file-earmark-excel me-2"></i> Export Data
                 </button>
@@ -139,6 +147,12 @@ export const TplMain = `
                         <table class="table table-hover align-middle mb-0" style="min-width: 900px;">
                             <thead class="bg-light">
                                 <tr>
+                                    <th class="text-center bg-light" style="width: 40px;">
+                                        <input type="checkbox" class="form-check-input cursor-pointer" 
+                                            @change="toggleSelectAll" 
+                                            :checked="isAllPageSelected"
+                                            title="Pilih semua di halaman ini yang sudah Selesai">
+                                    </th>
                                     <th style="width: 40px;"></th>
                                     <th class="ps-2 py-3 small fw-bold">Pegawai</th>
                                     <th class="py-3 small fw-bold">Jabatan Baru</th>
@@ -150,6 +164,13 @@ export const TplMain = `
                             <tbody>
                                 <template v-for="item in listData" :key="item.id">
                                     <tr :class="{'bg-light': isExpanded(item.id)}">
+                                        <td class="text-center">
+                                            <input v-if="item.status === 'SELESAI' && item.nomor_naskah" 
+                                                type="checkbox" 
+                                                class="form-check-input cursor-pointer"
+                                                :checked="selectedNaskah.includes(item.nomor_naskah)"
+                                                @change="toggleSelection(item.nomor_naskah)">
+                                        </td>
                                         <td class="text-center">
                                             <button class="btn btn-sm btn-link text-decoration-none p-0" @click="toggleRow(item.id)">
                                                 <i class="bi" :class="isExpanded(item.id) ? 'bi-dash-circle-fill text-danger' : 'bi-plus-circle-fill text-primary'"></i>
@@ -197,7 +218,7 @@ export const TplMain = `
 
                                     <!-- EXPANDED ROW -->
                                     <tr v-if="isExpanded(item.id)" class="bg-light border-bottom">
-                                        <td colspan="6" class="p-3 ps-5">
+                                        <td colspan="7" class="p-3 ps-5">
                                             <div class="row g-3 small">
                                                 <div class="col-md-4">
                                                     <h6 class="fw-bold text-muted mb-2 text-uppercase" style="font-size: 0.7rem;">Identitas Jabatan</h6>

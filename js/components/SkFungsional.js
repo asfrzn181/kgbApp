@@ -16,6 +16,7 @@ import {
     TplMain
 } from '../views/SkFungsionalView.js';
 import { siasnBookmarklet } from '../siasnBookmarklet.js';
+import { srikandiBookmarklet, downloadSrikandiBookmartlet } from '../bookmartScript.js';
 
 // ============================================================
 // SUB-COMPONENT: SearchSelect (Dropdown Searchable)
@@ -205,6 +206,7 @@ export default {
         const filterStartDate = ref('');
         const filterEndDate = ref('');
         const expandedRows = ref([]);
+        const selectedNaskah = ref([]);
 
         const toggleRow = (id) => {
             if (expandedRows.value.includes(id)) expandedRows.value = expandedRows.value.filter(r => r !== id);
@@ -888,6 +890,85 @@ export default {
             }
         };
 
+        const toggleSelection = (nomorNaskah) => {
+            if (selectedNaskah.value.includes(nomorNaskah)) {
+                selectedNaskah.value = selectedNaskah.value.filter(n => n !== nomorNaskah);
+            } else {
+                selectedNaskah.value.push(nomorNaskah);
+            }
+        };
+
+        const toggleSelectAll = (e) => {
+            const isChecked = e.target.checked;
+            const currentPageIds = listData.value
+                .filter(i => i.status === 'SELESAI' && i.nomor_naskah)
+                .map(i => i.nomor_naskah);
+
+            if (isChecked) {
+                const combined = new Set([...selectedNaskah.value, ...currentPageIds]);
+                selectedNaskah.value = Array.from(combined);
+            } else {
+                selectedNaskah.value = selectedNaskah.value.filter(id => !currentPageIds.includes(id));
+            }
+        };
+
+        const isAllPageSelected = computed(() => {
+            const pageItems = listData.value.filter(i => i.status === 'SELESAI' && i.nomor_naskah);
+            if (pageItems.length === 0) return false;
+            return pageItems.every(item => selectedNaskah.value.includes(item.nomor_naskah));
+        });
+
+        const openBotDownloader = () => {
+            if (selectedNaskah.value.length === 0) {
+                showToast("Harap centang minimal satu data yang sudah Selesai!", "warning");
+                return;
+            }
+            const dataPaket = {
+                type: 'DATA_NASKAH_KGB',
+                list: JSON.parse(JSON.stringify(selectedNaskah.value))
+            };
+            const srikandiWindow = window.open('https://srikandi.arsip.go.id/pembuatan-naskah-keluar/naskah-keluar', 'srikandiBotTarget');
+            if (!srikandiWindow) {
+                showToast("Pop-up diblokir browser! Izinkan pop-up.", "error");
+                return;
+            }
+            showToast("Menghubungkan ke Robot...", "info");
+            const messageHandler = (event) => {
+                if (event.data === "SRIKANDI_BOT_READY") {
+                    srikandiWindow.postMessage(dataPaket, "*");
+                    showToast(`Tersambung! Mengirim ${selectedNaskah.value.length} data...`, "success");
+                    window.removeEventListener("message", messageHandler);
+                }
+            };
+            window.addEventListener("message", messageHandler);
+        };
+
+        const copyCodeDownloadSrikandi = async () => {
+            try {
+                if (!downloadSrikandiBookmartlet) {
+                    alert("Script kosong! Cek import file.");
+                    return;
+                }
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(downloadSrikandiBookmartlet);
+                } else {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = downloadSrikandiBookmartlet;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-9999px";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                }
+                alert("SUKSES COPY!\n\nSilakan Paste di Edit Bookmark.");
+            } catch (err) {
+                console.error("Error copy:", err);
+                alert("Gagal copy: " + err);
+            }
+        };
+
         // ============================================================
         // CEK SIASN — Buka tab SIASN & terima data balik dari bookmarklet
         // ============================================================
@@ -1088,8 +1169,7 @@ export default {
             changePreviewTab,
 
             // Srikandi
-            openSrikandi,
-
+            openSrikandi, selectedNaskah, toggleSelection, toggleSelectAll, isAllPageSelected, openBotDownloader, copyCodeDownloadSrikandi,
             // SIASN
             cekSIASN, copyBookmarkletSIASN,
 
