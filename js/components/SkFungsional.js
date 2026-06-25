@@ -743,7 +743,9 @@ export default {
             }
 
             // Tambahkan variabel tanggal & statis
-            expandedVars.tanggal_naskah = "${tanggal_naskah}";
+            expandedVars.tanggal_naskah = previewTab.value === 'TTE' 
+                ? "${tanggal_naskah}" 
+                : formatTanggal(new Date().toISOString().split('T')[0]);
             expandedVars.valueTanggalPertekBKN = formatTanggal(item.tgl_pertek_bkn);
             expandedVars.valueTanggalSerKom = formatTanggal(item.tgl_ser_kom);
             expandedVars.valueTmtPangkatGolongan = formatTanggal(item.tmt_pangkat_golongan);
