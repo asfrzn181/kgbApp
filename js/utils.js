@@ -146,8 +146,7 @@ export function hitungHariLagi(targetDateStr) {
 
 // --- KONFIGURASI FORMATTER ---
 const LIST_SINGKATAN = [
-    'UPTD', 'SMP', 'SD', 'RSUD', 'RS', 'TK', 'PAUD', 'BLUD',
-    'PUSKESMAS', 'SETDA', 'BKPSDMD', 'DPRD',
+    'UPTD', 'SMP', 'SD', 'RSUD', 'RS', 'TK', 'PAUD', 'BLUD', 'SETDA', 'BKPSDMD', 'DPRD',
     'PNS', 'PPPK', 'ASN', 'SDN', 'SMPN', 'SMAN', 'SMKN', "PPKN", "IPA", "IPS", "TIK", "SDM", "SDMD", "TPA", "PPI", "DR"
 ];
 
@@ -195,13 +194,13 @@ export const formatTitleCase = (text) => {
 export function terbilang(angka) {
     if (angka === null || angka === undefined || angka === '') return '';
     const strAngka = String(angka).replace(',', '.').trim();
-    
+
     const parts = strAngka.split('.');
     const intPart = Math.abs(parseInt(parts[0], 10));
     const decPart = parts.length > 1 ? parts[1] : '';
 
     const huruf = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
-    
+
     function sebut(n) {
         if (n < 12) return huruf[n];
         if (n < 20) return sebut(n - 10) + " belas";
@@ -222,7 +221,7 @@ export function terbilang(angka) {
     } else {
         hasil = sebut(intPart).trim();
     }
-    
+
     hasil = hasil.replace(/\s+/g, ' ');
 
     if (decPart) {
@@ -236,6 +235,6 @@ export function terbilang(angka) {
     }
 
     if (strAngka.startsWith('-')) hasil = "minus " + hasil;
-    
+
     return hasil.trim();
 }
