@@ -940,6 +940,104 @@ export default {
         };
 
         // ============================================================
+        // EXPORT EXCEL
+        // ============================================================
+        const downloadExcel = async () => {
+            if (!window.XLSX) return showToast("Library Excel tidak tersedia", 'error');
+            
+            showToast("Menyiapkan data export...", 'info');
+            try {
+                const collRef = collection(db, "usulan_sk_fungsional");
+                const baseConstraints = [];
+                const isFilteringDate = filterStartDate.value || filterEndDate.value;
+                
+                if (tableSearch.value.trim()) {
+                    const term = tableSearch.value.trim();
+                    const isNumber = /^\d+$/.test(term);
+                    if (isNumber) {
+                        baseConstraints.push(orderBy("nip"));
+                        baseConstraints.push(where("nip", ">=", term));
+                        baseConstraints.push(where("nip", "<=", term + "\uf8ff"));
+                    } else {
+                        const termNama = term.toLowerCase();
+                        baseConstraints.push(orderBy("nama_search"));
+                        baseConstraints.push(where("nama_search", ">=", termNama));
+                        baseConstraints.push(where("nama_search", "<=", termNama + "\uf8ff"));
+                    }
+                } else if (isFilteringDate) {
+                    if (filterStartDate.value) {
+                        const startDate = new Date(filterStartDate.value);
+                        startDate.setHours(0, 0, 0, 0);
+                        baseConstraints.push(where("created_at", ">=", startDate));
+                    }
+                    if (filterEndDate.value) {
+                        const endDate = new Date(filterEndDate.value);
+                        endDate.setHours(23, 59, 59, 999);
+                        baseConstraints.push(where("created_at", "<=", endDate));
+                    }
+                    baseConstraints.push(orderBy("created_at", "desc"));
+                } else {
+                    baseConstraints.push(orderBy("created_at", "desc"));
+                }
+                
+                // Ambil maksimal 1000 data agar tidak memberatkan browser
+                const q = query(collRef, ...baseConstraints, limit(1000));
+                const snap = await getDocs(q);
+                
+                if (snap.empty) {
+                    return showToast("Tidak ada data untuk diexport", 'warning');
+                }
+                
+                const exportData = snap.docs.map(d => {
+                    const data = d.data();
+                    let tmtJabatan = data.tmt_jabatan || '-';
+                    let tmtPangkat = data.tmt_pangkat_golongan || '-';
+                    
+                    return {
+                        NIP: "'" + (data.nip || ''),
+                        NAMA: data.nama || '',
+                        "UNIT KERJA": data.unit_kerja || '',
+                        "PERANGKAT DAERAH": data.perangkat_daerah || '',
+                        PANGKAT: data.pangkat_golongan || '',
+                        TMT_PANGKAT: tmtPangkat,
+                        JABATAN_LAMA: data.jabatan_lama || '-',
+                        JABATAN_BARU: data.jabatan_baru || '',
+                        TMT_JABATAN: tmtJabatan,
+                        ANGKA_KREDIT: data.angka_kredit || '-',
+                        TUNJANGAN: data.tunjangan || 0,
+                        STATUS: data.status || 'DRAFT',
+                        NOMOR_SK: data.nomor_naskah || '-'
+                    };
+                });
+                
+                const ws = XLSX.utils.json_to_sheet(exportData);
+                const keys = Object.keys(exportData[0] || {});
+                ws['!cols'] = keys.map(() => ({ wch: 20 })); // Auto width
+                
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Data SK Fungsional");
+                
+                XLSX.writeFile(wb, `Export_SK_Fungsional_${new Date().toISOString().split('T')[0]}.xlsx`);
+                showToast("File Excel berhasil diunduh", 'success');
+                
+            } catch (error) {
+                console.error("Export Error:", error);
+                if (error.code === 'failed-precondition' || (error.message && error.message.includes('index'))) {
+                    const link = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+                    if (link) {
+                        console.warn("Index Required:", link[0]);
+                        showToast("Perlu Index Database Baru. Cek Console (F12) untuk Link.", 'info');
+                        window.open(link[0], '_blank');
+                    } else {
+                        showToast("Perlu Index Database (Cek Console)", 'warning');
+                    }
+                } else {
+                    showToast("Gagal export data: " + error.message, 'error');
+                }
+            }
+        };
+
+        // ============================================================
         // LIFECYCLE
         // ============================================================
         onMounted(() => {
@@ -979,7 +1077,7 @@ export default {
             fetchTable, goToPage,
             openModal, closeModal,
             simpanData, hapusData,
-            updateStatus,
+            updateStatus, downloadExcel,
             handleNipInput, handleGolonganChange, handlePejabatChange, handleJabatanBaruSelect,
 
             // Preview & Download

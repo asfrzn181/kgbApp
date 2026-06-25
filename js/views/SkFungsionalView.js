@@ -81,6 +81,9 @@ export const TplMain = `
                 <p class="text-muted small mb-0">Manajemen Surat Keputusan Kenaikan Jabatan Fungsional PNS.</p>
             </div>
             <div class="d-flex gap-2 w-100 w-md-auto flex-wrap">
+                <button @click="downloadExcel()" class="btn btn-success shadow-sm text-nowrap px-3 py-2 fw-semibold" style="flex: 1;">
+                    <i class="bi bi-file-earmark-excel me-2"></i> Export Data
+                </button>
                 <button @click="openModal()" class="btn btn-primary shadow-sm text-nowrap px-4 py-2 fw-semibold" style="flex: 1; background-color: #5c35a5; border-color: #5c35a5;">
                     <i class="bi bi-plus-lg me-2"></i> Input SK Baru
                 </button>
