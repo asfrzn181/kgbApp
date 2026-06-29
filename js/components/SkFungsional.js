@@ -504,8 +504,8 @@ export default {
             const found = listGolongan.value.find(g => g.kode === kode);
             if (found) {
                 form.golongan_kode = found.kode;
-                // Sesuai permintaan: value yang diset adalah III/a bukan Penata Muda / III/a
-                form.pangkat_golongan = found.kode;
+                // Sesuai permintaan terbaru: value yang diset adalah Penata Muda Tk. I / III/b
+                form.pangkat_golongan = `${found.pangkat} / ${found.kode}`;
             }
         };
 
@@ -528,6 +528,16 @@ export default {
                 form.tunjangan = '';
                 opsiTunjangan.value = 'non';
             }
+            
+            // Auto-detect Kategori Jabatan (Keahlian / Keterampilan) berdasarkan nama jabatan
+            if (jabatanItem.nama_jabatan) {
+                const nama = jabatanItem.nama_jabatan.toLowerCase();
+                if (nama.includes('pemula') || nama.includes('terampil') || nama.includes('mahir') || nama.includes('penyelia')) {
+                    form.kategori_jabatan = 'Keterampilan';
+                } else if (nama.includes('ahli')) {
+                    form.kategori_jabatan = 'Keahlian';
+                }
+            }
         };
 
         // ============================================================
@@ -544,9 +554,10 @@ export default {
             } else {
                 isEditMode.value = false;
                 formId.value = null;
+                const prevKategori = form.kategori_jabatan || 'Keahlian';
                 Object.keys(form).forEach(k => form[k] = '');
                 form.nomor_naskah = 'B-100.3.3.2/GANTI INI/BKPSDMD/2026';
-                form.kategori_jabatan = 'Keahlian';
+                form.kategori_jabatan = prevKategori;
                 opsiTunjangan.value = 'non';
             }
             searchMsg.value = '';
