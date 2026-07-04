@@ -51,6 +51,40 @@ const router = createRouter({
     routes,
 });
 
+// ============================================================
+// --- MANAJEMEN SESI (AUTO LOGOUT 1 JAM) ---
+// ============================================================
+const SESSION_KEY     = 'kgb_session_expiry';
+const SESSION_DURATION = 60 * 60 * 1000; // 1 jam dalam milidetik
+let sessionTimerId = null;
+
+/** Simpan waktu expired ke localStorage saat login */
+const startSessionTimer = () => {
+    const expiry = Date.now() + SESSION_DURATION;
+    localStorage.setItem(SESSION_KEY, expiry.toString());
+
+    // Cek setiap 60 detik
+    sessionTimerId = setInterval(async () => {
+        const stored = localStorage.getItem(SESSION_KEY);
+        if (!stored) return;
+
+        const remaining = parseInt(stored) - Date.now();
+        if (remaining <= 0) {
+            clearInterval(sessionTimerId);
+            localStorage.removeItem(SESSION_KEY);
+            alert('⏱️ Sesi Anda telah berakhir (1 jam). Silakan login kembali.');
+            await signOut(auth);
+        }
+    }, 60 * 1000);
+};
+
+/** Bersihkan timer dan hapus data sesi saat logout */
+const clearSessionTimer = () => {
+    clearInterval(sessionTimerId);
+    sessionTimerId = null;
+    localStorage.removeItem(SESSION_KEY);
+};
+
 // --- APLIKASI UTAMA ---
 const app = createApp({
     components: { Sidebar, Auth },
@@ -99,10 +133,27 @@ const app = createApp({
                 
                 if (user) {
                     console.log("User Login:", user.email);
+
+                    // --- CEK SESI EXPIRED (misal reload setelah 1 jam) ---
+                    const stored = localStorage.getItem(SESSION_KEY);
+                    if (stored && Date.now() > parseInt(stored)) {
+                        // Sesi sudah expired, langsung logout tanpa notif
+                        clearSessionTimer();
+                        await signOut(auth);
+                        store.setLoading(false);
+                        return;
+                    }
+
+                    // Mulai / lanjutkan timer sesi
+                    if (!sessionTimerId) {
+                        startSessionTimer();
+                    }
+
                     // Ambil Role Admin dari Firestore
                     await store.fetchUserProfile(user); 
                 } else {
                     console.log("User Logout");
+                    clearSessionTimer();
                     store.user = null;
                     store.profile = null;
                 }
