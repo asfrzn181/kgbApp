@@ -128,15 +128,19 @@ const app = createApp({
         
         // Listener Auth & Role Check
         onMounted(() => {
+            console.log('[MAIN] onMounted: mendaftarkan onAuthStateChanged listener');
             onAuthStateChanged(auth, async (user) => {
+                console.log('[MAIN] onAuthStateChanged fired. user:', user ? user.email : 'null');
                 store.setLoading(true);
                 
                 if (user) {
-                    console.log("User Login:", user.email);
+                    console.log('[MAIN] User terdeteksi:', user.email, '| uid:', user.uid);
 
-                    // --- CEK SESI EXPIRED (misal reload setelah 1 jam) ---
+                    // --- CEK SESI EXPIRED ---
                     const stored = localStorage.getItem(SESSION_KEY);
+                    console.log('[MAIN] Session expiry stored:', stored, '| now:', Date.now());
                     if (stored && Date.now() > parseInt(stored)) {
+                        console.log('[MAIN] Sesi expired → signOut');
                         clearSessionTimer();
                         await signOut(auth);
                         store.setLoading(false);
@@ -145,28 +149,38 @@ const app = createApp({
 
                     // --- CEK 2FA VERIFICATION ---
                     const verified2FA = sessionStorage.getItem('kgb_2fa_ok');
+                    console.log('[MAIN] kgb_2fa_ok di sessionStorage:', verified2FA, '| uid:', user.uid);
+                    console.log('[MAIN] 2FA sudah verified?', verified2FA === user.uid);
+
                     if (verified2FA === user.uid) {
-                        // 2FA sudah diverifikasi sesi ini — lanjut normal
+                        console.log('[MAIN] 2FA verified → fetchUserProfile');
                         if (!sessionTimerId) startSessionTimer();
                         await store.fetchUserProfile(user);
                     } else {
-                        // Belum verifikasi 2FA — cek status setup di Firestore
+                        console.log('[MAIN] 2FA belum verified → cek Firestore user_2fa');
                         store.pendingUser = user;
                         try {
                             const docSnap = await getDoc(doc(db, 'user_2fa', user.uid));
+                            console.log('[MAIN] user_2fa doc exists:', docSnap.exists());
+                            if (docSnap.exists()) {
+                                console.log('[MAIN] user_2fa data:', docSnap.data());
+                            }
                             if (docSnap.exists() && docSnap.data().enabled) {
-                                store.authStep = 'verify_2fa'; // Sudah setup → minta kode
+                                console.log('[MAIN] 2FA sudah setup → authStep = verify_2fa');
+                                store.authStep = 'verify_2fa';
                             } else {
-                                store.authStep = 'setup_2fa';  // Belum setup → tampilkan QR
+                                console.log('[MAIN] 2FA belum setup → authStep = setup_2fa');
+                                store.authStep = 'setup_2fa';
                             }
                         } catch (e) {
-                            console.error('2FA check error:', e);
+                            console.error('[MAIN] 2FA check error:', e);
                             store.authStep = 'setup_2fa';
                         }
-                        // Jangan set store.user — tetap di halaman auth
+                        console.log('[MAIN] store.authStep sekarang:', store.authStep);
+                        console.log('[MAIN] store.pendingUser:', store.pendingUser?.email);
                     }
                 } else {
-                    console.log("User Logout");
+                    console.log('[MAIN] Tidak ada user (logout/belum login)');
                     clearSessionTimer();
                     sessionStorage.removeItem('kgb_2fa_ok');
                     store.user = null;
@@ -175,6 +189,7 @@ const app = createApp({
                     store.authStep = 'login';
                 }
                 
+                console.log('[MAIN] setLoading(false). store.user:', store.user?.email ?? 'null', '| authStep:', store.authStep);
                 store.setLoading(false);
             });
         });
