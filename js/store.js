@@ -5,6 +5,8 @@ export const store = reactive({
     user: null,          // Data Murni dari Firebase Auth
     profile: null,       // Data Gabungan (Auth + Firestore Role)
     isLoading: true,     // Indikator Loading Global
+    pendingUser: null,   // User yang menunggu verifikasi 2FA
+    authStep: 'login',   // 'login' | 'setup_2fa' | 'verify_2fa'
 
     // Getter: Cek apakah user adalah admin
     get isAdmin() {

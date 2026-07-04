@@ -1,6 +1,6 @@
 import { createApp, onMounted } from 'vue';
 import { createRouter, createWebHashHistory } from 'vue-router';
-import { auth, onAuthStateChanged, signOut } from './firebase.js';
+import { auth, onAuthStateChanged, signOut, db, doc, getDoc } from './firebase.js';
 import { store } from './store.js';
 import { showConfirm } from './utils.js'; 
 
@@ -137,25 +137,42 @@ const app = createApp({
                     // --- CEK SESI EXPIRED (misal reload setelah 1 jam) ---
                     const stored = localStorage.getItem(SESSION_KEY);
                     if (stored && Date.now() > parseInt(stored)) {
-                        // Sesi sudah expired, langsung logout tanpa notif
                         clearSessionTimer();
                         await signOut(auth);
                         store.setLoading(false);
                         return;
                     }
 
-                    // Mulai / lanjutkan timer sesi
-                    if (!sessionTimerId) {
-                        startSessionTimer();
+                    // --- CEK 2FA VERIFICATION ---
+                    const verified2FA = sessionStorage.getItem('kgb_2fa_ok');
+                    if (verified2FA === user.uid) {
+                        // 2FA sudah diverifikasi sesi ini — lanjut normal
+                        if (!sessionTimerId) startSessionTimer();
+                        await store.fetchUserProfile(user);
+                    } else {
+                        // Belum verifikasi 2FA — cek status setup di Firestore
+                        store.pendingUser = user;
+                        try {
+                            const docSnap = await getDoc(doc(db, 'user_2fa', user.uid));
+                            if (docSnap.exists() && docSnap.data().enabled) {
+                                store.authStep = 'verify_2fa'; // Sudah setup → minta kode
+                            } else {
+                                store.authStep = 'setup_2fa';  // Belum setup → tampilkan QR
+                            }
+                        } catch (e) {
+                            console.error('2FA check error:', e);
+                            store.authStep = 'setup_2fa';
+                        }
+                        // Jangan set store.user — tetap di halaman auth
                     }
-
-                    // Ambil Role Admin dari Firestore
-                    await store.fetchUserProfile(user); 
                 } else {
                     console.log("User Logout");
                     clearSessionTimer();
+                    sessionStorage.removeItem('kgb_2fa_ok');
                     store.user = null;
                     store.profile = null;
+                    store.pendingUser = null;
+                    store.authStep = 'login';
                 }
                 
                 store.setLoading(false);

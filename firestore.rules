@@ -74,5 +74,15 @@ service cloud.firestore {
       allow read, update, create: if isAuthenticated(); 
       allow delete: if isAdmin();
     }
+
+    // F. TWO-FACTOR AUTHENTICATION (2FA)
+    match /user_2fa/{userId} {
+      // Hanya owner yang bisa baca secret 2FA miliknya
+      allow read: if isOwner(userId) || isAdmin();
+      // Owner bisa create/update (saat setup awal)
+      allow create, update: if isOwner(userId);
+      // Owner bisa reset sendiri, admin bisa reset milik siapapun
+      allow delete: if isOwner(userId) || isAdmin();
+    }
   }
 }

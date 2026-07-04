@@ -1,5 +1,5 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { auth, linkWithPopup, googleProvider } from '../firebase.js';
+import { auth, linkWithPopup, googleProvider, db, doc, deleteDoc, getDoc, getDocs, collection } from '../firebase.js';
 import { store } from '../store.js';
 import { showConfirm } from '../utils.js'; // Pastikan import showConfirm
 
@@ -131,6 +131,19 @@ export default {
                         </a>
                     </li>
                     <li><hr class="dropdown-divider"></li>
+                    <!-- Reset 2FA Sendiri -->
+                    <li>
+                        <a class="dropdown-item text-warning" href="#" @click.prevent="handleReset2FA">
+                            <i class="bi bi-shield-x me-2"></i> Reset 2FA Saya
+                        </a>
+                    </li>
+                    <!-- Admin: Reset 2FA User Lain -->
+                    <li v-if="store.isAdmin">
+                        <a class="dropdown-item text-danger" href="#" @click.prevent="handleAdminReset2FA">
+                            <i class="bi bi-shield-slash me-2"></i> Reset 2FA User Lain
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item text-danger" href="#" @click.prevent="$emit('logout')"><i class="bi bi-box-arrow-right me-2"></i> Keluar</a></li>
                 </ul>
             </div>
@@ -234,9 +247,82 @@ export default {
                     alert('❌ Akun Google ini sudah digunakan oleh akun lain.');
                 } else if (e.code === 'auth/popup-closed-by-user') {
                     // User menutup popup, tidak perlu notifikasi
+                } else if (e.code === 'auth/unauthorized-domain') {
+                    alert('❌ Domain ini belum diizinkan di Firebase.\nBuka Firebase Console → Authentication → Settings → Authorized Domains → tambahkan domain Anda (misal: localhost).');
+                } else if (e.code === 'auth/operation-not-allowed') {
+                    alert('❌ Google Sign-In belum diaktifkan.\nBuka Firebase Console → Authentication → Sign-in method → Google → Enable.');
+                } else if (e.code === 'auth/popup-blocked') {
+                    alert('❌ Popup diblokir browser. Izinkan popup untuk situs ini lalu coba lagi.');
                 } else {
-                    alert('❌ Gagal menghubungkan ke Google. Coba lagi.');
+                    alert(`❌ Gagal menghubungkan ke Google.\nKode Error: ${e.code}\n\nLihat Console browser untuk detail.`);
                 }
+            }
+        };
+
+        // --- FITUR RESET 2FA ---
+
+        // Reset 2FA milik sendiri
+        const handleReset2FA = async () => {
+            const confirmed = await showConfirm(
+                'Reset 2FA Anda?',
+                'Ini akan menghapus konfigurasi 2FA Anda. Anda harus setup ulang Google Authenticator saat login berikutnya.',
+                'Ya, Reset 2FA'
+            );
+            if (!confirmed) return;
+            try {
+                await deleteDoc(doc(db, 'user_2fa', auth.currentUser.uid));
+                sessionStorage.removeItem('kgb_2fa_ok');
+                alert('✅ 2FA berhasil direset. Anda akan diminta setup ulang saat login berikutnya.');
+            } catch (e) {
+                console.error('Reset 2FA error:', e);
+                alert('❌ Gagal reset 2FA. Coba lagi.');
+            }
+        };
+
+        // Admin: Reset 2FA milik user lain
+        const handleAdminReset2FA = async () => {
+            const targetEmail = prompt('Masukkan EMAIL user yang ingin di-reset 2FA-nya:');
+            if (!targetEmail) return;
+
+            try {
+                // Cari UID berdasarkan email dari collection 'users'
+                const snap = await getDocs(collection(db, 'users'));
+                let targetUid = null;
+                snap.forEach(d => {
+                    if (d.data().email === targetEmail || auth.currentUser.email === targetEmail) {
+                        targetUid = d.id;
+                    }
+                });
+
+                // Fallback: cek apakah email adalah milik admin sendiri
+                if (!targetUid && auth.currentUser.email === targetEmail) {
+                    targetUid = auth.currentUser.uid;
+                }
+
+                if (!targetUid) {
+                    alert('❌ User dengan email tersebut tidak ditemukan di database.');
+                    return;
+                }
+
+                // Cek apakah user punya 2FA
+                const twoFADoc = await getDoc(doc(db, 'user_2fa', targetUid));
+                if (!twoFADoc.exists()) {
+                    alert('ℹ️ User ini belum setup 2FA.');
+                    return;
+                }
+
+                const confirmed = await showConfirm(
+                    'Reset 2FA User?',
+                    `Ini akan menghapus 2FA untuk: ${targetEmail}\nUser harus setup ulang saat login berikutnya.`,
+                    'Ya, Reset'
+                );
+                if (!confirmed) return;
+
+                await deleteDoc(doc(db, 'user_2fa', targetUid));
+                alert(`✅ 2FA untuk ${targetEmail} berhasil direset.`);
+            } catch (e) {
+                console.error('Admin reset 2FA error:', e);
+                alert('❌ Gagal reset 2FA. Pastikan Anda adalah admin.');
             }
         };
 
@@ -252,7 +338,8 @@ export default {
             store, 
             isOpen, isDesktop, containerStyle, 
             toggleMenu, handleMobileClick, hardReset,
-            isGoogleLinked, handleLinkGoogle
+            isGoogleLinked, handleLinkGoogle,
+            handleReset2FA, handleAdminReset2FA
         };
     }
 };
