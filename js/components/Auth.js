@@ -150,30 +150,60 @@ export default {
 
         const generateQRCode = async () => {
             const user = store.pendingUser;
-            if (!user || !window.OTPAuth) {
-                errorMsg.value = 'Library 2FA belum termuat. Refresh halaman.';
+
+            // Validasi library & user
+            if (!user) {
+                errorMsg.value = 'Session error. Silakan login ulang.';
                 return;
             }
-            const secret = window.OTPAuth.Secret.generate(20);
-            tempSecret.value = secret.base32;
-
-            const totp = new window.OTPAuth.TOTP({
-                issuer:    'SIMPEL KGB',
-                label:     user.email,
-                algorithm: 'SHA1',
-                digits:    6,
-                period:    30,
-                secret
-            });
+            if (!window.OTPAuth) {
+                errorMsg.value = 'Library OTPAuth belum termuat. Refresh halaman.';
+                console.error('window.OTPAuth tidak tersedia');
+                return;
+            }
+            if (!window.QRCode) {
+                errorMsg.value = 'Library QRCode belum termuat. Refresh halaman.';
+                console.error('window.QRCode tidak tersedia');
+                return;
+            }
 
             try {
-                qrDataUrl.value = await window.QRCode.toDataURL(totp.toString(), {
-                    width: 220, margin: 2,
-                    color: { dark: '#1a1a2e', light: '#ffffff' }
+                // Generate TOTP secret
+                const secret = new window.OTPAuth.Secret({ size: 20 });
+                tempSecret.value = secret.base32;
+
+                const totp = new window.OTPAuth.TOTP({
+                    issuer:    'SIMPEL KGB',
+                    label:     user.email,
+                    algorithm: 'SHA1',
+                    digits:    6,
+                    period:    30,
+                    secret
                 });
+
+                const otpauthUrl = totp.toString();
+                console.log('OTPAuth URL:', otpauthUrl); // Debug
+
+                // Generate QR dengan callback (lebih kompatibel di semua versi)
+                qrDataUrl.value = await new Promise((resolve, reject) => {
+                    window.QRCode.toDataURL(otpauthUrl, { 
+                        width: 220, 
+                        margin: 2,
+                        errorCorrectionLevel: 'M'
+                    }, (err, url) => {
+                        if (err) {
+                            console.error('QRCode.toDataURL error:', err);
+                            reject(err);
+                        } else {
+                            resolve(url);
+                        }
+                    });
+                });
+
+                console.log('QR URL generated:', qrDataUrl.value ? 'OK' : 'EMPTY');
             } catch (e) {
-                console.error('QR Error:', e);
-                errorMsg.value = 'Gagal membuat QR Code. Pastikan koneksi internet tersedia lalu refresh.';
+                console.error('QR Generation Error:', e);
+                errorMsg.value = `Gagal membuat QR Code: ${e.message || e}. Coba refresh halaman.`;
             }
         };
 
