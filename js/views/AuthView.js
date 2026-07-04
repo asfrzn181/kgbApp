@@ -27,16 +27,6 @@ export const TplAuth = `
                     </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="form-label small text-muted text-uppercase fw-bold">Kode Keamanan</label>
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <canvas ref="captchaCanvas" width="140" height="45" class="border rounded bg-light cursor-pointer flex-shrink-0" title="Klik untuk ganti" @click="generateCaptcha"></canvas>
-                        <button type="button" class="btn btn-light border flex-fill" @click="generateCaptcha" title="Ganti Kode">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
-                    </div>
-                    <input v-model="captchaInput" type="text" class="form-control" placeholder="Ketik kode di gambar..." required maxlength="6">
-                </div>
 
                 <div v-if="errorMsg" class="alert alert-danger d-flex align-items-center small py-2 mb-3">
                     <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ errorMsg }}

@@ -22,22 +22,16 @@ import Penomoran from './components/Penomoran.js';
 import PenomoranInpassing from './components/PenomoranInpassing.js';
 import CekDuplikat from './components/CekDuplikat.js';
 import SkFungsional from './components/SkFungsional.js';
+
 // --- KONFIGURASI ROUTER ---
 const routes = [
-    // 1. Dashboard
     { path: '/', component: Dashboard },
-    
-    // 2. Transaksi & Penomoran
     { path: '/transaksi', component: TransaksiKgb },
     { path: '/penomoran', component: Penomoran },
     { path: '/penomoran-inpassing', component: PenomoranInpassing },
-    // 3. Laporan
     { path: '/laporan', component: Laporan },
-
     { path: '/duplikat', component: CekDuplikat },
     { path: '/sk-fungsional', component: SkFungsional },
-
-    // 4. Master Data CRUD
     { path: '/master/pegawai', component: MasterPegawai },
     { path: '/master/gaji', component: MasterGaji },
     { path: '/master/pejabat', component: MasterPejabat },
@@ -54,22 +48,17 @@ const router = createRouter({
 // ============================================================
 // --- MANAJEMEN SESI (AUTO LOGOUT 1 JAM) ---
 // ============================================================
-const SESSION_KEY     = 'kgb_session_expiry';
+const SESSION_KEY      = 'kgb_session_expiry';
 const SESSION_DURATION = 60 * 60 * 1000; // 1 jam dalam milidetik
 let sessionTimerId = null;
 
-/** Simpan waktu expired ke localStorage saat login */
 const startSessionTimer = () => {
     const expiry = Date.now() + SESSION_DURATION;
     localStorage.setItem(SESSION_KEY, expiry.toString());
-
-    // Cek setiap 60 detik
     sessionTimerId = setInterval(async () => {
         const stored = localStorage.getItem(SESSION_KEY);
         if (!stored) return;
-
-        const remaining = parseInt(stored) - Date.now();
-        if (remaining <= 0) {
+        if (parseInt(stored) - Date.now() <= 0) {
             clearInterval(sessionTimerId);
             localStorage.removeItem(SESSION_KEY);
             alert('⏱️ Sesi Anda telah berakhir (1 jam). Silakan login kembali.');
@@ -78,7 +67,6 @@ const startSessionTimer = () => {
     }, 60 * 1000);
 };
 
-/** Bersihkan timer dan hapus data sesi saat logout */
 const clearSessionTimer = () => {
     clearInterval(sessionTimerId);
     sessionTimerId = null;
@@ -101,9 +89,7 @@ const app = createApp({
         </div>
 
         <div v-else class="d-flex flex-column flex-md-row vh-100 w-100 overflow-hidden">
-            
             <Sidebar @logout="handleLogout" class="flex-shrink-0 border-end" />
-            
             <div class="flex-grow-1 bg-light position-relative overflow-auto h-100 w-100">
                 <div style="min-height: 100%;">
                     <router-view></router-view>
@@ -118,78 +104,56 @@ const app = createApp({
                 'Apakah Anda yakin ingin mengakhiri sesi ini?',
                 'Ya, Keluar'
             );
-
-            if(confirmed) {
+            if (confirmed) {
                 store.setLoading(true);
                 await signOut(auth);
-                // Loading stop otomatis via listener
             }
         };
-        
+
         // Listener Auth & Role Check
         onMounted(() => {
-            console.log('[MAIN] onMounted: mendaftarkan onAuthStateChanged listener');
             onAuthStateChanged(auth, async (user) => {
-                console.log('[MAIN] onAuthStateChanged fired. user:', user ? user.email : 'null');
                 store.setLoading(true);
-                
-                if (user) {
-                    console.log('[MAIN] User terdeteksi:', user.email, '| uid:', user.uid);
 
-                    // --- CEK SESI EXPIRED ---
+                if (user) {
+                    // Cek sesi expired
                     const stored = localStorage.getItem(SESSION_KEY);
-                    console.log('[MAIN] Session expiry stored:', stored, '| now:', Date.now());
                     if (stored && Date.now() > parseInt(stored)) {
-                        console.log('[MAIN] Sesi expired → signOut');
                         clearSessionTimer();
                         await signOut(auth);
                         store.setLoading(false);
                         return;
                     }
 
-                    // --- CEK 2FA VERIFICATION ---
+                    // Cek 2FA verification
                     const verified2FA = sessionStorage.getItem('kgb_2fa_ok');
-                    console.log('[MAIN] kgb_2fa_ok di sessionStorage:', verified2FA, '| uid:', user.uid);
-                    console.log('[MAIN] 2FA sudah verified?', verified2FA === user.uid);
-
                     if (verified2FA === user.uid) {
-                        console.log('[MAIN] 2FA verified → fetchUserProfile');
+                        // 2FA sudah diverifikasi sesi ini — lanjut normal
                         if (!sessionTimerId) startSessionTimer();
                         await store.fetchUserProfile(user);
                     } else {
-                        console.log('[MAIN] 2FA belum verified → cek Firestore user_2fa');
+                        // Belum verifikasi 2FA — cek status setup di Firestore
                         store.pendingUser = user;
                         try {
                             const docSnap = await getDoc(doc(db, 'user_2fa', user.uid));
-                            console.log('[MAIN] user_2fa doc exists:', docSnap.exists());
-                            if (docSnap.exists()) {
-                                console.log('[MAIN] user_2fa data:', docSnap.data());
-                            }
                             if (docSnap.exists() && docSnap.data().enabled) {
-                                console.log('[MAIN] 2FA sudah setup → authStep = verify_2fa');
                                 store.authStep = 'verify_2fa';
                             } else {
-                                console.log('[MAIN] 2FA belum setup → authStep = setup_2fa');
                                 store.authStep = 'setup_2fa';
                             }
                         } catch (e) {
-                            console.error('[MAIN] 2FA check error:', e);
                             store.authStep = 'setup_2fa';
                         }
-                        console.log('[MAIN] store.authStep sekarang:', store.authStep);
-                        console.log('[MAIN] store.pendingUser:', store.pendingUser?.email);
                     }
                 } else {
-                    console.log('[MAIN] Tidak ada user (logout/belum login)');
                     clearSessionTimer();
                     sessionStorage.removeItem('kgb_2fa_ok');
-                    store.user = null;
+                    store.user    = null;
                     store.profile = null;
                     store.pendingUser = null;
-                    store.authStep = 'login';
+                    store.authStep    = 'login';
                 }
-                
-                console.log('[MAIN] setLoading(false). store.user:', store.user?.email ?? 'null', '| authStep:', store.authStep);
+
                 store.setLoading(false);
             });
         });
@@ -199,4 +163,4 @@ const app = createApp({
 });
 
 app.use(router);
-app.mount('#app'); // Pastikan div id="app" ada di index.html
+app.mount('#app');

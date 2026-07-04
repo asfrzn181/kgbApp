@@ -19,10 +19,6 @@ export default {
         const password = ref('');
         const errorMsg = ref('');
 
-        // Captcha
-        const captchaCode   = ref('');
-        const captchaInput  = ref('');
-        const captchaCanvas = ref(null);
 
         // ============================================================
         // STEP 2 (Setup QR) & STEP 3 (Verify TOTP)
@@ -34,71 +30,12 @@ export default {
         const attemptCount = ref(0);
         const MAX_ATTEMPTS = 3;
 
-        // ============================================================
-        // CAPTCHA FUNCTIONS
-        // ============================================================
-        const generateCaptcha = () => {
-            const canvas = captchaCanvas.value;
-            if (!canvas) return;
-            const ctx    = canvas.getContext('2d');
-            const width  = canvas.width;
-            const height = canvas.height;
-
-            ctx.clearRect(0, 0, width, height);
-            ctx.fillStyle = '#f8f9fa';
-            ctx.fillRect(0, 0, width, height);
-
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-            let code = '';
-            for (let i = 0; i < 5; i++) {
-                const char = chars.charAt(Math.floor(Math.random() * chars.length));
-                code += char;
-                ctx.font = 'bold 24px Arial';
-                ctx.fillStyle = getRandomColor();
-                ctx.textBaseline = 'middle';
-                ctx.save();
-                ctx.translate(20 + i * 22, height / 2);
-                ctx.rotate((Math.random() - 0.5) * 0.4);
-                ctx.fillText(char, 0, 0);
-                ctx.restore();
-            }
-            captchaCode.value = code;
-
-            for (let i = 0; i < 7; i++) {
-                ctx.strokeStyle = getRandomColor(100);
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(Math.random() * width, Math.random() * height);
-                ctx.lineTo(Math.random() * width, Math.random() * height);
-                ctx.stroke();
-            }
-            for (let i = 0; i < 30; i++) {
-                ctx.fillStyle = getRandomColor();
-                ctx.beginPath();
-                ctx.arc(Math.random() * width, Math.random() * height, 1, 0, 2 * Math.PI);
-                ctx.fill();
-            }
-            captchaInput.value = '';
-        };
-
-        const getRandomColor = (max = 200) => {
-            const r = Math.floor(Math.random() * max);
-            const g = Math.floor(Math.random() * max);
-            const b = Math.floor(Math.random() * max);
-            return `rgb(${r},${g},${b})`;
-        };
 
         // ============================================================
         // STEP 1: Login Email + Password
         // ============================================================
         const handleLogin = async () => {
             errorMsg.value = '';
-
-            if (captchaInput.value.toUpperCase() !== captchaCode.value.toUpperCase()) {
-                errorMsg.value = 'Kode keamanan salah! Coba lagi.';
-                generateCaptcha();
-                return;
-            }
 
             store.setLoading(true);
             try {
@@ -112,7 +49,7 @@ export default {
                 else if (e.code === 'auth/invalid-credential') errorMsg.value = 'Email atau password salah.';
                 else if (e.code === 'auth/too-many-requests')  errorMsg.value = 'Terlalu banyak percobaan. Akun dikunci sementara.';
                 else                                            errorMsg.value = 'Gagal login. Cek koneksi internet.';
-                generateCaptcha();
+
                 password.value = '';
                 store.setLoading(false);
             }
@@ -322,18 +259,14 @@ export default {
             errorMsg.value = '';
             email.value    = '';
             password.value = '';
-            generateCaptcha();
+
         };
 
-        // Generate captcha saat mounted
-        onMounted(() => {
-            generateCaptcha();
-        });
 
         return { 
             // Step 1
             email, password, errorMsg, handleLogin, handleGoogleLogin, store,
-            captchaInput, generateCaptcha, captchaCanvas,
+
             // Step 2 & 3
             totpCode, qrDataUrl, isVerifying,
             confirmSetup, verifyTotp, cancelToStep1,

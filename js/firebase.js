@@ -2,49 +2,50 @@
 // 1. IMPORT LIBRARY
 // ============================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-appcheck.js";
 
-import { 
-    getAuth, 
-    signInWithEmailAndPassword, 
+import {
+    getAuth,
+    signInWithEmailAndPassword,
     GoogleAuthProvider,
     signInWithPopup,
     linkWithPopup,
-    signOut, 
-    onAuthStateChanged 
+    signOut,
+    onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { 
-    getFirestore, 
-    collection, 
-    getDocs, 
-    addDoc, 
-    setDoc, 
-    updateDoc, 
-    doc, 
-    getDoc, 
+import {
+    getFirestore,
+    collection,
+    getDocs,
+    addDoc,
+    setDoc,
+    updateDoc,
+    doc,
+    getDoc,
     deleteDoc,
-    query, 
-    where, 
+    query,
+    where,
     runTransaction,
-    orderBy, 
-    limit, 
-    writeBatch, 
+    orderBy,
+    limit,
+    writeBatch,
     serverTimestamp,
     Timestamp, // <--- TAMBAHAN PENTING (IMPORT)
-    startAfter, 
-    startAt, 
-    endBefore, 
-    endAt, 
+    startAfter,
+    startAt,
+    endBefore,
+    endAt,
     limitToLast,
     getCountFromServer
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 
-import { 
-    getStorage, 
-    ref as storageRef, 
-    uploadBytes, 
-    getDownloadURL, 
-    deleteObject 
+import {
+    getStorage,
+    ref as storageRef,
+    uploadBytes,
+    getDownloadURL,
+    deleteObject
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 // ============================================================
@@ -64,6 +65,19 @@ const firebaseConfig = {
 // 3. INISIALISASI
 // ============================================================
 const app = initializeApp(firebaseConfig);
+
+// ============================================================
+// 3.5. FIREBASE APP CHECK
+// ============================================================
+// HANYA UNTUK DEVELOPMENT: Agar bisa jalan di localhost (Laragon)
+// Hapus atau comment baris ini jika sudah di-deploy ke production
+self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+
+const appCheck = initializeAppCheck(app, {
+    // TODO: Ganti dengan Site Key reCAPTCHA v3 Anda dari Google Cloud Console
+    provider: new ReCaptchaV3Provider('6LfZMkQtAAAAAH9Ch4PNkbjJeHu3QcQK5JRuX4Ya'),
+    isTokenAutoRefreshEnabled: true
+});
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
@@ -72,37 +86,37 @@ const googleProvider = new GoogleAuthProvider();
 // ============================================================
 // 4. EXPORT (AGAR BISA DIPAKAI DI FILE LAIN)
 // ============================================================
-export { 
+export {
     // Instance
-    db, 
-    auth, 
+    db,
+    auth,
     storage,
-    
+
     // Firestore Core
-    collection, 
-    getDocs, 
-    addDoc, 
-    setDoc, 
-    updateDoc, 
-    doc, 
-    getDoc, 
+    collection,
+    getDocs,
+    addDoc,
+    setDoc,
+    updateDoc,
+    doc,
+    getDoc,
     deleteDoc,
-    
+
     // Firestore Query & Helpers
-    query, 
-    where, 
-    orderBy, 
-    limit, 
-    writeBatch, 
+    query,
+    where,
+    orderBy,
+    limit,
+    writeBatch,
     serverTimestamp,
     Timestamp, // <--- TAMBAHAN PENTING (EXPORT)
     getCountFromServer,
 
     // Firestore Pagination
-    startAfter, 
-    startAt, 
-    endBefore, 
-    endAt, 
+    startAfter,
+    startAt,
+    endBefore,
+    endAt,
     limitToLast,
     runTransaction,
     // Auth
@@ -111,13 +125,13 @@ export {
     signInWithPopup,
     linkWithPopup,
     googleProvider,
-    signOut, 
+    signOut,
     onAuthStateChanged,
 
     // Storage
-    storageRef, 
-    uploadBytes, 
-    getDownloadURL, 
+    storageRef,
+    uploadBytes,
+    getDownloadURL,
     deleteObject
 };
 
