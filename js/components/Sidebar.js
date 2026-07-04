@@ -1,4 +1,5 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { auth, linkWithPopup, googleProvider } from '../firebase.js';
 import { store } from '../store.js';
 import { showConfirm } from '../utils.js'; // Pastikan import showConfirm
 
@@ -118,6 +119,18 @@ export default {
                     </div>
                 </a>
                 <ul class="dropdown-menu text-small shadow border-0" aria-labelledby="dropdownUser2">
+                    <!-- Status / Tombol Hubungkan Google -->
+                    <li v-if="isGoogleLinked">
+                        <span class="dropdown-item text-success pe-none">
+                            <i class="bi bi-google me-2"></i> Google Terhubung ✅
+                        </span>
+                    </li>
+                    <li v-else>
+                        <a class="dropdown-item text-primary" href="#" @click.prevent="handleLinkGoogle">
+                            <i class="bi bi-google me-2"></i> Hubungkan ke Google
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
                     <li><a class="dropdown-item text-danger" href="#" @click.prevent="$emit('logout')"><i class="bi bi-box-arrow-right me-2"></i> Keluar</a></li>
                 </ul>
             </div>
@@ -197,6 +210,36 @@ export default {
             }
         };
 
+        // --- FITUR LINK GOOGLE ---
+        // Cek apakah user sudah punya provider Google
+        const isGoogleLinked = computed(() => {
+            return store.user?.providerData?.some(p => p.providerId === 'google.com') ?? false;
+        });
+
+        // Hubungkan akun Email/Password yang sedang login ke Google
+        const handleLinkGoogle = async () => {
+            const confirmed = await showConfirm(
+                'Hubungkan ke Google?',
+                'Akun Anda akan dihubungkan ke Google. Setelah ini Anda bisa login menggunakan akun Google Anda tanpa perlu email/password.',
+                'Ya, Hubungkan'
+            );
+            if (!confirmed) return;
+
+            try {
+                await linkWithPopup(auth.currentUser, googleProvider);
+                alert('✅ Akun Google berhasil dihubungkan! Anda kini bisa login dengan Google.');
+            } catch (e) {
+                console.error('Link Google Error:', e.code, e.message);
+                if (e.code === 'auth/credential-already-in-use') {
+                    alert('❌ Akun Google ini sudah digunakan oleh akun lain.');
+                } else if (e.code === 'auth/popup-closed-by-user') {
+                    // User menutup popup, tidak perlu notifikasi
+                } else {
+                    alert('❌ Gagal menghubungkan ke Google. Coba lagi.');
+                }
+            }
+        };
+
         onMounted(() => {
             window.addEventListener('resize', handleResize);
         });
@@ -208,7 +251,8 @@ export default {
         return { 
             store, 
             isOpen, isDesktop, containerStyle, 
-            toggleMenu, handleMobileClick, hardReset 
+            toggleMenu, handleMobileClick, hardReset,
+            isGoogleLinked, handleLinkGoogle
         };
     }
 };

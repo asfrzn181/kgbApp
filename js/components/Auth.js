@@ -1,5 +1,5 @@
 import { ref, onMounted } from 'vue';
-import { auth, signInWithEmailAndPassword } from '../firebase.js'; 
+import { auth, signInWithEmailAndPassword, signInWithPopup, googleProvider } from '../firebase.js'; 
 import { store } from '../store.js';
 
 // IMPORT VIEW HTML
@@ -115,13 +115,33 @@ export default {
             }
         };
 
+        // Handler Login Google
+        const handleGoogleLogin = async () => {
+            errorMsg.value = '';
+            store.setLoading(true);
+            try {
+                await signInWithPopup(auth, googleProvider);
+                // onAuthStateChanged di main.js otomatis menangani selebihnya
+            } catch (e) {
+                console.error("Google Login Error:", e.code, e.message);
+                if (e.code === 'auth/popup-closed-by-user') {
+                    errorMsg.value = "Login dibatalkan.";
+                } else if (e.code === 'auth/cancelled-popup-request') {
+                    // Popup dibuka ganda, abaikan
+                } else {
+                    errorMsg.value = "Login Google gagal. Coba lagi.";
+                }
+                store.setLoading(false);
+            }
+        };
+
         // Generate saat mounted
         onMounted(() => {
             generateCaptcha();
         });
 
         return { 
-            email, password, errorMsg, handleLogin, store,
+            email, password, errorMsg, handleLogin, handleGoogleLogin, store,
             captchaInput, generateCaptcha, captchaCanvas
         };
     }

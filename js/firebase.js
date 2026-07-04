@@ -6,6 +6,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { 
     getAuth, 
     signInWithEmailAndPassword, 
+    GoogleAuthProvider,
+    signInWithPopup,
+    linkWithPopup,
     signOut, 
     onAuthStateChanged 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -64,6 +67,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
+const googleProvider = new GoogleAuthProvider();
 
 // ============================================================
 // 4. EXPORT (AGAR BISA DIPAKAI DI FILE LAIN)
@@ -102,7 +106,11 @@ export {
     limitToLast,
     runTransaction,
     // Auth
-    signInWithEmailAndPassword, 
+    signInWithEmailAndPassword,
+    GoogleAuthProvider,
+    signInWithPopup,
+    linkWithPopup,
+    googleProvider,
     signOut, 
     onAuthStateChanged,
 
