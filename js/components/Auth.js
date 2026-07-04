@@ -134,37 +134,20 @@ export default {
         };
 
         // ============================================================
-        // STEP 2: Setup QR (watch store.authStep)
-        // { immediate: true } agar fire langsung saat komponen mount
-        // jika authStep sudah 'setup_2fa' sebelum Auth terpasang
+        // STEP 2: generateQRCode (harus didefinisikan SEBELUM watch)
         // ============================================================
-        watch(() => store.authStep, async (step) => {
-            errorMsg.value = '';
-            totpCode.value = '';
-            if (step === 'setup_2fa') {
-                await generateQRCode();
-                store.setLoading(false);
-            } else if (step === 'verify_2fa') {
-                store.setLoading(false);
-            }
-        }, { immediate: true }); // <-- PENTING: fire langsung dengan nilai saat ini
-
         const generateQRCode = async () => {
+            console.log('[2FA] generateQRCode dipanggil');
             const user = store.pendingUser;
 
-            // Validasi library & user
             if (!user) {
                 errorMsg.value = 'Session error. Silakan login ulang.';
+                console.error('[2FA] pendingUser null');
                 return;
             }
             if (!window.OTPAuth) {
                 errorMsg.value = 'Library OTPAuth belum termuat. Refresh halaman.';
-                console.error('window.OTPAuth tidak tersedia');
-                return;
-            }
-            if (!window.QRCode) {
-                errorMsg.value = 'Library QRCode belum termuat. Refresh halaman.';
-                console.error('window.QRCode tidak tersedia');
+                console.error('[2FA] window.OTPAuth tidak tersedia');
                 return;
             }
 
@@ -183,30 +166,56 @@ export default {
                 });
 
                 const otpauthUrl = totp.toString();
-                console.log('OTPAuth URL:', otpauthUrl); // Debug
+                console.log('[2FA] OTPAuth URL:', otpauthUrl);
 
-                // Generate QR dengan callback (lebih kompatibel di semua versi)
-                qrDataUrl.value = await new Promise((resolve, reject) => {
-                    window.QRCode.toDataURL(otpauthUrl, { 
-                        width: 220, 
-                        margin: 2,
-                        errorCorrectionLevel: 'M'
-                    }, (err, url) => {
-                        if (err) {
-                            console.error('QRCode.toDataURL error:', err);
-                            reject(err);
-                        } else {
-                            resolve(url);
-                        }
+                // Generate QR — coba library dulu, fallback ke external API
+                if (window.QRCode && typeof window.QRCode.toDataURL === 'function') {
+                    qrDataUrl.value = await new Promise((resolve, reject) => {
+                        window.QRCode.toDataURL(otpauthUrl, { 
+                            width: 220, margin: 2, errorCorrectionLevel: 'M'
+                        }, (err, url) => {
+                            if (err) reject(err);
+                            else resolve(url);
+                        });
                     });
-                });
+                } else {
+                    // Fallback: external QR API (tidak kirim secret, hanya otpauth URL)
+                    console.warn('[2FA] window.QRCode tidak ada, pakai external API');
+                    qrDataUrl.value = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(otpauthUrl)}`;
+                }
 
-                console.log('QR URL generated:', qrDataUrl.value ? 'OK' : 'EMPTY');
+                console.log('[2FA] QR siap:', qrDataUrl.value ? 'OK' : 'KOSONG');
             } catch (e) {
-                console.error('QR Generation Error:', e);
-                errorMsg.value = `Gagal membuat QR Code: ${e.message || e}. Coba refresh halaman.`;
+                console.error('[2FA] QR Generation Error:', e);
+                // Fallback jika library error
+                try {
+                    const totp2 = new window.OTPAuth.TOTP({
+                        issuer: 'SIMPEL KGB', label: store.pendingUser?.email,
+                        algorithm: 'SHA1', digits: 6, period: 30,
+                        secret: window.OTPAuth.Secret.fromBase32(tempSecret.value)
+                    });
+                    qrDataUrl.value = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(totp2.toString())}`;
+                } catch (_) {
+                    errorMsg.value = `Gagal membuat QR Code. Coba refresh halaman.`;
+                }
             }
         };
+
+        // ============================================================
+        // Watch authStep — SETELAH generateQRCode didefinisikan
+        // { immediate: true } agar fire langsung jika sudah 'setup_2fa'
+        // ============================================================
+        watch(() => store.authStep, async (step) => {
+            console.log('[2FA] authStep watch fired:', step);
+            errorMsg.value = '';
+            totpCode.value = '';
+            if (step === 'setup_2fa') {
+                await generateQRCode();
+                store.setLoading(false);
+            } else if (step === 'verify_2fa') {
+                store.setLoading(false);
+            }
+        }, { immediate: true });
 
         // Konfirmasi setup (user scan QR dan masukkan kode pertama)
         const confirmSetup = async () => {
