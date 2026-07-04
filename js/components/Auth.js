@@ -134,8 +134,9 @@ export default {
         };
 
         // ============================================================
-        // STEP 2: Setup 2FA (QR Code — pertama kali)
-        // Watch store.authStep untuk trigger generate QR
+        // STEP 2: Setup QR (watch store.authStep)
+        // { immediate: true } agar fire langsung saat komponen mount
+        // jika authStep sudah 'setup_2fa' sebelum Auth terpasang
         // ============================================================
         watch(() => store.authStep, async (step) => {
             errorMsg.value = '';
@@ -146,7 +147,7 @@ export default {
             } else if (step === 'verify_2fa') {
                 store.setLoading(false);
             }
-        });
+        }, { immediate: true }); // <-- PENTING: fire langsung dengan nilai saat ini
 
         const generateQRCode = async () => {
             const user = store.pendingUser;
