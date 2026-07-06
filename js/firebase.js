@@ -72,13 +72,13 @@ const app = initializeApp(firebaseConfig);
 // ============================================================
 // HANYA UNTUK DEVELOPMENT: Agar bisa jalan di localhost (Laragon)
 // Hapus atau comment baris ini jika sudah di-deploy ke production
-// self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
 
-// const appCheck = initializeAppCheck(app, {
-//     // TODO: Ganti dengan Site Key reCAPTCHA v3 Anda dari Google Cloud Console
-//     provider: new ReCaptchaV3Provider('6LfZMkQtAAAAAH9Ch4PNkbjJeHu3QcQK5JRuX4Ya'),
-//     isTokenAutoRefreshEnabled: true
-// });
+const appCheck = initializeAppCheck(app, {
+    // TODO: Ganti dengan Site Key reCAPTCHA v3 Anda dari Google Cloud Console
+    provider: new ReCaptchaV3Provider('6LfZMkQtAAAAAH9Ch4PNkbjJeHu3QcQK5JRuX4Ya'),
+    isTokenAutoRefreshEnabled: true
+});
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
