@@ -193,7 +193,32 @@ export const formatTitleCase = (text) => {
 // --- FUNGSI TERBILANG (Angka ke Kata) ---
 export function terbilang(angka) {
     if (angka === null || angka === undefined || angka === '') return '';
-    const strAngka = String(angka).replace(',', '.').trim();
+    // Ganti koma desimal ke titik, lalu hapus titik pemisah ribuan (format Indonesia)
+    // Contoh: "7.410" → "7410", "1.234.567,50" → "1234567.50"
+    let strAngka = String(angka).trim();
+
+    // Deteksi apakah pakai koma sebagai desimal (format Indonesia: 1.234,56)
+    const hasKomaDesimal = strAngka.includes(',');
+    if (hasKomaDesimal) {
+        // Format Indonesia: titik = ribuan, koma = desimal
+        strAngka = strAngka.replace(/\./g, '').replace(',', '.');
+    } else {
+        // Tidak ada koma: titik bisa jadi pemisah ribuan saja (misal "7.410")
+        // Jika lebih dari satu titik → semua titik adalah pemisah ribuan
+        const dotCount = (strAngka.match(/\./g) || []).length;
+        if (dotCount > 1) {
+            strAngka = strAngka.replace(/\./g, '');
+        }
+        // Jika tepat satu titik, bisa jadi ribuan (7.410) atau desimal (7.5)
+        // Bedakan: jika bagian setelah titik tepat 3 digit → ribuan
+        else if (dotCount === 1) {
+            const afterDot = strAngka.split('.')[1];
+            if (afterDot && afterDot.length === 3) {
+                strAngka = strAngka.replace(/\./g, ''); // ribuan
+            }
+            // else: biarkan sebagai desimal
+        }
+    }
 
     const parts = strAngka.split('.');
     const intPart = Math.abs(parseInt(parts[0], 10));
