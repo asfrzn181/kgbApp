@@ -72,7 +72,8 @@ const app = initializeApp(firebaseConfig);
 // ============================================================
 // HANYA UNTUK DEVELOPMENT: Agar bisa jalan di localhost (Laragon)
 // Hapus atau comment baris ini jika sudah di-deploy ke production
-self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+// Gunakan UUID tetap agar token tidak berubah setiap session
+self.FIREBASE_APPCHECK_DEBUG_TOKEN = 'CD44A71D-7398-40D7-AFBF-226B94217BFF';
 
 const appCheck = initializeAppCheck(app, {
     // TODO: Ganti dengan Site Key reCAPTCHA v3 Anda dari Google Cloud Console
