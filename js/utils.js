@@ -250,12 +250,8 @@ export function terbilang(angka) {
     hasil = hasil.replace(/\s+/g, ' ');
 
     if (decPart) {
-        let decText = " koma";
-        for (let i = 0; i < decPart.length; i++) {
-            const digit = parseInt(decPart[i], 10);
-            if (digit === 0) decText += " nol";
-            else decText += " " + huruf[digit];
-        }
+        const decNum = parseInt(decPart, 10);
+        const decText = isNaN(decNum) ? '' : ' koma ' + sebut(decNum).trim();
         hasil += decText;
     }
 
