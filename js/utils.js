@@ -193,69 +193,70 @@ export const formatTitleCase = (text) => {
 // --- FUNGSI TERBILANG (Angka ke Kata) ---
 export function terbilang(angka) {
     if (angka === null || angka === undefined || angka === '') return '';
-    // Ganti koma desimal ke titik, lalu hapus titik pemisah ribuan (format Indonesia)
-    // Contoh: "7.410" → "7410", "1.234.567,50" → "1234567.50"
-    let strAngka = String(angka).trim();
-
-    // Deteksi apakah pakai koma sebagai desimal (format Indonesia: 1.234,56)
-    const hasKomaDesimal = strAngka.includes(',');
-    if (hasKomaDesimal) {
-        // Format Indonesia: titik = ribuan, koma = desimal
-        strAngka = strAngka.replace(/\./g, '').replace(',', '.');
-    } else {
-        // Tidak ada koma: titik bisa jadi pemisah ribuan saja (misal "7.410")
-        // Jika lebih dari satu titik → semua titik adalah pemisah ribuan
-        const dotCount = (strAngka.match(/\./g) || []).length;
-        if (dotCount > 1) {
-            strAngka = strAngka.replace(/\./g, '');
-        }
-        // Jika tepat satu titik, bisa jadi ribuan (7.410) atau desimal (7.5)
-        // Bedakan: jika bagian setelah titik tepat 3 digit → ribuan
-        else if (dotCount === 1) {
-            const afterDot = strAngka.split('.')[1];
-            if (afterDot && afterDot.length === 3) {
-                strAngka = strAngka.replace(/\./g, ''); // ribuan
-            }
-            // else: biarkan sebagai desimal
-        }
-    }
-
-    const parts = strAngka.split('.');
-    const intPart = Math.abs(parseInt(parts[0], 10));
-    const decPart = parts.length > 1 ? parts[1] : '';
 
     const huruf = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
 
     function sebut(n) {
-        if (n < 12) return huruf[n];
-        if (n < 20) return sebut(n - 10) + " belas";
-        if (n < 100) return sebut(Math.floor(n / 10)) + " puluh " + sebut(n % 10);
-        if (n < 200) return "seratus " + sebut(n - 100);
-        if (n < 1000) return sebut(Math.floor(n / 100)) + " ratus " + sebut(n % 100);
-        if (n < 2000) return "seribu " + sebut(n - 1000);
-        if (n < 1000000) return sebut(Math.floor(n / 1000)) + " ribu " + sebut(n % 1000);
-        if (n < 1000000000) return sebut(Math.floor(n / 1000000)) + " juta " + sebut(n % 1000000);
+        if (n < 12)        return huruf[n];
+        if (n < 20)        return sebut(n - 10) + " belas";
+        if (n < 100)       return (sebut(Math.floor(n / 10)) + " puluh " + sebut(n % 10)).trim();
+        if (n < 200)       return ("seratus " + sebut(n - 100)).trim();
+        if (n < 1000)      return (sebut(Math.floor(n / 100)) + " ratus " + sebut(n % 100)).trim();
+        if (n < 2000)      return ("seribu " + sebut(n - 1000)).trim();
+        if (n < 1000000)   return (sebut(Math.floor(n / 1000)) + " ribu " + sebut(n % 1000)).trim();
+        if (n < 1000000000) return (sebut(Math.floor(n / 1000000)) + " juta " + sebut(n % 1000000)).trim();
         return "";
     }
 
-    if (isNaN(intPart)) return strAngka;
+    let intPart, decPart = '';
 
-    let hasil = '';
-    if (intPart === 0) {
-        hasil = 'nol';
+    if (typeof angka === 'number') {
+        // Sudah number JS — langsung pakai, tidak perlu parsing string
+        const isNeg = angka < 0;
+        const absVal = Math.abs(angka);
+        intPart = Math.floor(absVal);
+        // Ambil bagian desimal sebagai string agar tidak ada floating-point error
+        const strNum = String(absVal);
+        const dotIdx = strNum.indexOf('.');
+        decPart = dotIdx >= 0 ? strNum.slice(dotIdx + 1) : '';
+        if (isNeg) angka = -angka; // hanya untuk cek tanda di akhir
     } else {
-        hasil = sebut(intPart).trim();
+        // Input berupa string — deteksi format Indonesia
+        let str = String(angka).trim();
+
+        if (str.includes(',')) {
+            // Format Indonesia: titik = ribuan, koma = desimal  (contoh: "1.234,56")
+            str = str.replace(/\./g, '').replace(',', '.');
+        } else {
+            // Tidak ada koma: titik bisa pemisah ribuan atau desimal
+            const dots = (str.match(/\./g) || []).length;
+            if (dots > 1) {
+                // Lebih dari satu titik → pasti pemisah ribuan  (contoh: "7.4.1" → "741")
+                str = str.replace(/\./g, '');
+            }
+            // Satu titik: biarkan apa adanya (bisa desimal seperti "117.532" atau "7.5")
+        }
+
+        const parts = str.split('.');
+        intPart = Math.abs(parseInt(parts[0], 10));
+        decPart = parts.length > 1 ? parts[1] : '';
+
+        if (isNaN(intPart)) return String(angka);
     }
 
-    hasil = hasil.replace(/\s+/g, ' ');
+    const isNegative = String(angka).trim().startsWith('-');
+
+    let hasil = intPart === 0 ? 'nol' : sebut(intPart);
+    hasil = hasil.replace(/\s+/g, ' ').trim();
 
     if (decPart) {
         const decNum = parseInt(decPart, 10);
-        const decText = isNaN(decNum) ? '' : ' koma ' + sebut(decNum).trim();
-        hasil += decText;
+        if (!isNaN(decNum)) {
+            hasil += ' koma ' + sebut(decNum).trim();
+        }
     }
 
-    if (strAngka.startsWith('-')) hasil = "minus " + hasil;
+    if (isNegative) hasil = 'minus ' + hasil;
 
     return hasil.trim();
 }
