@@ -2,7 +2,7 @@ import { createApp, onMounted } from 'vue';
 import { createRouter, createWebHashHistory } from 'vue-router';
 import { auth, onAuthStateChanged, signOut, db, doc, getDoc } from './firebase.js';
 import { store } from './store.js';
-import { showConfirm } from './utils.js'; 
+import { showConfirm } from './utils.js';
 
 // --- IMPORT KOMPONEN ---
 import Sidebar from './components/Sidebar.js';
@@ -11,8 +11,8 @@ import Dashboard from './components/Dashboard.js';
 import Laporan from './components/Laporan.js';
 
 // --- IMPORT MODUL UTAMA ---
-import TransaksiKgb from './components/TransaksiKgb.js'; 
-import MasterPegawai from './components/MasterPegawai.js'; 
+import TransaksiKgb from './components/TransaksiKgb.js';
+import MasterPegawai from './components/MasterPegawai.js';
 import MasterGaji from './components/MasterGaji.js';
 import MasterPejabat from './components/MasterPejabat.js';
 import MasterTemplate from './components/MasterTemplate.js';
@@ -48,8 +48,8 @@ const router = createRouter({
 // ============================================================
 // --- MANAJEMEN SESI (AUTO LOGOUT 1 JAM) ---
 // ============================================================
-const SESSION_KEY      = 'kgb_session_expiry';
-const SESSION_DURATION = 60 * 60 * 1000; // 1 jam dalam milidetik
+const SESSION_KEY = 'kgb_session_expiry';
+const SESSION_DURATION = 3 * 60 * 1000; // 1 jam dalam milidetik
 let sessionTimerId = null;
 
 const startSessionTimer = () => {
@@ -148,10 +148,10 @@ const app = createApp({
                 } else {
                     clearSessionTimer();
                     sessionStorage.removeItem('kgb_2fa_ok');
-                    store.user    = null;
+                    store.user = null;
                     store.profile = null;
                     store.pendingUser = null;
-                    store.authStep    = 'login';
+                    store.authStep = 'login';
                 }
 
                 store.setLoading(false);

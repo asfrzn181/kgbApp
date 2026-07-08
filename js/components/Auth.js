@@ -1,8 +1,8 @@
 import { ref, onMounted, watch } from 'vue';
-import { 
+import {
     auth, signInWithEmailAndPassword, signInWithPopup, googleProvider, signOut,
     db, doc, getDoc, setDoc, serverTimestamp
-} from '../firebase.js'; 
+} from '../firebase.js';
 import { store } from '../store.js';
 
 // IMPORT VIEW HTML
@@ -15,7 +15,7 @@ export default {
         // ============================================================
         // STEP 1: Email/Password
         // ============================================================
-        const email    = ref('');
+        const email = ref('');
         const password = ref('');
         const errorMsg = ref('');
 
@@ -23,8 +23,8 @@ export default {
         // ============================================================
         // STEP 2 (Setup QR) & STEP 3 (Verify TOTP)
         // ============================================================
-        const totpCode   = ref('');
-        const qrDataUrl  = ref('');
+        const totpCode = ref('');
+        const qrDataUrl = ref('');
         const tempSecret = ref('');
         const isVerifying = ref(false);
         const attemptCount = ref(0);
@@ -43,12 +43,12 @@ export default {
                 // onAuthStateChanged di main.js akan cek 2FA dan set store.authStep
             } catch (e) {
                 console.error('Login Error:', e.code, e.message);
-                if      (e.code === 'auth/invalid-email')      errorMsg.value = 'Format email salah.';
-                else if (e.code === 'auth/user-not-found')     errorMsg.value = 'Akun tidak ditemukan.';
-                else if (e.code === 'auth/wrong-password')     errorMsg.value = 'Password salah.';
+                if (e.code === 'auth/invalid-email') errorMsg.value = 'Format email salah.';
+                else if (e.code === 'auth/user-not-found') errorMsg.value = 'Akun tidak ditemukan.';
+                else if (e.code === 'auth/wrong-password') errorMsg.value = 'Password salah.';
                 else if (e.code === 'auth/invalid-credential') errorMsg.value = 'Email atau password salah.';
-                else if (e.code === 'auth/too-many-requests')  errorMsg.value = 'Terlalu banyak percobaan. Akun dikunci sementara.';
-                else                                            errorMsg.value = 'Gagal login. Cek koneksi internet.';
+                else if (e.code === 'auth/too-many-requests') errorMsg.value = 'Terlalu banyak percobaan. Akun dikunci sementara.';
+                else errorMsg.value = 'Gagal login. Cek koneksi internet.';
 
                 password.value = '';
                 store.setLoading(false);
@@ -64,7 +64,7 @@ export default {
                 // onAuthStateChanged di main.js menangani selebihnya
             } catch (e) {
                 console.error('Google Login Error:', e.code, e.message);
-                if      (e.code === 'auth/popup-closed-by-user')    errorMsg.value = 'Login dibatalkan.';
+                if (e.code === 'auth/popup-closed-by-user') errorMsg.value = 'Login dibatalkan.';
                 else if (e.code !== 'auth/cancelled-popup-request') errorMsg.value = 'Login Google gagal. Coba lagi.';
                 store.setLoading(false);
             }
@@ -94,11 +94,11 @@ export default {
                 tempSecret.value = secret.base32;
 
                 const totp = new window.OTPAuth.TOTP({
-                    issuer:    'SIMPEL KGB',
-                    label:     user.email,
+                    issuer: 'MASPRI',
+                    label: user.email,
                     algorithm: 'SHA1',
-                    digits:    6,
-                    period:    30,
+                    digits: 6,
+                    period: 30,
                     secret
                 });
 
@@ -108,7 +108,7 @@ export default {
                 // Generate QR — coba library dulu, fallback ke external API
                 if (window.QRCode && typeof window.QRCode.toDataURL === 'function') {
                     qrDataUrl.value = await new Promise((resolve, reject) => {
-                        window.QRCode.toDataURL(otpauthUrl, { 
+                        window.QRCode.toDataURL(otpauthUrl, {
                             width: 220, margin: 2, errorCorrectionLevel: 'M'
                         }, (err, url) => {
                             if (err) reject(err);
@@ -164,8 +164,8 @@ export default {
             isVerifying.value = true;
             try {
                 const totp = new window.OTPAuth.TOTP({
-                    secret:    window.OTPAuth.Secret.fromBase32(tempSecret.value),
-                    period:    30, digits: 6, algorithm: 'SHA1'
+                    secret: window.OTPAuth.Secret.fromBase32(tempSecret.value),
+                    period: 30, digits: 6, algorithm: 'SHA1'
                 });
                 if (totp.validate({ token: totpCode.value, window: 1 }) === null) {
                     errorMsg.value = 'Kode salah. Pastikan waktu HP Anda sudah tepat dan coba lagi.';
@@ -176,8 +176,8 @@ export default {
                 // Simpan secret ke Firestore
                 const user = store.pendingUser;
                 await setDoc(doc(db, 'user_2fa', user.uid), {
-                    secret:   tempSecret.value,
-                    enabled:  true,
+                    secret: tempSecret.value,
+                    enabled: true,
                     setup_at: serverTimestamp()
                 });
 
@@ -205,7 +205,7 @@ export default {
             }
             isVerifying.value = true;
             try {
-                const user    = store.pendingUser;
+                const user = store.pendingUser;
                 const docSnap = await getDoc(doc(db, 'user_2fa', user.uid));
 
                 if (!docSnap.exists()) {
@@ -214,8 +214,8 @@ export default {
                 }
 
                 const totp = new window.OTPAuth.TOTP({
-                    secret:    window.OTPAuth.Secret.fromBase32(docSnap.data().secret),
-                    period:    30, digits: 6, algorithm: 'SHA1'
+                    secret: window.OTPAuth.Secret.fromBase32(docSnap.data().secret),
+                    period: 30, digits: 6, algorithm: 'SHA1'
                 });
 
                 if (totp.validate({ token: totpCode.value, window: 1 }) === null) {
@@ -244,26 +244,26 @@ export default {
 
         // Helper: selesaikan login setelah 2FA berhasil
         const startSessionAfter2FA = async (user) => {
-            store.authStep    = 'login';
+            store.authStep = 'login';
             store.pendingUser = null;
             await store.fetchUserProfile(user);
         };
 
         // Batal 2FA, kembali ke Step 1
         const cancelToStep1 = async () => {
-            store.authStep    = 'login';
+            store.authStep = 'login';
             store.pendingUser = null;
             sessionStorage.removeItem('kgb_2fa_ok');
-            try { await signOut(auth); } catch (_) {}
+            try { await signOut(auth); } catch (_) { }
             totpCode.value = '';
             errorMsg.value = '';
-            email.value    = '';
+            email.value = '';
             password.value = '';
 
         };
 
 
-        return { 
+        return {
             // Step 1
             email, password, errorMsg, handleLogin, handleGoogleLogin, store,
 
