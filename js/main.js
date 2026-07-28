@@ -49,7 +49,7 @@ const router = createRouter({
 // --- MANAJEMEN SESI (AUTO LOGOUT 1 JAM) ---
 // ============================================================
 const SESSION_KEY = 'kgb_session_expiry';
-const SESSION_DURATION = 3 * 60 * 1000; // 1 jam dalam milidetik
+const SESSION_DURATION = 300 * 60 * 1000; // 1 jam dalam milidetik
 let sessionTimerId = null;
 
 const startSessionTimer = () => {
