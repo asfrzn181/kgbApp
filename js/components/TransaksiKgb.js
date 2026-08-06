@@ -920,7 +920,8 @@ export default {
                 KOP: kopT, ALAMAT_KOP: kopA, NOMOR_NASKAH: item.nomor_naskah || "....................", TANGGAL_NASKAH: previewTab.value === 'TTE' ? "${tanggal_naskah}" : tanggalSurat,
                 SIFAT: "Biasa", TTD_PENGIRIM: ttdContent, JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp,
                 NAMA_PENGIRIM: pjn || "${nama_pengirim}", NIP_PENGIRIM: pjnip || "${nip_pengirim}",
-                LOKASI_PEMBERI_GAJI: item.lokasi_pemberi_gaji || "Sungailiat"
+                LOKASI_PEMBERI_GAJI: item.lokasi_pemberi_gaji || "Sungailiat",
+                lokasi_pemberi_gaji: item.lokasi_pemberi_gaji || "Sungailiat"
             });
             return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
         };
