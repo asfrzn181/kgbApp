@@ -919,7 +919,8 @@ export default {
                 MASA_PERJANJIAN_KERJA: item.masa_perjanjian || "-", PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian || "-",
                 KOP: kopT, ALAMAT_KOP: kopA, NOMOR_NASKAH: item.nomor_naskah || "....................", TANGGAL_NASKAH: previewTab.value === 'TTE' ? "${tanggal_naskah}" : tanggalSurat,
                 SIFAT: "Biasa", TTD_PENGIRIM: ttdContent, JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp,
-                NAMA_PENGIRIM: pjn || "${nama_pengirim}", NIP_PENGIRIM: pjnip || "${nip_pengirim}"
+                NAMA_PENGIRIM: pjn || "${nama_pengirim}", NIP_PENGIRIM: pjnip || "${nip_pengirim}",
+                LOKASI_PEMBERI_GAJI: item.lokasi_pemberi_gaji || "Sungailiat"
             });
             return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
         };
@@ -1203,16 +1204,16 @@ export default {
             const d = event.data.payload;
             if (!d) return;
 
-            if (d.nama)            form.nama            = d.nama;
-            if (d.unit_kerja)      form.unit_kerja      = d.unit_kerja;
+            if (d.nama) form.nama = d.nama;
+            if (d.unit_kerja) form.unit_kerja = d.unit_kerja;
             if (d.perangkat_daerah) form.perangkat_daerah = d.perangkat_daerah;
-            if (d.jabatan)         form.jabatan         = d.jabatan;
-            
+            if (d.jabatan) form.jabatan = d.jabatan;
+
             if (d.golongan_kode) {
                 form.golongan = d.golongan_kode;
                 handleGolonganChange(d.golongan_kode);
             }
-            
+
             showToast(`✅ Data SIASN diimport: ${d.nama || ''}`, 'success');
         };
 
