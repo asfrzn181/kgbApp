@@ -218,62 +218,101 @@
 
   <script>
     // ================================================================
-    // AUTO-UPDATE SERVICE WORKER
-    // Algoritma: Deteksi SW baru → paksa reload otomatis
-    // User TIDAK perlu refresh manual, hapus cache, atau hapus cookies
+    // AUTO-UPDATE SERVICE WORKER — SELF-HEALING AGRESIF
+    // Menangani kasus browser yang masih terjebak di cache lama.
+    // Algoritma:
+    //  [0] Hapus semua SW lama (yang pakai ?v=timestamp) + cache lama
+    //  [1] Listen pesan SW_UPDATED dari SW baru → reload otomatis
+    //  [2] Listen controllerchange → reload otomatis
+    //  [3] Register SW baru, trigger SKIP_WAITING saat update ditemukan
+    //  [4] Cek update periodik setiap 5 menit
     // ================================================================
-    if ('serviceWorker' in navigator) {
+    (async function initSW() {
+      if (!('serviceWorker' in navigator)) return;
 
-      // [1] Deteksi apakah halaman ini dikontrol SW lama
-      let refreshing = false;
+      const VALID_CACHES = ['maspri-app-v4.0', 'maspri-vendor-v1'];
+
+      // ── [0] SELF-HEALING: Bersihkan SW & cache lama ─────────────────
+      try {
+        // a) Unregister semua SW lama (termasuk yang pakai ?v=timestamp)
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          const url = (reg.active || reg.installing || reg.waiting)?.scriptURL || '';
+          if (url.includes('sw.js?v=') || url.includes('sw.js?v')) {
+            console.log('[SW] Unregister SW lama:', url);
+            await reg.unregister();
+          }
+        }
+
+        // b) Hapus semua cache yang tidak dikenal / sudah expired
+        const cacheKeys = await caches.keys();
+        await Promise.all(
+          cacheKeys
+            .filter(k => !VALID_CACHES.includes(k))
+            .map(k => {
+              console.log('[SW] Hapus cache lama dari halaman:', k);
+              return caches.delete(k);
+            })
+        );
+      } catch (e) {
+        console.warn('[SW] Self-healing error (non-fatal):', e);
+      }
+
+      // ── [1] Terima pesan SW_UPDATED dari Service Worker ─────────────
+      // Menangani kasus di mana halaman lama tidak punya controllerchange listener
+      let reloading = false;
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SW_UPDATED') {
+          if (reloading) return;
+          reloading = true;
+          console.log('[SW] Pesan SW_UPDATED diterima → reload halaman...');
+          window.location.reload();
+        }
+      });
+
+      // ── [2] Deteksi controllerchange (SW baru mengambil alih) ───────
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        // SW baru sudah aktif dan mengambil alih → reload halaman
-        if (refreshing) return;
-        refreshing = true;
+        if (reloading) return;
+        reloading = true;
         console.log('[SW] Controller baru aktif → reload halaman...');
         window.location.reload();
       });
 
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then((registration) => {
-            console.log('[SW] Terdaftar:', registration.scope);
+      // ── [3] Register SW baru & trigger update ───────────────────────
+      window.addEventListener('load', async () => {
+        try {
+          const registration = await navigator.serviceWorker.register('./sw.js');
+          console.log('[SW] Terdaftar:', registration.scope);
 
-            // [2] Cek update langsung setelah register
-            registration.update();
+          // Cek update langsung
+          registration.update();
 
-            // [3] Listener saat SW baru ditemukan & selesai install
-            registration.addEventListener('updatefound', () => {
-              const newWorker = registration.installing;
-              if (!newWorker) return;
+          // Listener saat SW baru ditemukan & selesai install
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            if (!newWorker) return;
 
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed') {
-                  if (navigator.serviceWorker.controller) {
-                    // Ada SW lama yang aktif → kirim perintah SKIP_WAITING
-                    // SW baru akan skip antrian & langsung klaim tab
-                    // → memicu 'controllerchange' di atas → reload otomatis
-                    console.log('[SW] Update tersedia → memperbarui otomatis...');
-                    newWorker.postMessage({ type: 'SKIP_WAITING' });
-                  }
-                }
-              });
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // SW baru siap → kirim SKIP_WAITING → activate → broadcast SW_UPDATED → reload
+                console.log('[SW] Update tersedia → skip waiting...');
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+              }
             });
-          })
-          .catch((err) => {
-            console.warn('[SW] Registrasi gagal:', err);
           });
+        } catch (err) {
+          console.warn('[SW] Registrasi gagal:', err);
+        }
 
-        // [4] Cek update periodik setiap 5 menit (tanpa harus refresh)
+        // ── [4] Cek update periodik setiap 5 menit ───────────────────
         setInterval(async () => {
           try {
             const reg = await navigator.serviceWorker.ready;
             await reg.update();
-            console.log('[SW] Pengecekan update periodik selesai.');
           } catch (e) { /* silent */ }
         }, 5 * 60 * 1000);
       });
-    }
+    })();
   </script>
 </body>
 

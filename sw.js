@@ -65,21 +65,30 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((name) => {
-          // Hapus cache APP versi lama (semua selain yang aktif sekarang)
-          if (name.startsWith(CACHE_APP_PREFIX) && name !== CACHE_APP) {
-            console.log('[SW] Hapus cache app lama:', name);
+          // Hapus SEMUA cache lama — termasuk maspri-v3.1-cache, dll
+          if (name !== CACHE_APP && name !== CACHE_VENDOR) {
+            console.log('[SW] Hapus cache lama:', name);
             return caches.delete(name);
           }
           return null;
         })
       );
-    }).then(() => {
-      // clients.claim → langsung kendalikan semua tab yang sudah terbuka
-      // Ini yang memungkinkan SW baru bekerja TANPA user reload manual
-      return self.clients.claim();
+    })
+    .then(() => self.clients.claim())
+    .then(() => {
+      // Broadcast ke SEMUA tab/window yang terbuka agar reload
+      // Ini mengatasi kasus di mana halaman lama tidak punya controllerchange listener
+      return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+        .then((clients) => {
+          clients.forEach((client) => {
+            console.log('[SW] Kirim SW_UPDATED ke tab:', client.url);
+            client.postMessage({ type: 'SW_UPDATED' });
+          });
+        });
     })
   );
 });
+
 
 // ── FETCH ─────────────────────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
