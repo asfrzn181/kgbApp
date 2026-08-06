@@ -925,15 +925,25 @@ export default {
         };
 
         const previewSK = async (item) => {
-            if (!window.docx) return showToast("Library Preview Missing", 'error');
+            // Cek library docx-preview (expose sebagai window.docx dengan method renderAsync)
+            if (!window.docx || typeof window.docx.renderAsync !== 'function') {
+                showToast("Library Preview (docx-preview) belum siap. Coba refresh halaman.", 'error');
+                return;
+            }
             showPreviewModal.value = true; previewLoading.value = true; currentPreviewItem.value = item; previewTab.value = 'TTE';
             await nextTick();
             try {
                 if (!currentPreviewItem.value) return;
                 const blob = await generateDocBlob(currentPreviewItem.value);
                 const container = document.getElementById('docx-preview-container');
-                if (container) { container.innerHTML = ''; await window.docx.renderAsync(blob, container); }
-            } catch (e) { showToast("Gagal Preview", 'error'); }
+                if (container) {
+                    container.innerHTML = '';
+                    await window.docx.renderAsync(blob, container);
+                }
+            } catch (e) {
+                console.error('[previewSK] Error:', e);
+                showToast("Gagal Preview: " + (e.message || e), 'error');
+            }
             finally { previewLoading.value = false; }
         };
 
@@ -943,7 +953,9 @@ export default {
                 const blob = await generateDocBlob(currentPreviewItem.value);
                 const container = document.getElementById('docx-preview-container');
                 if (container) { container.innerHTML = ''; await window.docx.renderAsync(blob, container); }
-            } catch (e) { } finally { previewLoading.value = false; }
+            } catch (e) {
+                console.error('[changePreviewTab] Error:', e);
+            } finally { previewLoading.value = false; }
         };
         const openSrikandi = async (item) => {
             previewTab.value = 'TTE';

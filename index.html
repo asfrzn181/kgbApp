@@ -217,34 +217,61 @@
   </script>
 
   <script>
+    // ================================================================
+    // AUTO-UPDATE SERVICE WORKER
+    // Algoritma: Deteksi SW baru → paksa reload otomatis
+    // User TIDAK perlu refresh manual, hapus cache, atau hapus cookies
+    // ================================================================
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        // Register SW dengan timestamp agar browser ngecek update
-        navigator.serviceWorker.register('./sw.js?v=' + new Date().getTime())
-          .then((registration) => {
-            console.log('SW Registered:', registration.scope);
 
-            // Cek update saat ini juga
+      // [1] Deteksi apakah halaman ini dikontrol SW lama
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        // SW baru sudah aktif dan mengambil alih → reload halaman
+        if (refreshing) return;
+        refreshing = true;
+        console.log('[SW] Controller baru aktif → reload halaman...');
+        window.location.reload();
+      });
+
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((registration) => {
+            console.log('[SW] Terdaftar:', registration.scope);
+
+            // [2] Cek update langsung setelah register
             registration.update();
 
-            registration.onupdatefound = () => {
-              const installingWorker = registration.installing;
-              installingWorker.onstatechange = () => {
-                if (installingWorker.state === 'installed') {
+            // [3] Listener saat SW baru ditemukan & selesai install
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              if (!newWorker) return;
+
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed') {
                   if (navigator.serviceWorker.controller) {
-                    console.log('New content available, please refresh.');
-                    // Opsional: Paksa reload jika ada update kritikal
-                    // window.location.reload(); 
-                  } else {
-                    console.log('Content is cached for offline use.');
+                    // Ada SW lama yang aktif → kirim perintah SKIP_WAITING
+                    // SW baru akan skip antrian & langsung klaim tab
+                    // → memicu 'controllerchange' di atas → reload otomatis
+                    console.log('[SW] Update tersedia → memperbarui otomatis...');
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
                   }
                 }
-              };
-            };
+              });
+            });
           })
           .catch((err) => {
-            console.log('SW Registration failed:', err);
+            console.warn('[SW] Registrasi gagal:', err);
           });
+
+        // [4] Cek update periodik setiap 5 menit (tanpa harus refresh)
+        setInterval(async () => {
+          try {
+            const reg = await navigator.serviceWorker.ready;
+            await reg.update();
+            console.log('[SW] Pengecekan update periodik selesai.');
+          } catch (e) { /* silent */ }
+        }, 5 * 60 * 1000);
       });
     }
   </script>

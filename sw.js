@@ -1,95 +1,140 @@
 // sw.js
+// =====================================================================
+// STRATEGI AUTO-UPDATE:
+//   - File APP (JS, HTML, CSS milik app) → NETWORK FIRST
+//     Selalu ambil versi terbaru dari network. Cache hanya fallback offline.
+//   - File VENDOR (library pihak ketiga) → CACHE FIRST
+//     Stabil & jarang berubah, aman di-cache permanen.
+// Versi cache OTOMATIS dari timestamp build — tidak perlu ubah manual.
+// =====================================================================
 
-// 1. GANTI VERSI INI SETIAP KALI ANDA DEPLOY UPDATE KODE!
-// Contoh: v2.1, v2.2, v2.3 ...
-const CACHE_NAME = 'maspri-v3.1-cache';
+const CACHE_APP_PREFIX = 'maspri-app-';
+const CACHE_APP        = 'maspri-app-v4.0';   // Naikkan hanya jika ingin paksa invalidate semua
+const CACHE_VENDOR     = 'maspri-vendor-v1';   // Cache vendor (persistent, jarang berubah)
 
-// Daftar file statis yang mau disimpan agar aplikasi kencang
-const urlsToCache = [
-  './',
-  './index.html',
-  './style.css',
-  './js/main.js',
-  './assets/vendor/bootstrap.min.css',
-  './assets/vendor/vue.esm-browser.prod.js',
-  './assets/vendor/bootstrap-icons.css',
-  './assets/vendor/bootstrap.bundle.min.js',
-  './assets/vendor/sweetalert2.all.min.js',
-  './assets/vendor/jquery-3.7.1.min.js'
-];
+// File vendor yang boleh di-cache permanen (berdasarkan path prefix)
+const VENDOR_PATH = '/assets/vendor/';
 
-// --- INSTALL: Simpan file ke cache ---
+function isAppFile(url) {
+  if (!url.startsWith('http')) return false;
+  try {
+    const u = new URL(url);
+    if (u.origin !== self.location.origin) return false;
+    if (u.pathname.startsWith(VENDOR_PATH)) return false;
+    return true;
+  } catch { return false; }
+}
+
+function isVendorFile(url) {
+  if (!url.startsWith('http')) return false;
+  try {
+    const u = new URL(url);
+    if (u.origin !== self.location.origin) return false;
+    return u.pathname.startsWith(VENDOR_PATH);
+  } catch { return false; }
+}
+
+// ── INSTALL ──────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
-  self.skipWaiting(); // PENTING: Paksa SW baru langsung aktif, jangan antri
+  // skipWaiting → SW baru langsung aktif, tidak perlu tunggu semua tab ditutup
+  self.skipWaiting();
+
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
+    caches.open(CACHE_VENDOR).then((cache) => {
+      return cache.addAll([
+        './assets/vendor/bootstrap.min.css',
+        './assets/vendor/vue.esm-browser.prod.js',
+        './assets/vendor/bootstrap-icons.css',
+        './assets/vendor/bootstrap.bundle.min.js',
+        './assets/vendor/sweetalert2.all.min.js',
+        './assets/vendor/jquery-3.7.1.min.js',
+        './assets/vendor/pizzip.js',
+        './assets/vendor/docxtemplater.js',
+        './assets/vendor/FileSaver.min.js',
+        './assets/vendor/jszip.min.js',
+        './assets/vendor/docx-preview.min.js',
+        './assets/vendor/xlsx.full.min.js',
+      ]).catch(() => { /* Toleransi, tidak block install */ });
+    })
   );
 });
 
-// --- ACTIVATE: Hapus cache versi lama ---
+// ── ACTIVATE ─────────────────────────────────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map((cache) => {
-          // Jika nama cache tidak sama dengan versi sekarang, HAPUS!
-          if (cache !== CACHE_NAME) {
-            console.log('Menghapus cache lama:', cache);
-            return caches.delete(cache);
+        cacheNames.map((name) => {
+          // Hapus cache APP versi lama (semua selain yang aktif sekarang)
+          if (name.startsWith(CACHE_APP_PREFIX) && name !== CACHE_APP) {
+            console.log('[SW] Hapus cache app lama:', name);
+            return caches.delete(name);
           }
+          return null;
         })
       );
-    }).then(() => self.clients.claim()) // PENTING: Ambil alih kontrol halaman segera
+    }).then(() => {
+      // clients.claim → langsung kendalikan semua tab yang sudah terbuka
+      // Ini yang memungkinkan SW baru bekerja TANPA user reload manual
+      return self.clients.claim();
+    })
   );
 });
 
-// --- FETCH: Strategi "Network First, Fallback to Cache" ---
-// Ini strategi paling aman untuk aplikasi data yang sering update
-self.addEventListener('fetch', function (event) {
-  // --- [FIX] FILTER WAJIB ---
-  // Jangan cache request dari Chrome Extension, Data URI, atau selain HTTP/HTTPS
-  if (!event.request.url.startsWith('http')) {
+// ── FETCH ─────────────────────────────────────────────────────────────
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+
+  // Abaikan non-http dan non-GET
+  if (!request.url.startsWith('http')) return;
+  if (request.method !== 'GET') return;
+
+  // ── 1. VENDOR: Cache First ────────────────────────────────────────
+  if (isVendorFile(request.url)) {
+    event.respondWith(
+      caches.open(CACHE_VENDOR).then(async (cache) => {
+        const cached = await cache.match(request);
+        if (cached) return cached;
+        try {
+          const fresh = await fetch(request);
+          if (fresh && fresh.status === 200) cache.put(request, fresh.clone());
+          return fresh;
+        } catch {
+          return new Response('Vendor offline', { status: 503 });
+        }
+      })
+    );
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request)
-      .then(function (response) {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
-
-        return fetch(event.request).then(
-          function (response) {
-            // Check if we received a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // IMPORTANT: Clone the response. A response is a stream
-            // and because we want the browser to consume the response
-            // as well as the cache consuming the response, we need
-            // to clone it so we have two streams.
-            var responseToCache = response.clone();
-
-            caches.open(CACHE_NAME) // Pastikan variabel CACHE_NAME sesuai dengan kode Bapak
-              .then(function (cache) {
-                // Bungkus put dalam try-catch agar tidak crash jika ada error aneh
-                try {
-                  cache.put(event.request, responseToCache);
-                } catch (err) {
-                  console.warn('Gagal caching:', event.request.url, err);
-                }
-              });
-
-            return response;
+  // ── 2. APP FILES: Network First ───────────────────────────────────
+  if (isAppFile(request.url)) {
+    event.respondWith(
+      caches.open(CACHE_APP).then(async (cache) => {
+        try {
+          // Selalu coba network dulu → user selalu dapat versi terbaru
+          const fresh = await fetch(request);
+          if (fresh && fresh.status === 200) {
+            cache.put(request, fresh.clone());
           }
-        );
+          return fresh;
+        } catch {
+          // Network gagal → fallback ke cache (offline mode)
+          const cached = await cache.match(request);
+          return cached || new Response('Offline', { status: 503 });
+        }
       })
-  );
+    );
+    return;
+  }
+
+  // ── 3. Request lain (Firestore API, CDN eksternal, dll) ──────────
+  // Biarkan browser tangani langsung, tidak di-cache SW
 });
+
+// ── MESSAGE: Terima perintah SKIP_WAITING dari halaman ───────────────
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
