@@ -293,7 +293,7 @@ export default {
         const form = reactive({
             nip: '', nama: '', tempat_lahir: '', tgl_lahir: '', tipe_asn: 'PNS',
             perangkat_daerah: '', unit_kerja: '', jabatan: '', pangkat: '',
-            jenis_jabatan: 'Pelaksana', is_pensiun_manual: false,
+            jenis_jabatan: 'Pelaksana', lokasi_pemberi_gaji: 'Sungailiat', is_pensiun_manual: false,
             dasar_hukum: '', dasar_nomor: '', dasar_tanggal: '', dasar_pejabat: '',
             dasar_tmt: '', dasar_golongan: '', dasar_mk_tahun: 0, dasar_mk_bulan: 0, dasar_gaji_lama: 0,
             golongan: '', mk_baru_tahun: 0, mk_baru_bulan: 0, gaji_baru: 0, perpres: '',
@@ -772,7 +772,7 @@ export default {
             else {
                 isEditMode.value = false; formId.value = null;
                 Object.keys(form).forEach(k => form[k] = (typeof form[k] === 'number' ? 0 : ''));
-                form.tipe_asn = 'PNS'; form.mk_baru_tahun = 0; currentBup.value = 58; form.jenis_jabatan = 'Pelaksana'; form.perpres = '';
+                form.tipe_asn = 'PNS'; form.mk_baru_tahun = 0; currentBup.value = 58; form.jenis_jabatan = 'Pelaksana'; form.lokasi_pemberi_gaji = 'Sungailiat'; form.perpres = '';
             }
             showModal.value = true;
         };
@@ -784,6 +784,7 @@ export default {
                 let pjSnap = {}; if (form.pejabat_baru_nip) { const p = listPejabat.value.find(x => x.nip === form.pejabat_baru_nip); if (p) pjSnap = { pejabat_baru_nama: p.jabatan, pejabat_baru_pangkat: p.pangkat }; }
                 const safeForm = { ...form }; delete safeForm.eselon;
                 if (safeForm.jenis_jabatan === undefined) safeForm.jenis_jabatan = 'Pelaksana';
+                if (safeForm.lokasi_pemberi_gaji === undefined) safeForm.lokasi_pemberi_gaji = 'Sungailiat';
                 if (safeForm.golongan === undefined) safeForm.golongan = '';
 
                 safeForm.jabatan = formatTitleCase(safeForm.jabatan);

@@ -413,12 +413,25 @@ export const TplMain = `
                                         <label class="form-label small text-muted">Perangkat Daerah</label>
                                         <AutocompletePerangkatDaerah v-model="form.perangkat_daerah" />
                                     </div>
-                                    <div class="col-12 col-md-6">
+                                    <div class="col-12 col-md-3">
                                         <label class="form-label small text-muted">Jenis Jabatan</label>
                                         <select v-model="form.jenis_jabatan" class="form-select">
                                             <option value="Pelaksana">Pelaksana</option>
                                             <option value="Fungsional">Fungsional</option>
                                             <option value="Struktural">Struktural</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label small text-muted">Lokasi Pemberi Gaji</label>
+                                        <select v-model="form.lokasi_pemberi_gaji" class="form-select">
+                                            <option value="Sungailiat">Sungailiat</option>
+                                            <option value="Merawang">Merawang</option>
+                                            <option value="Pemali">Pemali</option>
+                                            <option value="Belinyu">Belinyu</option>
+                                            <option value="Mendo Barat">Mendo Barat</option>
+                                            <option value="Riau Silip">Riau Silip</option>
+                                            <option value="Puding Besar">Puding Besar</option>
+                                            <option value="Bakam">Bakam</option>
                                         </select>
                                     </div>
                                 </div>
