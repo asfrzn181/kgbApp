@@ -773,61 +773,44 @@ export default {
             else {
                 isEditMode.value = false; formId.value = null;
                 Object.keys(form).forEach(k => form[k] = (typeof form[k] === 'number' ? 0 : ''));
-                form.tipe_asn = 'PNS'; form.mk_baru_tahun = 0; currentBup.value = 58; form.jenis_jabatan = 'Pelaksana'; form.lokasi_pemberi_gaji = 'Sungailiat'; form.perpres = '';
+                form.tipe_asn = 'PNS'; form.mk_baru_tahun = 0; currentBup.value = 58;
+                form.jenis_jabatan = 'Pelaksana'; form.lokasi_pemberi_gaji = 'Sungailiat'; form.perpres = '';
+
+                // Default dasar_hukum → item ke-2 (index 1) dari listDasarHukum
+                if (listDasarHukum.value.length >= 2) {
+                    form.dasar_hukum = listDasarHukum.value[1].judul;
+                } else if (listDasarHukum.value.length === 1) {
+                    form.dasar_hukum = listDasarHukum.value[0].judul;
+                }
 
                 // ⭐ CEK REMINDER DATA: Jika user klik dari Dashboard Reminder
                 const rd = store.reminderData;
                 if (rd) {
-                    // 1. Pre-fill NIP & Nama
                     form.nip = rd.nip || '';
                     form.nama = rd.nama || '';
                     if (form.nip) form.tgl_lahir = extractTglLahir(form.nip);
 
-                    // 2. TMT Sekarang = tmt_kgb_berikutnya dari reminder
+                    // TMT Sekarang KGB Baru = tmt_kgb_berikutnya dari reminder
                     form.tmt_sekarang = rd.tmt_sekarang || '';
 
-                    // 3. Dasar SK Lama: ambil dari data reminder
-                    // dasar_tmt = tmt_sekarang reminder (TMT KGB yg sedang berjalan = dasar KGB berikutnya)
-                    // Hitung dasar_tmt: tmt_sekarang - 2 tahun (TMT SK Lama)
-                    if (rd.tmt_sekarang) {
-                        try {
-                            const tmtNext = new Date(rd.tmt_sekarang);
-                            const tmtOld = new Date(tmtNext);
-                            tmtOld.setFullYear(tmtOld.getFullYear() - 2);
-                            form.dasar_tmt = tmtOld.toISOString().split('T')[0];
-                        } catch(e) {}
-                    }
-
-                    // 4. Dasar Golongan = golongan saat ini (dari reminder)
-                    if (rd.golongan) {
-                        form.dasar_golongan = rd.golongan;
-                        form.golongan = rd.golongan; // Golongan baru (biasanya sama untuk KGB)
-                        handleGolonganChange(rd.golongan);
-                    }
-
-                    // 5. Dasar MK = MK dari KGB sebelumnya
-                    form.dasar_mk_tahun = rd.dasar_mk_tahun || 0;
-                    form.dasar_mk_bulan = rd.dasar_mk_bulan || 0;
-
-                    // 6. MK Baru = MK Lama + 2 Tahun
-                    form.mk_baru_tahun = (rd.dasar_mk_tahun || 0) + 2;
-                    form.mk_baru_bulan = rd.dasar_mk_bulan || 0;
-
-                    // 7. Gaji Lama = Gaji Baru dari KGB sebelumnya
-                    if (rd.gaji_baru) form.dasar_gaji_lama = rd.gaji_baru;
-
-                    // 8. Default Dasar Hukum ke item ke-2 (index 1) jika listDasarHukum sudah ada
-                    if (listDasarHukum.value.length >= 2) {
-                        form.dasar_hukum = listDasarHukum.value[1].judul;
-                    } else if (listDasarHukum.value.length === 1) {
-                        form.dasar_hukum = listDasarHukum.value[0].judul;
-                    }
-
-                    // 9. Fetch data lengkap pegawai dari master_pegawai
+                    // --- PARALEL FETCH: Pegawai + KGB Lama ---
                     try {
-                        const snap = await getDoc(doc(db, "master_pegawai", rd.nip));
-                        if (snap.exists()) {
-                            const d = snap.data();
+                        const [snapPegawai, snapKgbLama] = await Promise.all([
+                            // A. Data Identitas dari master_pegawai
+                            getDoc(doc(db, "master_pegawai", rd.nip)),
+                            // B. Cari KGB LAMA terakhir dari usulan_kgb (yg punya tmt_sekarang = TMT lama)
+                            //    Ambil yg tmt_sekarang < tmt_sekarang baru, urutkan desc, limit 1
+                            getDocs(query(
+                                collection(db, "usulan_kgb"),
+                                where("nip", "==", rd.nip),
+                                orderBy("tmt_sekarang", "desc"),
+                                limit(3) // Ambil 3 teratas, kita filter di client
+                            ))
+                        ]);
+
+                        // === A. ISI IDENTITAS DARI MASTER PEGAWAI ===
+                        if (snapPegawai.exists()) {
+                            const d = snapPegawai.data();
                             if (d.nama) form.nama = d.nama;
                             if (d.tempat_lahir) form.tempat_lahir = d.tempat_lahir;
                             if (d.tgl_lahir) form.tgl_lahir = d.tgl_lahir;
@@ -837,26 +820,92 @@ export default {
                             if (d.tipe_asn) form.tipe_asn = d.tipe_asn;
                             if (d.jenis_jabatan) form.jenis_jabatan = formatTitleCase(String(d.jenis_jabatan || 'Pelaksana').trim());
                             if (d.pangkat) form.pangkat = d.pangkat;
-                            if (d.golongan_kode && !rd.golongan) {
-                                form.dasar_golongan = d.golongan_kode;
+                            if (d.lokasi_pemberi_gaji) form.lokasi_pemberi_gaji = d.lokasi_pemberi_gaji;
+                            // Golongan baru dari master pegawai
+                            if (d.golongan_kode) {
                                 form.golongan = d.golongan_kode;
                                 handleGolonganChange(d.golongan_kode);
                             }
-                            // Ambil lokasi pemberi gaji jika ada
-                            if (d.lokasi_pemberi_gaji) form.lokasi_pemberi_gaji = d.lokasi_pemberi_gaji;
                         }
-                    } catch(e) { console.error('Gagal fetch pegawai dari reminder:', e); }
 
-                    // 10. Bersihkan reminderData setelah dipakai
-                    store.reminderData = null;
-                    showToast(`Data reminder ${form.nama || rd.nip} berhasil dimuat.`, 'info');
-                } else {
-                    // Mode normal tanpa reminder: default dasar_hukum ke index 1 (Dokumen Dasar ke-2)
-                    if (listDasarHukum.value.length >= 2) {
-                        form.dasar_hukum = listDasarHukum.value[1].judul;
-                    } else if (listDasarHukum.value.length === 1) {
-                        form.dasar_hukum = listDasarHukum.value[0].judul;
+                        // === B. ISI DASAR SK LAMA DARI KGB TERAKHIR ===
+                        // Cari record KGB yang TMT-nya SEBELUM TMT baru ini
+                        const tmtBaru = rd.tmt_sekarang; // "YYYY-MM-DD"
+                        let kgbLama = null;
+
+                        if (!snapKgbLama.empty) {
+                            // Ambil record yg tmt_sekarang < tmt baru (KGB yang sudah ada sebelumnya)
+                            const docs = snapKgbLama.docs.map(d => ({ id: d.id, ...d.data() }));
+                            // Filter: ambil yg tmt_sekarang berbeda (bukan tmt baru) & terkecil/terbesar di bawah tmt baru
+                            kgbLama = docs.find(d => {
+                                const tmt = d.tmt_sekarang || '';
+                                return tmt < tmtBaru && tmt !== '';
+                            }) || docs[0]; // Fallback: ambil pertama
+                        }
+
+                        if (kgbLama) {
+                            // Dasar Surat (Jenis SK KGB)
+                            if (kgbLama.dasar_hukum) form.dasar_hukum = kgbLama.dasar_hukum;
+
+                            // Nomor SK Lama = nomor_naskah SK KGB lama
+                            if (kgbLama.nomor_naskah) form.dasar_nomor = kgbLama.nomor_naskah;
+                            else if (kgbLama.dasar_nomor) form.dasar_nomor = kgbLama.dasar_nomor;
+
+                            // Tanggal SK Lama
+                            if (kgbLama.tanggal_naskah) {
+                                // Firestore Timestamp atau string
+                                try {
+                                    const tgl = kgbLama.tanggal_naskah?.toDate
+                                        ? kgbLama.tanggal_naskah.toDate().toISOString().split('T')[0]
+                                        : kgbLama.tanggal_naskah;
+                                    form.dasar_tanggal = tgl;
+                                } catch(e) {}
+                            } else if (kgbLama.dasar_tanggal) {
+                                form.dasar_tanggal = kgbLama.dasar_tanggal;
+                            }
+
+                            // Pejabat TTD SK Lama
+                            if (kgbLama.dasar_pejabat) form.dasar_pejabat = kgbLama.dasar_pejabat;
+
+                            // TMT Gaji Lama = TMT Sekarang dari KGB lama
+                            if (kgbLama.tmt_sekarang) form.dasar_tmt = kgbLama.tmt_sekarang;
+
+                            // Golongan Lama
+                            if (kgbLama.golongan) {
+                                form.dasar_golongan = kgbLama.golongan;
+                                // Golongan baru biasanya sama (KGB tidak ubah golongan)
+                                if (!form.golongan) {
+                                    form.golongan = kgbLama.golongan;
+                                    handleGolonganChange(kgbLama.golongan);
+                                }
+                            }
+
+                            // MK Lama = MK Baru dari KGB lama
+                            form.dasar_mk_tahun = kgbLama.mk_baru_tahun || kgbLama.dasar_mk_tahun || 0;
+                            form.dasar_mk_bulan = kgbLama.mk_baru_bulan || kgbLama.dasar_mk_bulan || 0;
+
+                            // MK Baru = MK Lama + 2 Tahun
+                            form.mk_baru_tahun = form.dasar_mk_tahun + 2;
+                            form.mk_baru_bulan = form.dasar_mk_bulan;
+
+                            // Gaji Lama = Gaji Baru dari KGB lama
+                            if (kgbLama.gaji_baru) form.dasar_gaji_lama = kgbLama.gaji_baru;
+
+                            // Perpres (ikut dari KGB lama)
+                            if (kgbLama.perpres) form.perpres = kgbLama.perpres;
+
+                            showToast(`✅ Data KGB ${form.nama || rd.nip} + Dasar SK lama berhasil dimuat.`, 'success');
+                        } else {
+                            showToast(`Data ${form.nama || rd.nip} dimuat. Dasar SK belum ditemukan, isi manual.`, 'info');
+                        }
+
+                    } catch(e) {
+                        console.error('Gagal fetch data dari reminder:', e);
+                        showToast('Gagal memuat data reminder: ' + e.message, 'error');
                     }
+
+                    // Bersihkan reminderData setelah dipakai
+                    store.reminderData = null;
                 }
 
                 checkBup();
