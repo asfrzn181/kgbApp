@@ -5,6 +5,7 @@ import {
 } from '../firebase.js';
 import { formatTanggal, formatRupiah, formatTmtPendek, hitungHariLagi, showToast } from '../utils.js';
 import { store } from '../store.js';
+import { useRouter } from 'vue-router';
 
 // --- IMPORT VIEW HTML ---
 import { TplDashboard } from '../views/DashboardView.js';
@@ -12,6 +13,7 @@ import { TplDashboard } from '../views/DashboardView.js';
 export default {
     template: TplDashboard,
     setup() {
+        const router = useRouter();
         // STATE
         const listData = ref([]);
         const listReminder = ref([]);
@@ -148,6 +150,25 @@ export default {
             finally { loadingReminder.value = false; }
         };
 
+        // 5. OPEN KGB FORM FROM REMINDER
+        const openKgbFromReminder = (item) => {
+            // Simpan data reminder ke store (bridge ke TransaksiKgb)
+            store.reminderData = {
+                nip: item.nip,
+                nama: item.nama,
+                // tmt_kgb_berikutnya menjadi TMT Sekarang (KGB berikutnya)
+                tmt_sekarang: item.tmt_selanjutnya,
+                // tmt_selanjutnya baru akan dihitung otomatis (+2 thn)
+                // Simpan juga data lain jika ada
+                golongan: item.golongan || '',
+                dasar_mk_tahun: item.mk_baru_tahun || item.dasar_mk_tahun || 0,
+                dasar_mk_bulan: item.mk_baru_bulan || item.dasar_mk_bulan || 0,
+                gaji_baru: item.gaji_baru || 0, // Gaji baru lama → jadi gaji lama sekarang
+            };
+            // Navigasi ke halaman TransaksiKgb
+            router.push('/transaksi');
+        };
+
         onMounted(() => {
             fetchRecent();
             fetchMyInputs();
@@ -159,7 +180,7 @@ export default {
             listData, listReminder, loadingData, loadingReminder,
             store, stats, myInputCount, currentYear,
             fetchRecent, formatTanggal, formatRupiah, formatTmtPendek, hitungHariLagi,
-            rangeStart, rangeEnd
+            rangeStart, rangeEnd, openKgbFromReminder
         };
     }
 };

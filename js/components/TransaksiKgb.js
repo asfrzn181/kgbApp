@@ -12,6 +12,7 @@ import {
 import { TplSearchSelect, TplAutocompleteJabatan, TplAutocompleteUnitKerja, TplAutocompletePerangkatDaerah, TplMain } from '../views/TransaksiKgbView.js';
 import { srikandiBookmarklet, downloadSrikandiBookmartlet } from '../bookmartScript.js';
 import { siasnBookmarklet } from '../siasnBookmarklet.js';
+import { store } from '../store.js';
 
 
 const masterLoading = ref(false);
@@ -762,7 +763,7 @@ export default {
             }
         };
 
-        const openModal = (item = null) => {
+        const openModal = async (item = null) => {
             if (item) {
                 if (!item.id) { showToast("ID Error", 'error'); return; }
                 isEditMode.value = true; formId.value = item.id; Object.assign(form, item);
@@ -773,6 +774,92 @@ export default {
                 isEditMode.value = false; formId.value = null;
                 Object.keys(form).forEach(k => form[k] = (typeof form[k] === 'number' ? 0 : ''));
                 form.tipe_asn = 'PNS'; form.mk_baru_tahun = 0; currentBup.value = 58; form.jenis_jabatan = 'Pelaksana'; form.lokasi_pemberi_gaji = 'Sungailiat'; form.perpres = '';
+
+                // ⭐ CEK REMINDER DATA: Jika user klik dari Dashboard Reminder
+                const rd = store.reminderData;
+                if (rd) {
+                    // 1. Pre-fill NIP & Nama
+                    form.nip = rd.nip || '';
+                    form.nama = rd.nama || '';
+                    if (form.nip) form.tgl_lahir = extractTglLahir(form.nip);
+
+                    // 2. TMT Sekarang = tmt_kgb_berikutnya dari reminder
+                    form.tmt_sekarang = rd.tmt_sekarang || '';
+
+                    // 3. Dasar SK Lama: ambil dari data reminder
+                    // dasar_tmt = tmt_sekarang reminder (TMT KGB yg sedang berjalan = dasar KGB berikutnya)
+                    // Hitung dasar_tmt: tmt_sekarang - 2 tahun (TMT SK Lama)
+                    if (rd.tmt_sekarang) {
+                        try {
+                            const tmtNext = new Date(rd.tmt_sekarang);
+                            const tmtOld = new Date(tmtNext);
+                            tmtOld.setFullYear(tmtOld.getFullYear() - 2);
+                            form.dasar_tmt = tmtOld.toISOString().split('T')[0];
+                        } catch(e) {}
+                    }
+
+                    // 4. Dasar Golongan = golongan saat ini (dari reminder)
+                    if (rd.golongan) {
+                        form.dasar_golongan = rd.golongan;
+                        form.golongan = rd.golongan; // Golongan baru (biasanya sama untuk KGB)
+                        handleGolonganChange(rd.golongan);
+                    }
+
+                    // 5. Dasar MK = MK dari KGB sebelumnya
+                    form.dasar_mk_tahun = rd.dasar_mk_tahun || 0;
+                    form.dasar_mk_bulan = rd.dasar_mk_bulan || 0;
+
+                    // 6. MK Baru = MK Lama + 2 Tahun
+                    form.mk_baru_tahun = (rd.dasar_mk_tahun || 0) + 2;
+                    form.mk_baru_bulan = rd.dasar_mk_bulan || 0;
+
+                    // 7. Gaji Lama = Gaji Baru dari KGB sebelumnya
+                    if (rd.gaji_baru) form.dasar_gaji_lama = rd.gaji_baru;
+
+                    // 8. Default Dasar Hukum ke item ke-2 (index 1) jika listDasarHukum sudah ada
+                    if (listDasarHukum.value.length >= 2) {
+                        form.dasar_hukum = listDasarHukum.value[1].judul;
+                    } else if (listDasarHukum.value.length === 1) {
+                        form.dasar_hukum = listDasarHukum.value[0].judul;
+                    }
+
+                    // 9. Fetch data lengkap pegawai dari master_pegawai
+                    try {
+                        const snap = await getDoc(doc(db, "master_pegawai", rd.nip));
+                        if (snap.exists()) {
+                            const d = snap.data();
+                            if (d.nama) form.nama = d.nama;
+                            if (d.tempat_lahir) form.tempat_lahir = d.tempat_lahir;
+                            if (d.tgl_lahir) form.tgl_lahir = d.tgl_lahir;
+                            if (d.perangkat_daerah) form.perangkat_daerah = formatTitleCase(d.perangkat_daerah);
+                            if (d.unit_kerja) form.unit_kerja = formatTitleCase(d.unit_kerja);
+                            if (d.jabatan) form.jabatan = formatTitleCase(d.jabatan);
+                            if (d.tipe_asn) form.tipe_asn = d.tipe_asn;
+                            if (d.jenis_jabatan) form.jenis_jabatan = formatTitleCase(String(d.jenis_jabatan || 'Pelaksana').trim());
+                            if (d.pangkat) form.pangkat = d.pangkat;
+                            if (d.golongan_kode && !rd.golongan) {
+                                form.dasar_golongan = d.golongan_kode;
+                                form.golongan = d.golongan_kode;
+                                handleGolonganChange(d.golongan_kode);
+                            }
+                            // Ambil lokasi pemberi gaji jika ada
+                            if (d.lokasi_pemberi_gaji) form.lokasi_pemberi_gaji = d.lokasi_pemberi_gaji;
+                        }
+                    } catch(e) { console.error('Gagal fetch pegawai dari reminder:', e); }
+
+                    // 10. Bersihkan reminderData setelah dipakai
+                    store.reminderData = null;
+                    showToast(`Data reminder ${form.nama || rd.nip} berhasil dimuat.`, 'info');
+                } else {
+                    // Mode normal tanpa reminder: default dasar_hukum ke index 1 (Dokumen Dasar ke-2)
+                    if (listDasarHukum.value.length >= 2) {
+                        form.dasar_hukum = listDasarHukum.value[1].judul;
+                    } else if (listDasarHukum.value.length === 1) {
+                        form.dasar_hukum = listDasarHukum.value[0].judul;
+                    }
+                }
+
+                checkBup();
             }
             showModal.value = true;
         };
@@ -1264,11 +1351,16 @@ export default {
 
 
         onMounted(() => {
-            onAuthStateChanged(auth, (user) => {
+            onAuthStateChanged(auth, async (user) => {
                 if (user) {
-                    initRefs(); // ⭐ Panggil di sini
+                    await initRefs(); // ⭐ Panggil di sini (await agar listDasarHukum siap)
                     fetchTable(1);
                     window.addEventListener('message', handleSIASNMessage);
+
+                    // ⭐ Jika ada data reminder dari Dashboard, langsung buka form
+                    if (store.reminderData) {
+                        openModal(); // openModal() akan cek store.reminderData secara internal
+                    }
                 } else {
                     listData.value = [];
                     window.removeEventListener('message', handleSIASNMessage);

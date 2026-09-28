@@ -7,6 +7,7 @@ export const store = reactive({
     isLoading: true,     // Indikator Loading Global
     pendingUser: null,   // User yang menunggu verifikasi 2FA
     authStep: 'login',   // 'login' | 'setup_2fa' | 'verify_2fa'
+    reminderData: null,  // Data reminder yang diklik dari Dashboard (untuk pre-fill form KGB)
 
     // Getter: Cek apakah user adalah admin
     get isAdmin() {

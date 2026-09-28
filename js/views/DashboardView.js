@@ -76,14 +76,21 @@ export const TplDashboard = `
                         Tidak ada KGB jatuh tempo (2 bulan ke depan).
                     </div>
                     <ul v-else class="list-group list-group-flush small" style="max-height: 300px; overflow-y: auto;">
-                        <li v-for="item in listReminder" :key="item.id" class="list-group-item d-flex justify-content-between align-items-start bg-transparent">
+                        <li v-for="item in listReminder" :key="item.id" 
+                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center bg-transparent"
+                            style="cursor: pointer;"
+                            @click="openKgbFromReminder(item)"
+                            title="Klik untuk input KGB pegawai ini">
                             <div class="me-2">
-                                <div class="fw-bold text-dark text-truncate" style="max-width: 150px;">{{ item.nama_snapshot || item.nama }}</div>
-                                <div class="text-muted text-truncate" style="max-width: 150px; font-size: 0.75rem;">{{ item.nip }}</div>
+                                <div class="fw-bold text-dark text-truncate" style="max-width: 130px;">{{ item.nama_snapshot || item.nama }}</div>
+                                <div class="text-muted text-truncate font-monospace" style="max-width: 130px; font-size: 0.72rem;">{{ item.nip }}</div>
                             </div>
-                            <div class="text-end flex-shrink-0">
+                            <div class="text-end flex-shrink-0 d-flex flex-column align-items-end gap-1">
                                 <span class="badge bg-danger">TMT: {{ formatTmtPendek(item.tmt_selanjutnya) }}</span>
-                                <div class="text-muted" style="font-size: 0.7rem;">{{ hitungHariLagi(item.tmt_selanjutnya) }} hari lagi</div>
+                                <span class="badge bg-primary" style="font-size: 0.65rem;">
+                                    <i class="bi bi-pencil-square me-1"></i>Input KGB
+                                </span>
+                                <div class="text-muted" style="font-size: 0.68rem;">{{ hitungHariLagi(item.tmt_selanjutnya) }} hari lagi</div>
                             </div>
                         </li>
                     </ul>
