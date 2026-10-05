@@ -1,4 +1,4 @@
-import { ref, reactive, watch, onMounted, computed, nextTick } from 'vue';
+﻿import { ref, reactive, watch, onMounted, computed, nextTick } from 'vue';
 import {
     db, auth, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, getCountFromServer,
     query, orderBy, limit, startAfter, where, serverTimestamp, onAuthStateChanged
@@ -861,522 +861,522 @@ export default {
         };
         const closeModal = () => showModal.value = false;
 
-            const simpanTransaksi = async () => {
-                if (!form.nip || !form.nama) return showToast("Identitas wajib", 'warning'); isSaving.value = true;
-                try {
-                    let pjSnap = {}; if (form.pejabat_baru_nip) { const p = listPejabat.value.find(x => x.nip === form.pejabat_baru_nip); if (p) pjSnap = { pejabat_baru_nama: p.jabatan, pejabat_baru_pangkat: p.pangkat }; }
-                    const safeForm = { ...form }; delete safeForm.eselon;
-                    if (safeForm.jenis_jabatan === undefined) safeForm.jenis_jabatan = 'Pelaksana';
-                    if (safeForm.lokasi_pemberi_gaji === undefined) safeForm.lokasi_pemberi_gaji = 'Sungailiat';
-                    if (safeForm.golongan === undefined) safeForm.golongan = '';
+        const simpanTransaksi = async () => {
+            if (!form.nip || !form.nama) return showToast("Identitas wajib", 'warning'); isSaving.value = true;
+            try {
+                let pjSnap = {}; if (form.pejabat_baru_nip) { const p = listPejabat.value.find(x => x.nip === form.pejabat_baru_nip); if (p) pjSnap = { pejabat_baru_nama: p.jabatan, pejabat_baru_pangkat: p.pangkat }; }
+                const safeForm = { ...form }; delete safeForm.eselon;
+                if (safeForm.jenis_jabatan === undefined) safeForm.jenis_jabatan = 'Pelaksana';
+                if (safeForm.lokasi_pemberi_gaji === undefined) safeForm.lokasi_pemberi_gaji = 'Sungailiat';
+                if (safeForm.golongan === undefined) safeForm.golongan = '';
 
-                    safeForm.jabatan = formatTitleCase(safeForm.jabatan);
-                    safeForm.unit_kerja = formatTitleCase(safeForm.unit_kerja);
-                    safeForm.perangkat_daerah = formatTitleCase(safeForm.perangkat_daerah);
+                safeForm.jabatan = formatTitleCase(safeForm.jabatan);
+                safeForm.unit_kerja = formatTitleCase(safeForm.unit_kerja);
+                safeForm.perangkat_daerah = formatTitleCase(safeForm.perangkat_daerah);
 
-                    const payload = { ...safeForm, ...pjSnap, nama_snapshot: form.nama, jabatan_snapshot: form.jabatan, creator_email: auth.currentUser.email, updated_at: serverTimestamp() };
+                const payload = { ...safeForm, ...pjSnap, nama_snapshot: form.nama, jabatan_snapshot: form.jabatan, creator_email: auth.currentUser.email, updated_at: serverTimestamp() };
 
-                    if (isEditMode.value) {
-                        await updateDoc(doc(db, "usulan_kgb", formId.value), payload);
-                    } else {
-                        payload.created_at = serverTimestamp(); payload.created_by = auth.currentUser.uid; payload.status = 'DRAFT';
-                        await addDoc(collection(db, "usulan_kgb"), payload);
-                    }
-
-                    // [BUG FIXED] Mencegah overwrite paksa data otentik pegawai saat menyimpan form KGB 
-                    // Sebelumnya: await setDoc(doc(db, "master_pegawai", form.nip), { ... }, { merge: true });
-                    // Data master_pegawai hanya boleh diubah dari menu Master Pegawai agar data tidak "corrupt" karena salah ketik di KGB.
-                    // KECUALI untuk fitur Jemput Bola (Proaktif Alarm), dimana aplikasi mengupdate tmt_kgb_berikutnya otomatis.
-                    if (form.nip && form.tmt_selanjutnya) {
-                        await setDoc(doc(db, "master_pegawai", form.nip), { tmt_kgb_berikutnya: form.tmt_selanjutnya, updated_at: serverTimestamp() }, { merge: true });
-                    }
-
-                    if (form.jabatan) {
-                        const jId = form.jabatan.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
-                        await setDoc(doc(db, "master_jabatan", jId), { kode_jabatan: jId, nama_jabatan: form.jabatan, bup: currentBup.value, updated_at: serverTimestamp() }, { merge: true });
-                    }
-                    showToast("Tersimpan!"); closeModal(); fetchTable(1);
-                } catch (e) { console.error(e); showToast(e.message, 'error'); } finally { isSaving.value = false; }
-            };
-
-            const hapusTransaksi = async (item) => {
-                if (!item || !item.id) return showToast("ID Error", 'error');
-
-                // Aturan Baru: Jika data sudah ada nomor naskahnya (terikat SK), 
-                // baik tunggal maupun kolektif, DILARANG dihapus dari sini.
-                if (item.nomor_naskah) {
-                    const q = query(collection(db, "usulan_kgb"), where("nomor_naskah", "==", item.nomor_naskah));
-                    const snap = await getDocs(q);
-
-                    if (snap.size > 1) {
-                        showToast(`Gagal! Terdapat ${snap.size} data terikat dalam SK kolektif ini.Silakan Batalkan Nomor di menu Penomoran terlebih dahulu.`, 'error');
-                    } else {
-                        showToast("Gagal! Data sudah memiliki Nomor SK. Silakan Batalkan Nomor di menu Penomoran terlebih dahulu.", 'error');
-                    }
-                    return;
-                }
-
-                if (await showConfirm("Hapus Draft?", "Data hilang permanen.")) {
-                    await deleteDoc(doc(db, "usulan_kgb", item.id)); fetchTable(1); showToast("Draft dihapus.", 'success');
-                }
-            };
-
-            // --- PREVIEW & DOWNLOAD (HEMAT VERSION) ---
-            const generateDocBlob = async (item) => {
-                if (!window.PizZip || !window.docxtemplater) throw new Error("Lib Error");
-                console.table(item);
-                const tplId = item.tipe_asn === 'PPPK' ? "PPPK" : "PNS";
-
-                // [HEMAT] GUNAKAN CACHE TEMPLATE (Jika belum ada baru fetch)
-                if (!cacheTemplates.value[tplId]) {
-                    const ts = await getDoc(doc(db, "config_template", tplId));
-                    if (!ts.exists()) throw new Error("Template Missing");
-                    cacheTemplates.value[tplId] = ts.data().url || `./templates/${ts.data().nama_file}`;
-                }
-                const url = cacheTemplates.value[tplId];
-
-                // [HEMAT] GUNAKAN CACHE GLOBAL VARS (Dari initRefs)
-                let gvd = cacheGlobalVars.value;
-                if (!gvd.dasar_hukum) { // Fallback jika belum ter-cache
-                    const gv = await getDoc(doc(db, "config_template", "GLOBAL_VARS"));
-                    gvd = gv.exists() ? gv.data() : {};
-                    cacheGlobalVars.value = gvd;
-                }
-
-                let pangkatFinal = item.pangkat || "";
-                if (item.golongan) {
-                    // [HEMAT] Cari di listGolongan yg sudah di-cache di RAM
-                    const foundGol = listGolongan.value.find(g => g.kode === item.golongan);
-                    if (foundGol) pangkatFinal = foundGol.pangkat;
-                }
-
-                const isSetda = item.tipe_asn === 'PNS' && ((item.golongan || '').startsWith('IV') || (item.golongan || '').startsWith('4'));
-                let kopT = isSetda ? gvd.kop_setda?.judul : gvd.kop_bkpsdmd?.judul;
-                let kopA = isSetda ? gvd.kop_setda?.alamat : gvd.kop_bkpsdmd?.alamat;
-
-                let targetNip = item.pejabat_baru_nip || (isSetda ? gvd.kop_setda?.pejabat_nip : gvd.kop_bkpsdmd?.pejabat_nip);
-                let pjp = item.pejabat_baru_pangkat || ""; let pjj = item.pejabat_baru_nama || ""; let pjn = ""; let pjnip = "";
-
-                if (targetNip) {
-                    // [HEMAT] Cari di listPejabat yg sudah di-cache di RAM
-                    const foundPj = listPejabat.value.find(p => p.nip === targetNip);
-                    if (foundPj) { pjp = foundPj.pangkat; pjj = foundPj.jabatan; pjn = foundPj.nama; pjnip = foundPj.nip; }
-                    else {
-                        // Fallback fetch jika tidak ada di list cache (jarang terjadi)
-                        const ps = await getDoc(doc(db, "master_pejabat", targetNip));
-                        if (ps.exists()) { const d = ps.data(); pjp = d.pangkat || pjp; pjj = d.jabatan || pjj; pjn = d.nama || ""; pjnip = d.nip || ""; }
-                    }
-                }
-
-                let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n\n" : "\n\n\n";
-                let tanggalSurat = item.tanggal_naskah ? formatTanggal(item.tanggal_naskah.toDate ? item.tanggal_naskah.toDate() : new Date(item.tanggal_naskah)) : "....................";
-
-                const mapH = gvd.dasar_hukum || [];
-                const searchKey = item.nomor_inpassing ? "INPASSING" : item.dasar_hukum;
-                const foundH = mapH.find(h => h.judul === searchKey);
-                const textHukum = foundH ? foundH.isi : "-";
-
-                const res = await fetch(url); const buf = await res.arrayBuffer();
-                const zip = new window.PizZip(buf);
-                const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => "" });
-
-                let tmtFinal = new Date();
-                if (item.tmt_inpassing) tmtFinal = item.tmt_inpassing.toDate ? item.tmt_inpassing.toDate() : new Date(item.tmt_inpassing);
-                else if (item.dasar_tmt) tmtFinal = item.dasar_tmt.toDate ? item.dasar_tmt.toDate() : new Date(item.dasar_tmt);
-
-                let dasarTanggalObj = new Date();
-                if (item.tanggal_inpassing_manual) dasarTanggalObj = item.tanggal_inpassing_manual.toDate ? item.tanggal_inpassing_manual.toDate() : new Date(item.tanggal_inpassing_manual);
-                else if (item.dasar_tanggal) dasarTanggalObj = item.dasar_tanggal.toDate ? item.dasar_tanggal.toDate() : new Date(item.dasar_tanggal);
-
-                docRender.render({
-                    NAMA: item.nama || "", NIP: item.nip || "", PANGKAT: pangkatFinal, JABATAN: item.jabatan || "",
-                    UNIT_KERJA: item.unit_kerja, UNIT_KERJA_INDUK: item.perangkat_daerah,
-                    TGL_LAHIR: formatTanggal(item.tgl_lahir), GOLONGAN: item.golongan || "",
-                    DASAR_NOMOR: item.nomor_inpassing || item.dasar_nomor || "-",
-                    DASAR_TANGGAL: formatTanggal(dasarTanggalObj), DASAR_TMT: formatTanggal(tmtFinal),
-                    DASAR_PEJABAT: item.nomor_inpassing ? "BUPATI BANGKA" : item.dasar_pejabat || "-",
-                    DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
-                    DASAR_MK_LAMA: `${(item.dasar_mk_tahun || 0).toString().padStart(2, '0')} Tahun ${(item.dasar_mk_bulan || 0).toString().padStart(2, '0')} Bulan`,
-                    DASAR_HUKUM: textHukum, MK_BARU: `${(item.mk_baru_tahun || 0).toString().padStart(2, '0')} Tahun ${(item.mk_baru_bulan || 0).toString().padStart(2, '0')} Bulan`,
-                    GAJI_BARU: formatRupiah(item.gaji_baru), TMT_SEKARANG: formatTanggal(item.tmt_sekarang), TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
-                    MASA_PERJANJIAN_KERJA: item.masa_perjanjian || "-", PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian || "-",
-                    KOP: kopT, ALAMAT_KOP: kopA, NOMOR_NASKAH: item.nomor_naskah || "....................", TANGGAL_NASKAH: previewTab.value === 'TTE' ? "${tanggal_naskah}" : tanggalSurat,
-                    SIFAT: "Biasa", TTD_PENGIRIM: ttdContent, JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp,
-                    NAMA_PENGIRIM: pjn || "${nama_pengirim}", NIP_PENGIRIM: pjnip || "${nip_pengirim}",
-                    LOKASI_PEMBERI_GAJI: item.lokasi_pemberi_gaji || "Sungailiat",
-                    lokasi_pemberi_gaji: item.lokasi_pemberi_gaji || "Sungailiat",
-                    sjp: item.status_jabatan_pejabat || ""
-                });
-                return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
-            };
-
-            const previewSK = async (item) => {
-                // Cek library docx-preview (expose sebagai window.docx dengan method renderAsync)
-                if (!window.docx || typeof window.docx.renderAsync !== 'function') {
-                    showToast("Library Preview (docx-preview) belum siap. Coba refresh halaman.", 'error');
-                    return;
-                }
-                showPreviewModal.value = true; previewLoading.value = true; currentPreviewItem.value = item; previewTab.value = 'TTE';
-                await nextTick();
-                try {
-                    if (!currentPreviewItem.value) return;
-                    const blob = await generateDocBlob(currentPreviewItem.value);
-                    const container = document.getElementById('docx-preview-container');
-                    if (container) {
-                        container.innerHTML = '';
-                        await window.docx.renderAsync(blob, container);
-                    }
-                } catch (e) {
-                    console.error('[previewSK] Error:', e);
-                    showToast("Gagal Preview: " + (e.message || e), 'error');
-                }
-                finally { previewLoading.value = false; }
-            };
-
-            const changePreviewTab = async (tabName) => {
-                previewTab.value = tabName; previewLoading.value = true; await nextTick();
-                try {
-                    const blob = await generateDocBlob(currentPreviewItem.value);
-                    const container = document.getElementById('docx-preview-container');
-                    if (container) { container.innerHTML = ''; await window.docx.renderAsync(blob, container); }
-                } catch (e) {
-                    console.error('[changePreviewTab] Error:', e);
-                } finally { previewLoading.value = false; }
-            };
-            const openSrikandi = async (item) => {
-                previewTab.value = 'TTE';
-                try {
-                    showToast("Menyiapkan data...", "info");
-
-                    // 1. GENERATE FILE
-                    const docBlob = await generateDocBlob(item);
-                    const reader = new FileReader();
-                    reader.readAsDataURL(docBlob);
-
-                    reader.onloadend = () => {
-                        const base64data = reader.result;
-
-                        // 2. LOGIKA DATA
-                        const gol = (item.golongan || '').trim().toUpperCase();
-                        const isGol4 = gol.startsWith('IV') || gol.startsWith('4');
-
-                        // A. Penandatangan (Dinamis dari Master Pejabat)
-                        let gvd = cacheGlobalVars.value || {};
-                        let targetNip = item.pejabat_baru_nip || (isGol4 ? gvd.kop_setda?.pejabat_nip : gvd.kop_bkpsdmd?.pejabat_nip);
-                        let penandatangan = isGol4 ? "ASISTEN ADMINISTRASI" : "KEPALA BADAN KEPEGAWAIAN"; // Fallback darurat
-
-                        if (targetNip && listPejabat.value) {
-                            const foundPj = listPejabat.value.find(p => p.nip === targetNip);
-                            if (foundPj && foundPj.jabatan) {
-                                penandatangan = foundPj.jabatan.toUpperCase();
-                            }
-                        }
-
-                        // B. Verifikator (URUTAN: Mutasi -> Sekretaris -> [Kaban])
-                        // GUNAKAN NAMA JABATAN YANG BAKU DI SRIKANDI
-                        let listVerifikator = [
-                            "BIDANG MUTASI",
-                            "SEKRETARIS"
-                        ];
-
-                        // Jika Gol IV, tambah Kepala Badan sebagai verifikator ke-3
-                        if (isGol4) {
-                            listVerifikator.push("KEPALA BADAN KEPEGAWAIAN");
-                        }
-
-                        // Gabung jadi satu string: "Mutasi|Sekretaris|Kaban"
-                        const verifikatorString = listVerifikator.join('|');
-
-                        // C. Tujuan / Dikirimkan Melalui (HANYA SATU)
-                        const tujuanString = "Badan Kepegawaian dan Pengembangan Sumber Daya Manusia";
-
-                        // 3. KIRIM
-                        const params = new URLSearchParams({
-                            action: 'autofill_magic',
-
-                            fill_hal: `Kenaikan Gaji Berkala a.n ${item.nama} `,
-                            fill_ringkasan: `Usulan KGB Tahun ${new Date().getFullYear()} a.n ${item.nama}, ${item.pangkat}, ${item.golongan}.`,
-                            fill_nomor: item.nomor_naskah || "NOMOR KOSONG",
-                            fill_klasifikasi: "800.1.11.13",
-
-                            fill_penandatangan: penandatangan,
-                            fill_verifikator: verifikatorString, // String gabungan
-                            fill_tujuan: tujuanString,           // String tunggal
-
-                            transfer_mode: 'direct_post_message',
-                            file_name: `SK_KGB_${item.nama.replace(/[^a-zA-Z0-9]/g, '_')}.docx`
-                        });
-
-                        const srikandiUrl = `https://srikandi.arsip.go.id/pembuatan-naskah-keluar/registrasi-naskah-keluar?${params.toString()}`;
-                        const popup = window.open(srikandiUrl, '_blank');
-
-                        // 4. LISTENER
-                        const messageHandler = (event) => {
-                            if (event.data === "SRIKANDI_READY_TO_RECEIVE") {
-                                popup.postMessage({
-                                    type: 'FILE_TRANSFER',
-                                    fileData: base64data,
-                                    fileName: `SK_KGB_${item.nama.replace(/[^a-zA-Z0-9]/g, '_')}.docx`
-                                }, '*');
-                                window.removeEventListener('message', messageHandler);
-                            }
-                        };
-                        window.addEventListener('message', messageHandler);
-                    };
-
-                } catch (e) { console.error(e); }
-            };
-
-            const toggleSelection = (nomorNaskah) => {
-                if (selectedNaskah.value.includes(nomorNaskah)) {
-                    // Uncheck (Hapus dari array)
-                    selectedNaskah.value = selectedNaskah.value.filter(n => n !== nomorNaskah);
+                if (isEditMode.value) {
+                    await updateDoc(doc(db, "usulan_kgb", formId.value), payload);
                 } else {
-                    // Check (Masukan ke array)
-                    selectedNaskah.value.push(nomorNaskah);
+                    payload.created_at = serverTimestamp(); payload.created_by = auth.currentUser.uid; payload.status = 'DRAFT';
+                    await addDoc(collection(db, "usulan_kgb"), payload);
                 }
-            };
 
-            // 2. Pilih Semua (Select All)
-            // Ganti fungsi toggleSelectAll dengan ini:
-            const toggleSelectAll = (e) => {
-                const isChecked = e.target.checked;
+                // [BUG FIXED] Mencegah overwrite paksa data otentik pegawai saat menyimpan form KGB 
+                // Sebelumnya: await setDoc(doc(db, "master_pegawai", form.nip), { ... }, { merge: true });
+                // Data master_pegawai hanya boleh diubah dari menu Master Pegawai agar data tidak "corrupt" karena salah ketik di KGB.
+                // KECUALI untuk fitur Jemput Bola (Proaktif Alarm), dimana aplikasi mengupdate tmt_kgb_berikutnya otomatis.
+                if (form.nip && form.tmt_selanjutnya) {
+                    await setDoc(doc(db, "master_pegawai", form.nip), { tmt_kgb_berikutnya: form.tmt_selanjutnya, updated_at: serverTimestamp() }, { merge: true });
+                }
 
-                // Ambil hanya item yang valid di HALAMAN INI SAJA
-                const currentPageIds = listData.value
-                    .filter(i => i.status === 'SELESAI' && i.nomor_naskah)
-                    .map(i => i.nomor_naskah);
+                if (form.jabatan) {
+                    const jId = form.jabatan.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
+                    await setDoc(doc(db, "master_jabatan", jId), { kode_jabatan: jId, nama_jabatan: form.jabatan, bup: currentBup.value, updated_at: serverTimestamp() }, { merge: true });
+                }
+                showToast("Tersimpan!"); closeModal(); fetchTable(1);
+            } catch (e) { console.error(e); showToast(e.message, 'error'); } finally { isSaving.value = false; }
+        };
 
-                if (isChecked) {
-                    // LOGIKA GABUNG (MERGE): Data Lama + Data Halaman Ini
-                    // Set digunakan untuk mencegah duplikat otomatis
-                    const combined = new Set([...selectedNaskah.value, ...currentPageIds]);
-                    selectedNaskah.value = Array.from(combined);
+        const hapusTransaksi = async (item) => {
+            if (!item || !item.id) return showToast("ID Error", 'error');
+
+            // Aturan Baru: Jika data sudah ada nomor naskahnya (terikat SK), 
+            // baik tunggal maupun kolektif, DILARANG dihapus dari sini.
+            if (item.nomor_naskah) {
+                const q = query(collection(db, "usulan_kgb"), where("nomor_naskah", "==", item.nomor_naskah));
+                const snap = await getDocs(q);
+
+                if (snap.size > 1) {
+                    showToast(`Gagal! Terdapat ${snap.size} data terikat dalam SK kolektif ini.Silakan Batalkan Nomor di menu Penomoran terlebih dahulu.`, 'error');
                 } else {
-                    // LOGIKA HAPUS PARSIAL: Hapus item halaman ini saja, sisanya biarkan
-                    selectedNaskah.value = selectedNaskah.value.filter(
-                        id => !currentPageIds.includes(id)
-                    );
+                    showToast("Gagal! Data sudah memiliki Nomor SK. Silakan Batalkan Nomor di menu Penomoran terlebih dahulu.", 'error');
                 }
-            };
+                return;
+            }
 
-            // 3. Eksekusi Robot (Buka Srikandi & Kirim Data)
-            const openBotDownloader = () => {
-                // Validasi
-                if (selectedNaskah.value.length === 0) {
-                    showToast("Harap centang minimal satu data yang sudah Selesai!", "warning");
-                    return;
+            if (await showConfirm("Hapus Draft?", "Data hilang permanen.")) {
+                await deleteDoc(doc(db, "usulan_kgb", item.id)); fetchTable(1); showToast("Draft dihapus.", 'success');
+            }
+        };
+
+        // --- PREVIEW & DOWNLOAD (HEMAT VERSION) ---
+        const generateDocBlob = async (item) => {
+            if (!window.PizZip || !window.docxtemplater) throw new Error("Lib Error");
+            console.table(item);
+            const tplId = item.tipe_asn === 'PPPK' ? "PPPK" : "PNS";
+
+            // [HEMAT] GUNAKAN CACHE TEMPLATE (Jika belum ada baru fetch)
+            if (!cacheTemplates.value[tplId]) {
+                const ts = await getDoc(doc(db, "config_template", tplId));
+                if (!ts.exists()) throw new Error("Template Missing");
+                cacheTemplates.value[tplId] = ts.data().url || `./templates/${ts.data().nama_file}`;
+            }
+            const url = cacheTemplates.value[tplId];
+
+            // [HEMAT] GUNAKAN CACHE GLOBAL VARS (Dari initRefs)
+            let gvd = cacheGlobalVars.value;
+            if (!gvd.dasar_hukum) { // Fallback jika belum ter-cache
+                const gv = await getDoc(doc(db, "config_template", "GLOBAL_VARS"));
+                gvd = gv.exists() ? gv.data() : {};
+                cacheGlobalVars.value = gvd;
+            }
+
+            let pangkatFinal = item.pangkat || "";
+            if (item.golongan) {
+                // [HEMAT] Cari di listGolongan yg sudah di-cache di RAM
+                const foundGol = listGolongan.value.find(g => g.kode === item.golongan);
+                if (foundGol) pangkatFinal = foundGol.pangkat;
+            }
+
+            const isSetda = item.tipe_asn === 'PNS' && ((item.golongan || '').startsWith('IV') || (item.golongan || '').startsWith('4'));
+            let kopT = isSetda ? gvd.kop_setda?.judul : gvd.kop_bkpsdmd?.judul;
+            let kopA = isSetda ? gvd.kop_setda?.alamat : gvd.kop_bkpsdmd?.alamat;
+
+            let targetNip = item.pejabat_baru_nip || (isSetda ? gvd.kop_setda?.pejabat_nip : gvd.kop_bkpsdmd?.pejabat_nip);
+            let pjp = item.pejabat_baru_pangkat || ""; let pjj = item.pejabat_baru_nama || ""; let pjn = ""; let pjnip = "";
+
+            if (targetNip) {
+                // [HEMAT] Cari di listPejabat yg sudah di-cache di RAM
+                const foundPj = listPejabat.value.find(p => p.nip === targetNip);
+                if (foundPj) { pjp = foundPj.pangkat; pjj = foundPj.jabatan; pjn = foundPj.nama; pjnip = foundPj.nip; }
+                else {
+                    // Fallback fetch jika tidak ada di list cache (jarang terjadi)
+                    const ps = await getDoc(doc(db, "master_pejabat", targetNip));
+                    if (ps.exists()) { const d = ps.data(); pjp = d.pangkat || pjp; pjj = d.jabatan || pjj; pjn = d.nama || ""; pjnip = d.nip || ""; }
                 }
+            }
 
-                // A. Siapkan Paket Data
-                const dataPaket = {
-                    type: 'DATA_NASKAH_KGB', // Password agar data tidak tertukar
-                    list: JSON.parse(JSON.stringify(selectedNaskah.value)) // Copy murni agar aman
-                };
+            let ttdContent = previewTab.value === 'TTE' ? "\n\n\n${ttd_pengirim}\n\n\n\n" : "\n\n\n";
+            let tanggalSurat = item.tanggal_naskah ? formatTanggal(item.tanggal_naskah.toDate ? item.tanggal_naskah.toDate() : new Date(item.tanggal_naskah)) : "....................";
 
-                // B. Buka Srikandi di Tab Baru (Target Window)
-                // 'srikandiBotTarget' adalah nama window agar browser tidak spam tab baru
-                const srikandiWindow = window.open(
-                    'https://srikandi.arsip.go.id/pembuatan-naskah-keluar/naskah-keluar',
-                    'srikandiBotTarget'
-                );
+            const mapH = gvd.dasar_hukum || [];
+            const searchKey = item.nomor_inpassing ? "INPASSING" : item.dasar_hukum;
+            const foundH = mapH.find(h => h.judul === searchKey);
+            const textHukum = foundH ? foundH.isi : "-";
 
-                if (!srikandiWindow) {
-                    showToast("Pop-up diblokir browser! Izinkan pop-up.", "error");
-                    return;
-                }
+            const res = await fetch(url); const buf = await res.arrayBuffer();
+            const zip = new window.PizZip(buf);
+            const docRender = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (p) => "" });
 
-                showToast("Menghubungkan ke Robot...", "info");
+            let tmtFinal = new Date();
+            if (item.tmt_inpassing) tmtFinal = item.tmt_inpassing.toDate ? item.tmt_inpassing.toDate() : new Date(item.tmt_inpassing);
+            else if (item.dasar_tmt) tmtFinal = item.dasar_tmt.toDate ? item.dasar_tmt.toDate() : new Date(item.dasar_tmt);
 
-                // C. Pasang Telinga (Listener)
-                // Kita menunggu Bookmarklet di Srikandi berteriak "SRIKANDI_BOT_READY"
-                const messageHandler = (event) => {
-                    // Terima pesan dari Bookmarklet
-                    if (event.data === "SRIKANDI_BOT_READY") {
-                        console.log("🤖 Robot tersambung! Mengirim paket data...");
+            let dasarTanggalObj = new Date();
+            if (item.tanggal_inpassing_manual) dasarTanggalObj = item.tanggal_inpassing_manual.toDate ? item.tanggal_inpassing_manual.toDate() : new Date(item.tanggal_inpassing_manual);
+            else if (item.dasar_tanggal) dasarTanggalObj = item.dasar_tanggal.toDate ? item.dasar_tanggal.toDate() : new Date(item.dasar_tanggal);
 
-                        // KIRIM DATA VIA JALUR BELAKANG (POST MESSAGE)
-                        srikandiWindow.postMessage(dataPaket, "*");
-
-                        showToast(`Tersambung! Mengirim ${selectedNaskah.value.length} data...`, "success");
-
-                        // Lepas listener agar hemat memori setelah selesai kirim
-                        window.removeEventListener("message", messageHandler);
-                    }
-                };
-
-                // Aktifkan pendengaran
-                window.addEventListener("message", messageHandler);
-            };
-
-            // Fungsi untuk Copy ke Clipboard
-            const copyCode = async () => {
-                try {
-                    if (!srikandiBookmarklet) {
-                        alert("Script kosong! Cek import file.");
-                        return;
-                    }
-
-                    // Coba cara modern (Clipboard API)
-                    if (navigator.clipboard && window.isSecureContext) {
-                        await navigator.clipboard.writeText(srikandiBookmarklet);
-                    } else {
-                        // Fallback untuk browser lama / Non-HTTPS
-                        const textArea = document.createElement("textarea");
-                        textArea.value = srikandiBookmarklet;
-                        textArea.style.position = "fixed";
-                        textArea.style.left = "-9999px";
-                        document.body.appendChild(textArea);
-                        textArea.focus();
-                        textArea.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(textArea);
-                    }
-
-                    alert("SUKSES COPY!\n\nSilakan Paste di Edit Bookmark.");
-                } catch (err) {
-                    console.error("Error copy:", err);
-                    alert("Gagal copy: " + err);
-                }
-            };
-
-            const copyCodeDownloadSrikandi = async () => {
-                try {
-                    if (!downloadSrikandiBookmartlet) {
-                        alert("Script kosong! Cek import file.");
-                        return;
-                    }
-
-                    // Coba cara modern (Clipboard API)
-                    if (navigator.clipboard && window.isSecureContext) {
-                        await navigator.clipboard.writeText(downloadSrikandiBookmartlet);
-                    } else {
-                        // Fallback untuk browser lama / Non-HTTPS
-                        const textArea = document.createElement("textarea");
-                        textArea.value = downloadSrikandiBookmartlet;
-                        textArea.style.position = "fixed";
-                        textArea.style.left = "-9999px";
-                        document.body.appendChild(textArea);
-                        textArea.focus();
-                        textArea.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(textArea);
-                    }
-
-                    alert("SUKSES COPY!\n\nSilakan Paste di Edit Bookmark.");
-                } catch (err) {
-                    console.error("Error copy:", err);
-                    alert("Gagal copy: " + err);
-                }
-            };
-
-            const cekSIASN = (nip) => {
-                if (!nip) {
-                    showToast('Masukkan NIP terlebih dahulu!', 'warning');
-                    return;
-                }
-                const encodedNip = encodeURIComponent(nip.trim());
-                const encodedOrigin = encodeURIComponent(window.location.origin);
-                const siasUrl = `https://siasn-instansi.bkn.go.id/peremajaan/profil/pns/?kgb_nip=${encodedNip}&kgb_origin=${encodedOrigin}`;
-                window.open(siasUrl, '_blank');
-                showToast('Tab SIASN dibuka. Jalankan Bookmarklet SIASN di halaman tersebut.', 'info');
-            };
-
-            const handleSIASNMessage = (event) => {
-                if (!event.origin.includes('siasn-instansi.bkn.go.id') && !event.origin.includes('localhost') && !event.origin.includes('127.0.0.1')) return;
-                if (!event.data || event.data.type !== 'KGBAPP_SIASN_DATA') return;
-
-                const d = event.data.payload;
-                if (!d) return;
-
-                if (d.nama) form.nama = d.nama;
-                if (d.unit_kerja) form.unit_kerja = d.unit_kerja;
-                if (d.perangkat_daerah) form.perangkat_daerah = d.perangkat_daerah;
-                if (d.jabatan) form.jabatan = d.jabatan;
-
-                if (d.golongan_kode) {
-                    form.golongan = d.golongan_kode;
-                    handleGolonganChange(d.golongan_kode);
-                }
-
-                showToast(`✅ Data SIASN diimport: ${d.nama || ''}`, 'success');
-            };
-
-            const copyBookmarkletSIASN = async () => {
-                if (!siasnBookmarklet) { showToast('Bookmarklet kosong!', 'error'); return; }
-                try {
-                    if (navigator.clipboard && window.isSecureContext) {
-                        await navigator.clipboard.writeText(siasnBookmarklet);
-                    } else {
-                        const ta = document.createElement('textarea');
-                        ta.value = siasnBookmarklet;
-                        ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
-                        document.body.appendChild(ta); ta.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(ta);
-                    }
-                    showToast('Bookmarklet SIASN berhasil dicopy! Paste di URL bookmark.', 'success');
-                } catch (e) { showToast('Gagal copy: ' + e.message, 'error'); }
-            };
-
-            const closePreview = () => { showPreviewModal.value = false; currentPreviewItem.value = null; };
-            const downloadFromPreview = async () => { if (currentPreviewItem.value) cetakSK(currentPreviewItem.value); };
-            const cetakSK = async (item) => {
-                try {
-                    showToast("Menyiapkan...", 'info');
-                    const blob = await generateDocBlob(item);
-
-                    const prefix = previewTab.value === 'TTE' ? 'DRAFT_TTE_' : 'SK_';
-
-                    // 1. Bersihkan Nama Pegawai (Hanya huruf & angka, spasi jadi _)
-                    const safeName = (item.nama || 'TanpaNama').replace(/[^a-zA-Z0-9]/g, '_');
-
-                    // 2. Bersihkan Nama Unit Kerja (Baru)
-                    // Jika unit kerja panjang, kita ambil depannya saja atau biarkan full tapi dibersihkan
-                    const safeUnit = (item.unit_kerja || 'TanpaUnit').replace(/[^a-zA-Z0-9]/g, '_');
-
-                    // 3. Gabungkan: SK_KGB_NamaPegawai_NamaUnit.docx
-                    window.saveAs(blob, `${prefix}KGB_${safeName}_${safeUnit}.docx`);
-
-                } catch (e) {
-                    showToast("Gagal: " + e.message, 'error');
-                }
-            };
-
-            const nextPage = () => goToPage(currentPage.value + 1);
-            const prevPage = () => goToPage(currentPage.value - 1);
-
-
-            onMounted(() => {
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        await initRefs(); // ⭐ Panggil di sini (await agar listDasarHukum siap)
-                        fetchTable(1);
-                        window.addEventListener('message', handleSIASNMessage);
-
-                        // ⭐ Jika ada data reminder dari Dashboard, langsung buka form
-                        if (store.reminderData) {
-                            openModal(); // openModal() akan cek store.reminderData secara internal
-                        }
-                    } else {
-                        listData.value = [];
-                        window.removeEventListener('message', handleSIASNMessage);
-                    }
-                });
+            docRender.render({
+                NAMA: item.nama || "", NIP: item.nip || "", PANGKAT: pangkatFinal, JABATAN: item.jabatan || "",
+                UNIT_KERJA: item.unit_kerja, UNIT_KERJA_INDUK: item.perangkat_daerah,
+                TGL_LAHIR: formatTanggal(item.tgl_lahir), GOLONGAN: item.golongan || "",
+                DASAR_NOMOR: item.nomor_inpassing || item.dasar_nomor || "-",
+                DASAR_TANGGAL: formatTanggal(dasarTanggalObj), DASAR_TMT: formatTanggal(tmtFinal),
+                DASAR_PEJABAT: item.nomor_inpassing ? "BUPATI BANGKA" : item.dasar_pejabat || "-",
+                DASAR_GAJI_LAMA: formatRupiah(item.dasar_gaji_lama),
+                DASAR_MK_LAMA: `${(item.dasar_mk_tahun || 0).toString().padStart(2, '0')} Tahun ${(item.dasar_mk_bulan || 0).toString().padStart(2, '0')} Bulan`,
+                DASAR_HUKUM: textHukum, MK_BARU: `${(item.mk_baru_tahun || 0).toString().padStart(2, '0')} Tahun ${(item.mk_baru_bulan || 0).toString().padStart(2, '0')} Bulan`,
+                GAJI_BARU: formatRupiah(item.gaji_baru), TMT_SEKARANG: formatTanggal(item.tmt_sekarang), TMT_SELANJUTNYA: formatTanggal(item.tmt_selanjutnya),
+                MASA_PERJANJIAN_KERJA: item.masa_perjanjian || "-", PERPANJANGAN_PERJANJIAN_KERJA: item.perpanjangan_perjanjian || "-",
+                KOP: kopT, ALAMAT_KOP: kopA, NOMOR_NASKAH: item.nomor_naskah || "....................", TANGGAL_NASKAH: previewTab.value === 'TTE' ? "${tanggal_naskah}" : tanggalSurat,
+                SIFAT: "Biasa", TTD_PENGIRIM: ttdContent, JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp,
+                NAMA_PENGIRIM: pjn || "${nama_pengirim}", NIP_PENGIRIM: pjnip || "${nip_pengirim}",
+                LOKASI_PEMBERI_GAJI: item.lokasi_pemberi_gaji || "Sungailiat",
+                lokasi_pemberi_gaji: item.lokasi_pemberi_gaji || "Sungailiat",
+                sjp: item.status_jabatan_pejabat || ""
             });
+            return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
+        };
 
-            return {
-                listData, tableLoading, tableSearch, currentPage, isLastPage, itemsPerPage, filterStartDate, filterEndDate, totalPages, visiblePages,
-                expandedRows, toggleRow, isExpanded,
-                showModal, isEditMode, isSaving, isSearching, searchMsg, gajiMsg,
-                form, listGolongan, listDasarHukum, listPejabat, listPerpres, filteredGolongan, currentAge, isPensiun, pensiunMsg,
-                nextPage, prevPage, fetchTable, goToPage, openModal, closeModal, simpanTransaksi, hapusTransaksi, cetakSK,
-                handleNipInput, cariGajiBaru, cariGajiLama, handleGolonganChange, handleGolonganLamaChange, handleJabatanSelect, formatRupiah, formatTanggal,
-                showPreviewModal, previewLoading, previewSK, closePreview, downloadFromPreview,
-                previewTab, changePreviewTab, updateStatus, setTmtPensiun, openSrikandi, copyCode, selectedNaskah, toggleSelection,
-                toggleSelectAll,
-                openBotDownloader, copyCodeDownloadSrikandi, isAllPageSelected,
-                cekSIASN, copyBookmarkletSIASN
+        const previewSK = async (item) => {
+            // Cek library docx-preview (expose sebagai window.docx dengan method renderAsync)
+            if (!window.docx || typeof window.docx.renderAsync !== 'function') {
+                showToast("Library Preview (docx-preview) belum siap. Coba refresh halaman.", 'error');
+                return;
+            }
+            showPreviewModal.value = true; previewLoading.value = true; currentPreviewItem.value = item; previewTab.value = 'TTE';
+            await nextTick();
+            try {
+                if (!currentPreviewItem.value) return;
+                const blob = await generateDocBlob(currentPreviewItem.value);
+                const container = document.getElementById('docx-preview-container');
+                if (container) {
+                    container.innerHTML = '';
+                    await window.docx.renderAsync(blob, container);
+                }
+            } catch (e) {
+                console.error('[previewSK] Error:', e);
+                showToast("Gagal Preview: " + (e.message || e), 'error');
+            }
+            finally { previewLoading.value = false; }
+        };
+
+        const changePreviewTab = async (tabName) => {
+            previewTab.value = tabName; previewLoading.value = true; await nextTick();
+            try {
+                const blob = await generateDocBlob(currentPreviewItem.value);
+                const container = document.getElementById('docx-preview-container');
+                if (container) { container.innerHTML = ''; await window.docx.renderAsync(blob, container); }
+            } catch (e) {
+                console.error('[changePreviewTab] Error:', e);
+            } finally { previewLoading.value = false; }
+        };
+        const openSrikandi = async (item) => {
+            previewTab.value = 'TTE';
+            try {
+                showToast("Menyiapkan data...", "info");
+
+                // 1. GENERATE FILE
+                const docBlob = await generateDocBlob(item);
+                const reader = new FileReader();
+                reader.readAsDataURL(docBlob);
+
+                reader.onloadend = () => {
+                    const base64data = reader.result;
+
+                    // 2. LOGIKA DATA
+                    const gol = (item.golongan || '').trim().toUpperCase();
+                    const isGol4 = gol.startsWith('IV') || gol.startsWith('4');
+
+                    // A. Penandatangan (Dinamis dari Master Pejabat)
+                    let gvd = cacheGlobalVars.value || {};
+                    let targetNip = item.pejabat_baru_nip || (isGol4 ? gvd.kop_setda?.pejabat_nip : gvd.kop_bkpsdmd?.pejabat_nip);
+                    let penandatangan = isGol4 ? "ASISTEN ADMINISTRASI" : "KEPALA BADAN KEPEGAWAIAN"; // Fallback darurat
+
+                    if (targetNip && listPejabat.value) {
+                        const foundPj = listPejabat.value.find(p => p.nip === targetNip);
+                        if (foundPj && foundPj.jabatan) {
+                            penandatangan = foundPj.jabatan.toUpperCase();
+                        }
+                    }
+
+                    // B. Verifikator (URUTAN: Mutasi -> Sekretaris -> [Kaban])
+                    // GUNAKAN NAMA JABATAN YANG BAKU DI SRIKANDI
+                    let listVerifikator = [
+                        "BIDANG MUTASI",
+                        "SEKRETARIS"
+                    ];
+
+                    // Jika Gol IV, tambah Kepala Badan sebagai verifikator ke-3
+                    if (isGol4) {
+                        listVerifikator.push("KEPALA BADAN KEPEGAWAIAN");
+                    }
+
+                    // Gabung jadi satu string: "Mutasi|Sekretaris|Kaban"
+                    const verifikatorString = listVerifikator.join('|');
+
+                    // C. Tujuan / Dikirimkan Melalui (HANYA SATU)
+                    const tujuanString = "Badan Kepegawaian dan Pengembangan Sumber Daya Manusia";
+
+                    // 3. KIRIM
+                    const params = new URLSearchParams({
+                        action: 'autofill_magic',
+
+                        fill_hal: `Kenaikan Gaji Berkala a.n ${item.nama} `,
+                        fill_ringkasan: `Usulan KGB Tahun ${new Date().getFullYear()} a.n ${item.nama}, ${item.pangkat}, ${item.golongan}.`,
+                        fill_nomor: item.nomor_naskah || "NOMOR KOSONG",
+                        fill_klasifikasi: "800.1.11.13",
+
+                        fill_penandatangan: penandatangan,
+                        fill_verifikator: verifikatorString, // String gabungan
+                        fill_tujuan: tujuanString,           // String tunggal
+
+                        transfer_mode: 'direct_post_message',
+                        file_name: `SK_KGB_${item.nama.replace(/[^a-zA-Z0-9]/g, '_')}.docx`
+                    });
+
+                    const srikandiUrl = `https://srikandi.arsip.go.id/pembuatan-naskah-keluar/registrasi-naskah-keluar?${params.toString()}`;
+                    const popup = window.open(srikandiUrl, '_blank');
+
+                    // 4. LISTENER
+                    const messageHandler = (event) => {
+                        if (event.data === "SRIKANDI_READY_TO_RECEIVE") {
+                            popup.postMessage({
+                                type: 'FILE_TRANSFER',
+                                fileData: base64data,
+                                fileName: `SK_KGB_${item.nama.replace(/[^a-zA-Z0-9]/g, '_')}.docx`
+                            }, '*');
+                            window.removeEventListener('message', messageHandler);
+                        }
+                    };
+                    window.addEventListener('message', messageHandler);
+                };
+
+            } catch (e) { console.error(e); }
+        };
+
+        const toggleSelection = (nomorNaskah) => {
+            if (selectedNaskah.value.includes(nomorNaskah)) {
+                // Uncheck (Hapus dari array)
+                selectedNaskah.value = selectedNaskah.value.filter(n => n !== nomorNaskah);
+            } else {
+                // Check (Masukan ke array)
+                selectedNaskah.value.push(nomorNaskah);
+            }
+        };
+
+        // 2. Pilih Semua (Select All)
+        // Ganti fungsi toggleSelectAll dengan ini:
+        const toggleSelectAll = (e) => {
+            const isChecked = e.target.checked;
+
+            // Ambil hanya item yang valid di HALAMAN INI SAJA
+            const currentPageIds = listData.value
+                .filter(i => i.status === 'SELESAI' && i.nomor_naskah)
+                .map(i => i.nomor_naskah);
+
+            if (isChecked) {
+                // LOGIKA GABUNG (MERGE): Data Lama + Data Halaman Ini
+                // Set digunakan untuk mencegah duplikat otomatis
+                const combined = new Set([...selectedNaskah.value, ...currentPageIds]);
+                selectedNaskah.value = Array.from(combined);
+            } else {
+                // LOGIKA HAPUS PARSIAL: Hapus item halaman ini saja, sisanya biarkan
+                selectedNaskah.value = selectedNaskah.value.filter(
+                    id => !currentPageIds.includes(id)
+                );
+            }
+        };
+
+        // 3. Eksekusi Robot (Buka Srikandi & Kirim Data)
+        const openBotDownloader = () => {
+            // Validasi
+            if (selectedNaskah.value.length === 0) {
+                showToast("Harap centang minimal satu data yang sudah Selesai!", "warning");
+                return;
+            }
+
+            // A. Siapkan Paket Data
+            const dataPaket = {
+                type: 'DATA_NASKAH_KGB', // Password agar data tidak tertukar
+                list: JSON.parse(JSON.stringify(selectedNaskah.value)) // Copy murni agar aman
             };
-        }
-    };
+
+            // B. Buka Srikandi di Tab Baru (Target Window)
+            // 'srikandiBotTarget' adalah nama window agar browser tidak spam tab baru
+            const srikandiWindow = window.open(
+                'https://srikandi.arsip.go.id/pembuatan-naskah-keluar/naskah-keluar',
+                'srikandiBotTarget'
+            );
+
+            if (!srikandiWindow) {
+                showToast("Pop-up diblokir browser! Izinkan pop-up.", "error");
+                return;
+            }
+
+            showToast("Menghubungkan ke Robot...", "info");
+
+            // C. Pasang Telinga (Listener)
+            // Kita menunggu Bookmarklet di Srikandi berteriak "SRIKANDI_BOT_READY"
+            const messageHandler = (event) => {
+                // Terima pesan dari Bookmarklet
+                if (event.data === "SRIKANDI_BOT_READY") {
+                    console.log("🤖 Robot tersambung! Mengirim paket data...");
+
+                    // KIRIM DATA VIA JALUR BELAKANG (POST MESSAGE)
+                    srikandiWindow.postMessage(dataPaket, "*");
+
+                    showToast(`Tersambung! Mengirim ${selectedNaskah.value.length} data...`, "success");
+
+                    // Lepas listener agar hemat memori setelah selesai kirim
+                    window.removeEventListener("message", messageHandler);
+                }
+            };
+
+            // Aktifkan pendengaran
+            window.addEventListener("message", messageHandler);
+        };
+
+        // Fungsi untuk Copy ke Clipboard
+        const copyCode = async () => {
+            try {
+                if (!srikandiBookmarklet) {
+                    alert("Script kosong! Cek import file.");
+                    return;
+                }
+
+                // Coba cara modern (Clipboard API)
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(srikandiBookmarklet);
+                } else {
+                    // Fallback untuk browser lama / Non-HTTPS
+                    const textArea = document.createElement("textarea");
+                    textArea.value = srikandiBookmarklet;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-9999px";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                }
+
+                alert("SUKSES COPY!\n\nSilakan Paste di Edit Bookmark.");
+            } catch (err) {
+                console.error("Error copy:", err);
+                alert("Gagal copy: " + err);
+            }
+        };
+
+        const copyCodeDownloadSrikandi = async () => {
+            try {
+                if (!downloadSrikandiBookmartlet) {
+                    alert("Script kosong! Cek import file.");
+                    return;
+                }
+
+                // Coba cara modern (Clipboard API)
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(downloadSrikandiBookmartlet);
+                } else {
+                    // Fallback untuk browser lama / Non-HTTPS
+                    const textArea = document.createElement("textarea");
+                    textArea.value = downloadSrikandiBookmartlet;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-9999px";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                }
+
+                alert("SUKSES COPY!\n\nSilakan Paste di Edit Bookmark.");
+            } catch (err) {
+                console.error("Error copy:", err);
+                alert("Gagal copy: " + err);
+            }
+        };
+
+        const cekSIASN = (nip) => {
+            if (!nip) {
+                showToast('Masukkan NIP terlebih dahulu!', 'warning');
+                return;
+            }
+            const encodedNip = encodeURIComponent(nip.trim());
+            const encodedOrigin = encodeURIComponent(window.location.origin);
+            const siasUrl = `https://siasn-instansi.bkn.go.id/peremajaan/profil/pns/?kgb_nip=${encodedNip}&kgb_origin=${encodedOrigin}`;
+            window.open(siasUrl, '_blank');
+            showToast('Tab SIASN dibuka. Jalankan Bookmarklet SIASN di halaman tersebut.', 'info');
+        };
+
+        const handleSIASNMessage = (event) => {
+            if (!event.origin.includes('siasn-instansi.bkn.go.id') && !event.origin.includes('localhost') && !event.origin.includes('127.0.0.1')) return;
+            if (!event.data || event.data.type !== 'KGBAPP_SIASN_DATA') return;
+
+            const d = event.data.payload;
+            if (!d) return;
+
+            if (d.nama) form.nama = d.nama;
+            if (d.unit_kerja) form.unit_kerja = d.unit_kerja;
+            if (d.perangkat_daerah) form.perangkat_daerah = d.perangkat_daerah;
+            if (d.jabatan) form.jabatan = d.jabatan;
+
+            if (d.golongan_kode) {
+                form.golongan = d.golongan_kode;
+                handleGolonganChange(d.golongan_kode);
+            }
+
+            showToast(`✅ Data SIASN diimport: ${d.nama || ''}`, 'success');
+        };
+
+        const copyBookmarkletSIASN = async () => {
+            if (!siasnBookmarklet) { showToast('Bookmarklet kosong!', 'error'); return; }
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(siasnBookmarklet);
+                } else {
+                    const ta = document.createElement('textarea');
+                    ta.value = siasnBookmarklet;
+                    ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
+                    document.body.appendChild(ta); ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                }
+                showToast('Bookmarklet SIASN berhasil dicopy! Paste di URL bookmark.', 'success');
+            } catch (e) { showToast('Gagal copy: ' + e.message, 'error'); }
+        };
+
+        const closePreview = () => { showPreviewModal.value = false; currentPreviewItem.value = null; };
+        const downloadFromPreview = async () => { if (currentPreviewItem.value) cetakSK(currentPreviewItem.value); };
+        const cetakSK = async (item) => {
+            try {
+                showToast("Menyiapkan...", 'info');
+                const blob = await generateDocBlob(item);
+
+                const prefix = previewTab.value === 'TTE' ? 'DRAFT_TTE_' : 'SK_';
+
+                // 1. Bersihkan Nama Pegawai (Hanya huruf & angka, spasi jadi _)
+                const safeName = (item.nama || 'TanpaNama').replace(/[^a-zA-Z0-9]/g, '_');
+
+                // 2. Bersihkan Nama Unit Kerja (Baru)
+                // Jika unit kerja panjang, kita ambil depannya saja atau biarkan full tapi dibersihkan
+                const safeUnit = (item.unit_kerja || 'TanpaUnit').replace(/[^a-zA-Z0-9]/g, '_');
+
+                // 3. Gabungkan: SK_KGB_NamaPegawai_NamaUnit.docx
+                window.saveAs(blob, `${prefix}KGB_${safeName}_${safeUnit}.docx`);
+
+            } catch (e) {
+                showToast("Gagal: " + e.message, 'error');
+            }
+        };
+
+        const nextPage = () => goToPage(currentPage.value + 1);
+        const prevPage = () => goToPage(currentPage.value - 1);
+
+
+        onMounted(() => {
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    await initRefs(); // ⭐ Panggil di sini (await agar listDasarHukum siap)
+                    fetchTable(1);
+                    window.addEventListener('message', handleSIASNMessage);
+
+                    // ⭐ Jika ada data reminder dari Dashboard, langsung buka form
+                    if (store.reminderData) {
+                        openModal(); // openModal() akan cek store.reminderData secara internal
+                    }
+                } else {
+                    listData.value = [];
+                    window.removeEventListener('message', handleSIASNMessage);
+                }
+            });
+        });
+
+        return {
+            listData, tableLoading, tableSearch, currentPage, isLastPage, itemsPerPage, filterStartDate, filterEndDate, totalPages, visiblePages,
+            expandedRows, toggleRow, isExpanded,
+            showModal, isEditMode, isSaving, isSearching, searchMsg, gajiMsg,
+            form, listGolongan, listDasarHukum, listPejabat, listPerpres, filteredGolongan, currentAge, isPensiun, pensiunMsg,
+            nextPage, prevPage, fetchTable, goToPage, openModal, closeModal, simpanTransaksi, hapusTransaksi, cetakSK,
+            handleNipInput, cariGajiBaru, cariGajiLama, handleGolonganChange, handleGolonganLamaChange, handleJabatanSelect, formatRupiah, formatTanggal,
+            showPreviewModal, previewLoading, previewSK, closePreview, downloadFromPreview,
+            previewTab, changePreviewTab, updateStatus, setTmtPensiun, openSrikandi, copyCode, selectedNaskah, toggleSelection,
+            toggleSelectAll,
+            openBotDownloader, copyCodeDownloadSrikandi, isAllPageSelected,
+            cekSIASN, copyBookmarkletSIASN
+        };
+    }
+};
