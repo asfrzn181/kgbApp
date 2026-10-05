@@ -547,9 +547,23 @@ export const TplMain = `
                                         </div>
                                         <div class="small text-danger fw-bold mt-1" v-if="pensiunMsg">{{ pensiunMsg }}</div>
                                     </div>
-                                    <div class="col-12 col-md-5">
+                                    <div class="col-12 col-md-7">
                                         <label class="form-label small fw-bold text-primary">Pejabat TTD</label>
                                         <SearchSelect :options="listPejabat" v-model="form.pejabat_baru_nip" label-key="jabatan" value-key="nip" />
+                                        <div class="d-flex gap-3 mt-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" v-model="form.status_jabatan_pejabat" value="" id="radioDefinitif">
+                                                <label class="form-check-label small fw-semibold text-secondary" for="radioDefinitif">Definitif</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" v-model="form.status_jabatan_pejabat" value="Plt." id="radioPlt">
+                                                <label class="form-check-label small fw-semibold text-warning" for="radioPlt">Plt.</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" v-model="form.status_jabatan_pejabat" value="Plh." id="radioPlh">
+                                                <label class="form-check-label small fw-semibold text-info" for="radioPlh">Plh.</label>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
