@@ -1,4 +1,4 @@
-﻿import { ref, reactive, watch, onMounted, computed, nextTick } from 'vue';
+import { ref, reactive, watch, onMounted, computed, nextTick } from 'vue';
 import {
     db, auth, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, getCountFromServer,
     query, orderBy, limit, startAfter, where, serverTimestamp, onAuthStateChanged
@@ -1007,7 +1007,17 @@ export default {
                 lokasi_pemberi_gaji: item.lokasi_pemberi_gaji || "Sungailiat",
                 sjp: item.status_jabatan_pejabat || ""
             });
-            return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 5 } });
+            const finalZip = docRender.getZip();
+            const newFiles = {};
+            if (finalZip.files["[Content_Types].xml"]) newFiles["[Content_Types].xml"] = finalZip.files["[Content_Types].xml"];
+            if (finalZip.files["_rels/.rels"]) newFiles["_rels/.rels"] = finalZip.files["_rels/.rels"];
+            for (let key in finalZip.files) {
+                if (key !== "[Content_Types].xml" && key !== "_rels/.rels") {
+                    newFiles[key] = finalZip.files[key];
+                }
+            }
+            finalZip.files = newFiles;
+            return finalZip.generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 5 } });
         };
 
         const previewSK = async (item) => {

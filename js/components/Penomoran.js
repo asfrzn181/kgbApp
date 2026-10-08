@@ -601,7 +601,17 @@ export default {
                 SIFAT: "Biasa", TTD_PENGIRIM: ttdContent, JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp,
                 NAMA_PENGIRIM: pjn || "${nama_pengirim}", NIP_PENGIRIM: pjnip || "${nip_pengirim}"
             });
-            return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
+            const finalZip = docRender.getZip();
+            const newFiles = {};
+            if (finalZip.files["[Content_Types].xml"]) newFiles["[Content_Types].xml"] = finalZip.files["[Content_Types].xml"];
+            if (finalZip.files["_rels/.rels"]) newFiles["_rels/.rels"] = finalZip.files["_rels/.rels"];
+            for (let key in finalZip.files) {
+                if (key !== "[Content_Types].xml" && key !== "_rels/.rels") {
+                    newFiles[key] = finalZip.files[key];
+                }
+            }
+            finalZip.files = newFiles;
+            return finalZip.generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 9 } });
         };
 
         const previewSK = async (logItem) => {
