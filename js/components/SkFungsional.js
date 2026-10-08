@@ -769,7 +769,9 @@ export default {
 
             return docRender.getZip().generate({
                 type: "blob",
-                mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                compression: "DEFLATE",
+                compressionOptions: { level: 7 }
             });
         };
 

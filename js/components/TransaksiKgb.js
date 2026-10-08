@@ -1,4 +1,4 @@
-import { ref, reactive, watch, onMounted, computed, nextTick } from 'vue';
+﻿import { ref, reactive, watch, onMounted, computed, nextTick } from 'vue';
 import {
     db, auth, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, getCountFromServer,
     query, orderBy, limit, startAfter, where, serverTimestamp, onAuthStateChanged
@@ -805,7 +805,7 @@ export default {
                             const tmtOld = new Date(tmtNext);
                             tmtOld.setFullYear(tmtOld.getFullYear() - 2);
                             form.dasar_tmt = tmtOld.toISOString().split('T')[0];
-                        } catch(e) {}
+                        } catch (e) { }
                     }
 
                     // 4. Dasar Golongan = golongan saat ini (dari reminder)
@@ -848,12 +848,12 @@ export default {
                             // Ambil lokasi pemberi gaji jika ada
                             if (d.lokasi_pemberi_gaji) form.lokasi_pemberi_gaji = d.lokasi_pemberi_gaji;
                         }
-                    } catch(e) { console.error('Gagal fetch pegawai dari reminder:', e); }
+                    } catch (e) { console.error('Gagal fetch pegawai dari reminder:', e); }
 
                     // 10. Bersihkan reminderData setelah dipakai
                     store.reminderData = null;
                     showToast(`Data reminder ${form.nama || rd.nip} berhasil dimuat.`, 'info');
-                } else {           }
+                } else { }
 
                 checkBup();
             }
@@ -1007,7 +1007,7 @@ export default {
                 lokasi_pemberi_gaji: item.lokasi_pemberi_gaji || "Sungailiat",
                 sjp: item.status_jabatan_pejabat || ""
             });
-            return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+            return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 5 } });
         };
 
         const previewSK = async (item) => {
