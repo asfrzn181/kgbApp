@@ -613,7 +613,7 @@ export default {
                 JABATAN_PEJABAT: pjj, PANGKAT_PEJABAT: pjp, NAMA_PENGIRIM: pjn || "${nama_pengirim}", NIP_PENGIRIM: pjnip || "${nip_pengirim}",
                 DASAR_HUKUM: textHukum, MKGB: 'Masa Kerja Golongan untuk Kenaikan Gaji Berkala Berikutnya',
             });
-            return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", compression: "DEFLATE", compressionOptions: { level: 7 } });
+            return docRender.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
         };
 
         const previewSK = async (logItem) => {
