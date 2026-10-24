@@ -56,6 +56,13 @@ export default {
                     </router-link>
                 </li>
 
+                <li class="mt-3 text-muted small fw-bold text-uppercase ls-1 ps-2">Utilitas</li>
+                <li>
+                    <router-link to="/compress-pdf" class="nav-link link-dark" active-class="active bg-primary text-white" @click="handleMobileClick">
+                        <i class="bi bi-file-earmark-zip me-2"></i> Compress PDF
+                    </router-link>
+                </li>
+
                 <div v-if="store.isAdmin">
 
                                
