@@ -208,6 +208,12 @@ export default {
         const expandedRows = ref([]);
         const selectedNaskah = ref([]);
 
+        // --- STATE: MODAL EXPORT ---
+        const showExportModal = ref(false);
+        const exportStartDate = ref('');
+        const exportEndDate = ref('');
+        const isExporting = ref(false);
+
         const toggleRow = (id) => {
             if (expandedRows.value.includes(id)) expandedRows.value = expandedRows.value.filter(r => r !== id);
             else expandedRows.value.push(id);
@@ -528,7 +534,7 @@ export default {
                 form.tunjangan = '';
                 opsiTunjangan.value = 'non';
             }
-            
+
             // Auto-detect Kategori Jabatan (Keahlian / Keterampilan) berdasarkan nama jabatan
             if (jabatanItem.nama_jabatan) {
                 const nama = jabatanItem.nama_jabatan.toLowerCase();
@@ -1048,36 +1054,35 @@ export default {
         // ============================================================
         // EXPORT EXCEL
         // ============================================================
+        const openExportModal = () => {
+            // Default-kan ke filter tabel yang aktif (jika ada)
+            exportStartDate.value = filterStartDate.value || '';
+            exportEndDate.value = filterEndDate.value || '';
+            showExportModal.value = true;
+        };
+
         const downloadExcel = async () => {
             if (!window.XLSX) return showToast("Library Excel tidak tersedia", 'error');
+            isExporting.value = true;
 
             showToast("Menyiapkan data export...", 'info');
             try {
                 const collRef = collection(db, "usulan_sk_fungsional");
                 const baseConstraints = [];
-                const isFilteringDate = filterStartDate.value || filterEndDate.value;
 
-                if (tableSearch.value.trim()) {
-                    const term = tableSearch.value.trim();
-                    const isNumber = /^\d+$/.test(term);
-                    if (isNumber) {
-                        baseConstraints.push(orderBy("nip"));
-                        baseConstraints.push(where("nip", ">=", term));
-                        baseConstraints.push(where("nip", "<=", term + "\uf8ff"));
-                    } else {
-                        const termNama = term.toLowerCase();
-                        baseConstraints.push(orderBy("nama_search"));
-                        baseConstraints.push(where("nama_search", ">=", termNama));
-                        baseConstraints.push(where("nama_search", "<=", termNama + "\uf8ff"));
-                    }
-                } else if (isFilteringDate) {
-                    if (filterStartDate.value) {
-                        const startDate = new Date(filterStartDate.value);
+                // Gunakan filter dari modal export (bukan filter tabel)
+                const useStartDate = exportStartDate.value;
+                const useEndDate = exportEndDate.value;
+                const isFilteringExport = useStartDate || useEndDate;
+
+                if (isFilteringExport) {
+                    if (useStartDate) {
+                        const startDate = new Date(useStartDate);
                         startDate.setHours(0, 0, 0, 0);
                         baseConstraints.push(where("created_at", ">=", startDate));
                     }
-                    if (filterEndDate.value) {
-                        const endDate = new Date(filterEndDate.value);
+                    if (useEndDate) {
+                        const endDate = new Date(useEndDate);
                         endDate.setHours(23, 59, 59, 999);
                         baseConstraints.push(where("created_at", "<=", endDate));
                     }
@@ -1086,18 +1091,31 @@ export default {
                     baseConstraints.push(orderBy("created_at", "desc"));
                 }
 
-                // Ambil maksimal 1000 data agar tidak memberatkan browser
-                const q = query(collRef, ...baseConstraints, limit(1000));
-                const snap = await getDocs(q);
+                // Ambil semua data dengan pagination loop (batch 500) agar tidak ada data yang terlewat
+                const BATCH_SIZE = 500;
+                let allDocs = [];
+                let lastVisible = null;
 
-                if (snap.empty) {
+                while (true) {
+                    const batchConstraints = lastVisible
+                        ? [...baseConstraints, startAfter(lastVisible), limit(BATCH_SIZE)]
+                        : [...baseConstraints, limit(BATCH_SIZE)];
+
+                    const snap = await getDocs(query(collRef, ...batchConstraints));
+                    if (snap.empty) break;
+
+                    allDocs = allDocs.concat(snap.docs);
+                    lastVisible = snap.docs[snap.docs.length - 1];
+
+                    if (snap.docs.length < BATCH_SIZE) break; // Sudah halaman terakhir
+                }
+
+                if (allDocs.length === 0) {
                     return showToast("Tidak ada data untuk diexport", 'warning');
                 }
 
-                const exportData = snap.docs.map(d => {
+                const exportData = allDocs.map(d => {
                     const data = d.data();
-                    let tmtJabatan = data.tmt_jabatan || '-';
-                    let tmtPangkat = data.tmt_pangkat_golongan || '-';
 
                     return {
                         NIP: "'" + (data.nip || ''),
@@ -1105,12 +1123,19 @@ export default {
                         "UNIT KERJA": data.unit_kerja || '',
                         "PERANGKAT DAERAH": data.perangkat_daerah || '',
                         PANGKAT: data.pangkat_golongan || '',
-                        TMT_PANGKAT: tmtPangkat,
+                        TMT_PANGKAT: data.tmt_pangkat_golongan || '-',
+                        "NO PERTEK BKN": data.no_pertek_bkn || '-',
+                        "TGL PERTEK BKN": data.tgl_pertek_bkn || '-',
+                        "NO SERTIFIKAT KOMPETENSI": data.no_ser_kom || '-',
+                        "TGL SERTIFIKAT KOMPETENSI": data.tgl_ser_kom || '-',
                         JABATAN_LAMA: data.jabatan_lama || '-',
                         JABATAN_BARU: data.jabatan_baru || '',
-                        TMT_JABATAN: tmtJabatan,
+                        KATEGORI_JABATAN: data.kategori_jabatan || '-',
+                        TMT_JABATAN: data.tmt_jabatan || '-',
                         ANGKA_KREDIT: data.angka_kredit || '-',
                         TUNJANGAN: data.tunjangan || 0,
+                        "NAMA PEJABAT": data.pejabat_nama || '-',
+                        "JABATAN PEJABAT": data.pejabat_jabatan || '-',
                         STATUS: data.status || 'DRAFT',
                         NOMOR_SK: data.nomor_naskah || '-'
                     };
@@ -1118,13 +1143,17 @@ export default {
 
                 const ws = XLSX.utils.json_to_sheet(exportData);
                 const keys = Object.keys(exportData[0] || {});
-                ws['!cols'] = keys.map(() => ({ wch: 20 })); // Auto width
+                ws['!cols'] = keys.map(k => ({ wch: Math.max(k.length + 2, 20) }));
 
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "Data SK Fungsional");
 
-                XLSX.writeFile(wb, `Export_SK_Fungsional_${new Date().toISOString().split('T')[0]}.xlsx`);
-                showToast("File Excel berhasil diunduh", 'success');
+                const suffix = exportStartDate.value || exportEndDate.value
+                    ? `_${exportStartDate.value || 'awal'}_sd_${exportEndDate.value || 'akhir'}`
+                    : `_${new Date().toISOString().split('T')[0]}`;
+                XLSX.writeFile(wb, `Export_SK_Fungsional${suffix}.xlsx`);
+                showToast(`File Excel berhasil diunduh (${allDocs.length} data)`, 'success');
+                showExportModal.value = false;
 
             } catch (error) {
                 console.error("Export Error:", error);
@@ -1140,6 +1169,8 @@ export default {
                 } else {
                     showToast("Gagal export data: " + error.message, 'error');
                 }
+            } finally {
+                isExporting.value = false;
             }
         };
 
@@ -1179,11 +1210,15 @@ export default {
             form, listGolongan, listPejabat, pejabatTerpilih,
             opsiTunjangan,
 
+            // Export Excel
+            showExportModal, exportStartDate, exportEndDate, isExporting,
+            openExportModal, downloadExcel,
+
             // Actions
             fetchTable, goToPage,
             openModal, closeModal,
             simpanData, hapusData,
-            updateStatus, downloadExcel,
+            updateStatus,
             handleNipInput, handleGolonganChange, handlePejabatChange, handleJabatanBaruSelect,
 
             // Preview & Download

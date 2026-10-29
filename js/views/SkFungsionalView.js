@@ -89,7 +89,7 @@ export const TplMain = `
                     title="Download via Srikandi">
                     <i class="bi bi-robot me-2"></i> Download ({{ selectedNaskah.length }})
                 </button>
-                <button @click="downloadExcel()" class="btn btn-success shadow-sm text-nowrap px-3 py-2 fw-semibold" style="flex: 1;">
+                <button @click="openExportModal()" class="btn btn-success shadow-sm text-nowrap px-3 py-2 fw-semibold" style="flex: 1;">
                     <i class="bi bi-file-earmark-excel me-2"></i> Export Data
                 </button>
                 <button @click="openModal()" class="btn btn-primary shadow-sm text-nowrap px-4 py-2 fw-semibold" style="flex: 1; background-color: #5c35a5; border-color: #5c35a5;">
@@ -639,6 +639,90 @@ export const TplMain = `
                         <div id="docx-preview-container-fungsional" class="bg-white shadow-lg" style="width: 210mm; min-height: 297mm; padding: 20px;"></div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODAL EXPORT EXCEL                                             -->
+    <!-- ============================================================ -->
+    <div v-if="showExportModal" class="modal fade show d-block" style="background: rgba(0,0,0,0.55); backdrop-filter: blur(3px); z-index: 1070;" tabindex="-1" @click.self="showExportModal = false">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 460px;">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+
+                <!-- Header -->
+                <div class="modal-header border-0 pb-0 pt-4 px-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center justify-content-center rounded-3 bg-success bg-opacity-10" style="width:48px;height:48px;">
+                            <i class="bi bi-file-earmark-excel fs-4 text-success"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0">Export Excel</h5>
+                            <p class="text-muted small mb-0">SK Jabatan Fungsional</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" @click="showExportModal = false"></button>
+                </div>
+
+                <!-- Body -->
+                <div class="modal-body px-4 pt-3 pb-2">
+
+                    <!-- Pilihan rentang -->
+                    <label class="form-label small fw-bold text-secondary mb-2">
+                        <i class="bi bi-calendar-range me-1"></i>Filter Periode (Tanggal Input)
+                    </label>
+
+                    <div class="d-flex gap-2 align-items-center mb-1">
+                        <div class="flex-fill">
+                            <label class="form-label small text-muted mb-1">Dari Tanggal</label>
+                            <input type="date" v-model="exportStartDate" class="form-control form-control-sm">
+                        </div>
+                        <div class="pt-4 text-muted"><i class="bi bi-arrow-right"></i></div>
+                        <div class="flex-fill">
+                            <label class="form-label small text-muted mb-1">Sampai Tanggal</label>
+                            <input type="date" v-model="exportEndDate" class="form-control form-control-sm">
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-2 mb-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
+                            @click="exportStartDate = ''; exportEndDate = ''">
+                            <i class="bi bi-x-circle me-1"></i>Semua Data
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
+                            @click="(() => { const d = new Date(); exportEndDate = d.toISOString().split('T')[0]; d.setMonth(d.getMonth()-1); exportStartDate = d.toISOString().split('T')[0]; })()">
+                            <i class="bi bi-calendar-month me-1"></i>1 Bulan Terakhir
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
+                            @click="(() => { const d = new Date(); exportEndDate = d.toISOString().split('T')[0]; exportStartDate = d.getFullYear() + '-01-01'; })()">
+                            <i class="bi bi-calendar me-1"></i>Tahun Ini
+                        </button>
+                    </div>
+
+                    <!-- Info -->
+                    <div class="alert alert-light border small py-2 px-3 mb-0" style="border-radius:10px;">
+                        <i class="bi bi-info-circle text-primary me-1"></i>
+                        <span v-if="!exportStartDate && !exportEndDate">Akan mengexport <strong>semua data</strong> tanpa filter tanggal.</span>
+                        <span v-else>Export data dari
+                            <strong>{{ exportStartDate || '—' }}</strong> s/d <strong>{{ exportEndDate || '—' }}</strong>.
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="modal-footer border-0 px-4 pb-4 pt-2 gap-2">
+                    <button type="button" class="btn btn-light border px-4" @click="showExportModal = false">Batal</button>
+                    <button type="button" class="btn btn-success px-4 fw-semibold shadow-sm"
+                        @click="downloadExcel()" :disabled="isExporting">
+                        <span v-if="isExporting">
+                            <span class="spinner-border spinner-border-sm me-1"></span> Mengexport...
+                        </span>
+                        <span v-else>
+                            <i class="bi bi-download me-1"></i> Download Excel
+                        </span>
+                    </button>
+                </div>
+
             </div>
         </div>
     </div>
