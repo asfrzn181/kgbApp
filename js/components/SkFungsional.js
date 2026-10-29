@@ -1065,7 +1065,11 @@ export default {
             if (!window.XLSX) return showToast("Library Excel tidak tersedia", 'error');
             isExporting.value = true;
 
+            // Helper: yield ke event loop agar UI tidak freeze
+            const yieldToUI = () => new Promise(resolve => setTimeout(resolve, 0));
+
             showToast("Menyiapkan data export...", 'info');
+            await yieldToUI();
             try {
                 const collRef = collection(db, "usulan_sk_fungsional");
                 const baseConstraints = [];
@@ -1095,6 +1099,7 @@ export default {
                 const BATCH_SIZE = 500;
                 let allDocs = [];
                 let lastVisible = null;
+                let batchNum = 0;
 
                 while (true) {
                     const batchConstraints = lastVisible
@@ -1106,6 +1111,11 @@ export default {
 
                     allDocs = allDocs.concat(snap.docs);
                     lastVisible = snap.docs[snap.docs.length - 1];
+                    batchNum++;
+
+                    // Yield setiap batch agar UI tetap responsif saat mengambil banyak data
+                    showToast(`Mengambil data... (${allDocs.length} dokumen)`, 'info');
+                    await yieldToUI();
 
                     if (snap.docs.length < BATCH_SIZE) break; // Sudah halaman terakhir
                 }
@@ -1113,6 +1123,9 @@ export default {
                 if (allDocs.length === 0) {
                     return showToast("Tidak ada data untuk diexport", 'warning');
                 }
+
+                showToast(`Memproses ${allDocs.length} data...`, 'info');
+                await yieldToUI();
 
                 const exportData = allDocs.map(d => {
                     const data = d.data();
@@ -1141,9 +1154,15 @@ export default {
                     };
                 });
 
+                // Yield sebelum operasi XLSX yang berat agar UI tidak freeze
+                showToast(`Membuat file Excel...`, 'info');
+                await yieldToUI();
+
                 const ws = XLSX.utils.json_to_sheet(exportData);
                 const keys = Object.keys(exportData[0] || {});
                 ws['!cols'] = keys.map(k => ({ wch: Math.max(k.length + 2, 20) }));
+
+                await yieldToUI();
 
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "Data SK Fungsional");
