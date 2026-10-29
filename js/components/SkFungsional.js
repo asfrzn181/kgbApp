@@ -1061,12 +1061,81 @@ export default {
             showExportModal.value = true;
         };
 
+        // Yield yang benar-benar memberi kesempatan browser untuk repaint.
+        // Ada timeout cadangan karena requestAnimationFrame tidak jalan saat tab di background.
+        const yieldToUI = () => new Promise(resolve => {
+            const fallback = setTimeout(resolve, 60);
+            requestAnimationFrame(() => {
+                clearTimeout(fallback);
+                setTimeout(resolve, 0);
+            });
+        });
+
+        // Bangun file XLSX di Web Worker (tidak memblokir halaman).
+        // File worker: excel-worker.js, sejajar dengan firebase.js.
+        const buildExcelInWorker = (aoa, sheetName) => new Promise((resolve, reject) => {
+            let worker;
+            try {
+                worker = new Worker(new URL('../excel-worker.js', import.meta.url));
+            } catch (err) {
+                return reject(err);
+            }
+            worker.onmessage = (e) => {
+                worker.terminate();
+                if (e.data && e.data.ok) resolve(e.data.buffer);
+                else reject(new Error((e.data && e.data.error) || 'Worker gagal membuat Excel'));
+            };
+            worker.onerror = (err) => {
+                worker.terminate();
+                reject(new Error(err.message || 'Worker error'));
+            };
+            worker.postMessage({ aoa, sheetName });
+        });
+
+        // Cadangan jika Worker tidak bisa dipakai: bangun di main thread
+        const buildExcelOnMainThread = (aoa, sheetName) => {
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            ws['!cols'] = (aoa[0] || []).map(h => ({ wch: Math.max(String(h).length + 2, 20) }));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        };
+
+        const EXPORT_HEADERS = [
+            'NIP', 'NAMA', 'UNIT KERJA', 'PERANGKAT DAERAH', 'PANGKAT', 'TMT_PANGKAT',
+            'NO PERTEK BKN', 'TGL PERTEK BKN', 'NO SERTIFIKAT KOMPETENSI', 'TGL SERTIFIKAT KOMPETENSI',
+            'JABATAN_LAMA', 'JABATAN_BARU', 'KATEGORI_JABATAN', 'TMT_JABATAN', 'ANGKA_KREDIT',
+            'TUNJANGAN', 'NAMA PEJABAT', 'JABATAN PEJABAT', 'STATUS', 'NOMOR_SK'
+        ];
+
+        // Ubah satu dokumen Firestore menjadi satu baris array (ringan, tanpa menyimpan snapshot)
+        const docToRow = (data) => [
+            String(data.nip || ''), // string murni: otomatis jadi teks di Excel (tanpa tanda kutip)
+            data.nama || '',
+            data.unit_kerja || '',
+            data.perangkat_daerah || '',
+            data.pangkat_golongan || '',
+            data.tmt_pangkat_golongan || '-',
+            data.no_pertek_bkn || '-',
+            data.tgl_pertek_bkn || '-',
+            data.no_ser_kom || '-',
+            data.tgl_ser_kom || '-',
+            data.jabatan_lama || '-',
+            data.jabatan_baru || '',
+            data.kategori_jabatan || '-',
+            data.tmt_jabatan || '-',
+            data.angka_kredit || '-',
+            data.tunjangan || 0,
+            data.pejabat_nama || '-',
+            data.pejabat_jabatan || '-',
+            data.status || 'DRAFT',
+            data.nomor_naskah || '-'
+        ];
+
         const downloadExcel = async () => {
+            if (isExporting.value) return;
             if (!window.XLSX) return showToast("Library Excel tidak tersedia", 'error');
             isExporting.value = true;
-
-            // Helper: yield ke event loop agar UI tidak freeze
-            const yieldToUI = () => new Promise(resolve => setTimeout(resolve, 0));
 
             showToast("Menyiapkan data export...", 'info');
             await yieldToUI();
@@ -1077,29 +1146,24 @@ export default {
                 // Gunakan filter dari modal export (bukan filter tabel)
                 const useStartDate = exportStartDate.value;
                 const useEndDate = exportEndDate.value;
-                const isFilteringExport = useStartDate || useEndDate;
 
-                if (isFilteringExport) {
-                    if (useStartDate) {
-                        const startDate = new Date(useStartDate);
-                        startDate.setHours(0, 0, 0, 0);
-                        baseConstraints.push(where("created_at", ">=", startDate));
-                    }
-                    if (useEndDate) {
-                        const endDate = new Date(useEndDate);
-                        endDate.setHours(23, 59, 59, 999);
-                        baseConstraints.push(where("created_at", "<=", endDate));
-                    }
-                    baseConstraints.push(orderBy("created_at", "desc"));
-                } else {
-                    baseConstraints.push(orderBy("created_at", "desc"));
+                if (useStartDate) {
+                    const startDate = new Date(useStartDate);
+                    startDate.setHours(0, 0, 0, 0);
+                    baseConstraints.push(where("created_at", ">=", startDate));
                 }
+                if (useEndDate) {
+                    const endDate = new Date(useEndDate);
+                    endDate.setHours(23, 59, 59, 999);
+                    baseConstraints.push(where("created_at", "<=", endDate));
+                }
+                baseConstraints.push(orderBy("created_at", "desc"));
 
-                // Ambil semua data dengan pagination loop (batch 500) agar tidak ada data yang terlewat
+                // Ambil semua data per batch. Langsung diubah ke baris array
+                // (tidak menyimpan DocumentSnapshot, tidak ada concat berulang).
                 const BATCH_SIZE = 500;
-                let allDocs = [];
+                const rows = [];
                 let lastVisible = null;
-                let batchNum = 0;
 
                 while (true) {
                     const batchConstraints = lastVisible
@@ -1109,69 +1173,42 @@ export default {
                     const snap = await getDocs(query(collRef, ...batchConstraints));
                     if (snap.empty) break;
 
-                    allDocs = allDocs.concat(snap.docs);
+                    for (const d of snap.docs) rows.push(docToRow(d.data()));
                     lastVisible = snap.docs[snap.docs.length - 1];
-                    batchNum++;
 
-                    // Yield setiap batch agar UI tetap responsif saat mengambil banyak data
-                    showToast(`Mengambil data... (${allDocs.length} dokumen)`, 'info');
                     await yieldToUI();
-
-                    if (snap.docs.length < BATCH_SIZE) break; // Sudah halaman terakhir
+                    if (snap.docs.length < BATCH_SIZE) break; // sudah halaman terakhir
                 }
 
-                if (allDocs.length === 0) {
+                if (rows.length === 0) {
                     return showToast("Tidak ada data untuk diexport", 'warning');
                 }
 
-                showToast(`Memproses ${allDocs.length} data...`, 'info');
+                showToast(`Membuat file Excel (${rows.length} data)...`, 'info');
                 await yieldToUI();
 
-                const exportData = allDocs.map(d => {
-                    const data = d.data();
+                const aoa = [EXPORT_HEADERS, ...rows];
+                const sheetName = "Data SK Fungsional";
 
-                    return {
-                        NIP: "'" + (data.nip || ''),
-                        NAMA: data.nama || '',
-                        "UNIT KERJA": data.unit_kerja || '',
-                        "PERANGKAT DAERAH": data.perangkat_daerah || '',
-                        PANGKAT: data.pangkat_golongan || '',
-                        TMT_PANGKAT: data.tmt_pangkat_golongan || '-',
-                        "NO PERTEK BKN": data.no_pertek_bkn || '-',
-                        "TGL PERTEK BKN": data.tgl_pertek_bkn || '-',
-                        "NO SERTIFIKAT KOMPETENSI": data.no_ser_kom || '-',
-                        "TGL SERTIFIKAT KOMPETENSI": data.tgl_ser_kom || '-',
-                        JABATAN_LAMA: data.jabatan_lama || '-',
-                        JABATAN_BARU: data.jabatan_baru || '',
-                        KATEGORI_JABATAN: data.kategori_jabatan || '-',
-                        TMT_JABATAN: data.tmt_jabatan || '-',
-                        ANGKA_KREDIT: data.angka_kredit || '-',
-                        TUNJANGAN: data.tunjangan || 0,
-                        "NAMA PEJABAT": data.pejabat_nama || '-',
-                        "JABATAN PEJABAT": data.pejabat_jabatan || '-',
-                        STATUS: data.status || 'DRAFT',
-                        NOMOR_SK: data.nomor_naskah || '-'
-                    };
+                let buffer;
+                try {
+                    buffer = await buildExcelInWorker(aoa, sheetName);
+                } catch (workerErr) {
+                    console.warn("Web Worker gagal, pakai main thread:", workerErr);
+                    await yieldToUI();
+                    buffer = buildExcelOnMainThread(aoa, sheetName);
+                }
+
+                const blob = new Blob([buffer], {
+                    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 });
 
-                // Yield sebelum operasi XLSX yang berat agar UI tidak freeze
-                showToast(`Membuat file Excel...`, 'info');
-                await yieldToUI();
-
-                const ws = XLSX.utils.json_to_sheet(exportData);
-                const keys = Object.keys(exportData[0] || {});
-                ws['!cols'] = keys.map(k => ({ wch: Math.max(k.length + 2, 20) }));
-
-                await yieldToUI();
-
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Data SK Fungsional");
-
-                const suffix = exportStartDate.value || exportEndDate.value
+                const suffix = (exportStartDate.value || exportEndDate.value)
                     ? `_${exportStartDate.value || 'awal'}_sd_${exportEndDate.value || 'akhir'}`
                     : `_${new Date().toISOString().split('T')[0]}`;
-                XLSX.writeFile(wb, `Export_SK_Fungsional${suffix}.xlsx`);
-                showToast(`File Excel berhasil diunduh (${allDocs.length} data)`, 'success');
+                window.saveAs(blob, `Export_SK_Fungsional${suffix}.xlsx`);
+
+                showToast(`File Excel berhasil diunduh (${rows.length} data)`, 'success');
                 showExportModal.value = false;
 
             } catch (error) {
