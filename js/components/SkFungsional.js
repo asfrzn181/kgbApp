@@ -1072,21 +1072,30 @@ export default {
         });
 
         // Bangun file XLSX di Web Worker (tidak memblokir halaman).
-        // File worker: excel-worker.js, sejajar dengan firebase.js.
+        // File worker: js/excel-worker.js — path relatif terhadap root app (lokasi index.html).
         const buildExcelInWorker = (aoa, sheetName) => new Promise((resolve, reject) => {
             let worker;
             try {
-                worker = new Worker(new URL('../excel-worker.js', import.meta.url));
+                // Cari base URL root app: hapus nama file dari pathname jika ada (misal /kgbApp/index.html -> /kgbApp/)
+                const pathname = window.location.pathname;
+                const basePath = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
+                const workerUrl = window.location.origin + basePath + 'js/excel-worker.js';
+                worker = new Worker(workerUrl);
             } catch (err) {
                 return reject(err);
             }
             worker.onmessage = (e) => {
                 worker.terminate();
                 if (e.data && e.data.ok) resolve(e.data.buffer);
-                else reject(new Error((e.data && e.data.error) || 'Worker gagal membuat Excel'));
+                else {
+                    const msg = (e.data && e.data.error) || 'Worker gagal membuat Excel';
+                    console.error('[Excel Worker] Error dari worker:', msg);
+                    reject(new Error(msg));
+                }
             };
             worker.onerror = (err) => {
                 worker.terminate();
+                console.error('[Excel Worker] Worker onerror:', err.message, err);
                 reject(new Error(err.message || 'Worker error'));
             };
             worker.postMessage({ aoa, sheetName });
@@ -1194,7 +1203,8 @@ export default {
                 try {
                     buffer = await buildExcelInWorker(aoa, sheetName);
                 } catch (workerErr) {
-                    console.warn("Web Worker gagal, pakai main thread:", workerErr);
+                    console.warn("[Excel Worker] Gagal, fallback ke main thread:", workerErr.message);
+                    showToast("Worker tidak tersedia, proses di main thread (mungkin lebih lambat)...", 'warning');
                     await yieldToUI();
                     buffer = buildExcelOnMainThread(aoa, sheetName);
                 }

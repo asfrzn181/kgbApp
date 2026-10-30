@@ -1,7 +1,8 @@
 // excel-worker.js
-// Membuat file XLSX di Web Worker agar halaman utama tidak freeze.
-// Letakkan file ini sejajar dengan firebase.js (satu folder di atas file komponen).
-importScripts('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+// Membuat file XLSX di Web Worker agar halaman utama tidak freeze/crash.
+// File ini berada di js/excel-worker.js; XLSX diambil dari vendor lokal.
+// importScripts path relatif terhadap URL worker: js/ -> ../assets/vendor/
+importScripts('../assets/vendor/xlsx.full.min.js');
 
 self.onmessage = (e) => {
     try {
