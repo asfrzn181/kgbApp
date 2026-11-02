@@ -456,8 +456,9 @@ export default {
                 });
                 showToast(newStatus === 'SELESAI' ? "Ditandai Selesai" : "Dikembalikan ke Draft", "success");
             } catch (e) {
+                console.error("Gagal update status SK Fungsional:", e);
                 item.status = oldStatus;
-                showToast("Gagal update status", "error");
+                showToast("Gagal update status: " + (e.message || "Izin ditolak"), "error");
             }
         };
 

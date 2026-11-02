@@ -52,7 +52,11 @@ export default {
                     </router-link>
 
                     <router-link to="/laporan" class="nav-link link-dark" active-class="active bg-primary text-white" @click="handleMobileClick">
-                        <i class="bi bi-printer me-2"></i> Laporan Rekap
+                        <i class="bi bi-printer me-2"></i> Laporan Rekap KGB
+                    </router-link>
+
+                    <router-link to="/laporan-jabfung" class="nav-link link-dark" active-class="active text-white" style="--bs-nav-link-color: #5c35a5;" @click="handleMobileClick">
+                        <i class="bi bi-file-earmark-bar-graph me-2"></i> Laporan Rekap Jabfung
                     </router-link>
                 </li>
 

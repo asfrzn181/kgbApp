@@ -58,7 +58,10 @@ service cloud.firestore {
     match /usulan_sk_fungsional/{docId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && (resource.data.created_by == request.auth.uid || isAdmin());
+      // Update (edit data & centang selesai): semua user login boleh
+      allow update: if isAuthenticated();
+      // Hapus: hanya pemilik asli atau admin
+      allow delete: if isAuthenticated() && (resource.data.created_by == request.auth.uid || isAdmin());
     }
     
     // E. MODUL PENOMORAN

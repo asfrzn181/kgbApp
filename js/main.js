@@ -22,6 +22,7 @@ import Penomoran from './components/Penomoran.js';
 import PenomoranInpassing from './components/PenomoranInpassing.js';
 import CekDuplikat from './components/CekDuplikat.js';
 import SkFungsional from './components/SkFungsional.js';
+import LaporanJabfung from './components/LaporanJabfung.js';
 import CompressPdf from './components/CompressPdf.js';
 
 // --- KONFIGURASI ROUTER ---
@@ -33,6 +34,7 @@ const routes = [
     { path: '/laporan', component: Laporan },
     { path: '/duplikat', component: CekDuplikat },
     { path: '/sk-fungsional', component: SkFungsional },
+    { path: '/laporan-jabfung', component: LaporanJabfung },
     { path: '/compress-pdf', component: CompressPdf },
     { path: '/master/pegawai', component: MasterPegawai },
     { path: '/master/gaji', component: MasterGaji },
