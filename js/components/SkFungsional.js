@@ -1071,32 +1071,62 @@ export default {
             });
         });
 
-        // Bangun file XLSX di Web Worker (tidak memblokir halaman).
-        // File worker: js/excel-worker.js — path relatif terhadap root app (lokasi index.html).
+        // Bangun file XLSX di Web Worker via Blob URL.
+        // Pendekatan ini tidak butuh file eksternal — worker code di-embed sebagai string.
+        // Tidak ada masalah path, CORS, atau MIME type.
         const buildExcelInWorker = (aoa, sheetName) => new Promise((resolve, reject) => {
+            // Ambil URL XLSX dari tag <script> yang sudah di-load di halaman
+            const xlsxScript = Array.from(document.querySelectorAll('script[src]'))
+                .find(s => s.src.includes('xlsx'));
+            if (!xlsxScript) {
+                return reject(new Error('Script XLSX tidak ditemukan di halaman'));
+            }
+            const xlsxSrc = xlsxScript.src;
+
+            const workerCode = `
+importScripts(${JSON.stringify(xlsxSrc)});
+self.onmessage = function(e) {
+    try {
+        var aoa = e.data.aoa;
+        var sheetName = e.data.sheetName;
+        var ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = (aoa[0] || []).map(function(h) { return { wch: Math.max(String(h).length + 2, 20) }; });
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Sheet1');
+        var out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        self.postMessage({ ok: true, buffer: out }, [out.buffer]);
+    } catch(err) {
+        self.postMessage({ ok: false, error: err.message || String(err) });
+    }
+};`;
+
+            let blobUrl;
             let worker;
             try {
-                // Cari base URL root app: hapus nama file dari pathname jika ada (misal /kgbApp/index.html -> /kgbApp/)
-                const pathname = window.location.pathname;
-                const basePath = pathname.endsWith('/') ? pathname : pathname.substring(0, pathname.lastIndexOf('/') + 1);
-                const workerUrl = window.location.origin + basePath + 'js/excel-worker.js';
-                worker = new Worker(workerUrl);
+                const blob = new Blob([workerCode], { type: 'application/javascript' });
+                blobUrl = URL.createObjectURL(blob);
+                worker = new Worker(blobUrl);
             } catch (err) {
-                return reject(err);
+                if (blobUrl) URL.revokeObjectURL(blobUrl);
+                return reject(new Error('Tidak bisa buat Blob Worker: ' + err.message));
             }
+
             worker.onmessage = (e) => {
                 worker.terminate();
-                if (e.data && e.data.ok) resolve(e.data.buffer);
-                else {
+                URL.revokeObjectURL(blobUrl);
+                if (e.data && e.data.ok) {
+                    resolve(e.data.buffer);
+                } else {
                     const msg = (e.data && e.data.error) || 'Worker gagal membuat Excel';
-                    console.error('[Excel Worker] Error dari worker:', msg);
+                    console.error('[Excel Worker] Error:', msg);
                     reject(new Error(msg));
                 }
             };
             worker.onerror = (err) => {
                 worker.terminate();
-                console.error('[Excel Worker] Worker onerror:', err.message, err);
-                reject(new Error(err.message || 'Worker error'));
+                URL.revokeObjectURL(blobUrl);
+                console.error('[Excel Worker] onerror:', err.message, err);
+                reject(new Error(err.message || 'Worker error tidak diketahui'));
             };
             worker.postMessage({ aoa, sheetName });
         });
